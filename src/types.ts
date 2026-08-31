@@ -48,6 +48,8 @@ export type Explanation = {
 };
 export type Settings = {
   apiKey: string;
+  apiKeyValidated: boolean;
+  showSentencesTab: boolean;
   apiUrl: string;
   model: string;
   ttsProvider: string;

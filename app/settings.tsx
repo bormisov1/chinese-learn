@@ -3,6 +3,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -13,6 +14,7 @@ import { Header, shell } from "@/ui";
 import { Button } from "@/ui";
 import { router } from "expo-router";
 import { Settings as SettingsData } from "@/types";
+import { validateApiKey } from "@/deepseek";
 import {
   getTtsProvider,
   speakMandarin,
@@ -22,6 +24,9 @@ import {
 
 export default function Settings() {
   const { data, patch } = useStore();
+  const [keyValidation, setKeyValidation] = useState<
+    "idle" | "checking" | "valid" | "invalid" | "error"
+  >(data.settings.apiKeyValidated ? "valid" : "idle");
   const [sort, setSort] = useState<{
     column: "word" | "sentences" | "cards";
     direction: 1 | -1;
@@ -30,6 +35,49 @@ export default function Settings() {
     key: K,
     value: SettingsData[K],
   ) => patch((d) => ({ ...d, settings: { ...d.settings, [key]: value } }));
+  const updateApiKey = (apiKey: string) => {
+    setKeyValidation("idle");
+    patch((d) => ({
+      ...d,
+      settings: {
+        ...d.settings,
+        apiKey,
+        apiKeyValidated: false,
+        showSentencesTab: false,
+      },
+    }));
+  };
+  useEffect(() => {
+    const apiKey = data.settings.apiKey.trim();
+    if (!apiKey || data.settings.apiKeyValidated) return;
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setKeyValidation("checking");
+      try {
+        await validateApiKey(apiKey, controller.signal);
+        patch((d) =>
+          d.settings.apiKey.trim() === apiKey
+            ? {
+                ...d,
+                settings: { ...d.settings, apiKeyValidated: true },
+              }
+            : d,
+        );
+        setKeyValidation("valid");
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setKeyValidation(
+          error instanceof Error && error.message.startsWith("Invalid")
+            ? "invalid"
+            : "error",
+        );
+      }
+    }, 800);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [data.settings.apiKey, data.settings.apiKeyValidated]);
   const now = Date.now();
   const toggleSort = (column: typeof sort.column) =>
     setSort((current) => ({
@@ -82,11 +130,16 @@ export default function Settings() {
         title="Settings"
         subtitle="Your key and study data stay in this app's local storage."
       />
-      <View style={shell.panel}>
+      <View
+        style={[
+          shell.panel,
+          data.settings.apiKeyValidated && styles.deepSeekValidated,
+        ]}
+      >
         <Field
           label="DEEPSEEK API KEY"
           value={data.settings.apiKey}
-          onChangeText={(v) => update("apiKey", v)}
+          onChangeText={updateApiKey}
           secureTextEntry
           placeholder="sk-…"
         />
@@ -100,6 +153,38 @@ export default function Settings() {
           value={data.settings.model}
           onChangeText={(v) => update("model", v)}
         />
+        {data.settings.apiKey ? (
+          <Text
+            style={[
+              styles.validationStatus,
+              data.settings.apiKeyValidated && styles.validationSuccess,
+              keyValidation === "invalid" && styles.error,
+            ]}
+          >
+            {data.settings.apiKeyValidated
+              ? "✓ DeepSeek API key validated"
+              : keyValidation === "checking"
+                ? "Validating DeepSeek API key…"
+                : keyValidation === "invalid"
+                  ? "Invalid DeepSeek API key."
+                  : keyValidation === "error"
+                    ? "Could not validate key. Check network and try editing it again."
+                    : "Waiting to validate…"}
+          </Text>
+        ) : null}
+        {data.settings.apiKeyValidated ? (
+          <View style={styles.sentencesToggle}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.privacyTitle}>Sentences menu</Text>
+              <Text style={styles.help}>Show Sentences in the bottom menu.</Text>
+            </View>
+            <Switch
+              value={data.settings.showSentencesTab}
+              onValueChange={(value) => update("showSentencesTab", value)}
+              trackColor={{ false: colors.line, true: colors.green }}
+            />
+          </View>
+        ) : null}
       </View>
       <TtsSettings settings={data.settings} update={update} />
       <View style={styles.privacy}>
@@ -112,18 +197,22 @@ export default function Settings() {
           </Text>
         </View>
       </View>
+      <View style={styles.settingsAction}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.privacyTitle}>Import vocabulary</Text>
+          <Text style={styles.help}>
+            Add words from screenshots, HSK lists, or a QR backup.
+          </Text>
+        </View>
+        <Button
+          secondary
+          label="Import"
+          icon="scan-outline"
+          onPress={() => router.push("/import")}
+        />
+      </View>
       <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 12,
-          marginTop: 12,
-          padding: 17,
-          backgroundColor: colors.card,
-          borderWidth: 1,
-          borderColor: colors.line,
-          borderRadius: 15,
-        }}
+        style={styles.settingsAction}
       >
         <View style={{ flex: 1 }}>
           <Text style={styles.privacyTitle}>Transfer vocabulary + SRS</Text>
@@ -321,6 +410,28 @@ function Field(props: {
 }
 
 const styles = StyleSheet.create({
+  deepSeekValidated: { backgroundColor: "#EAF7ED", borderColor: "#AED8B7" },
+  validationStatus: { color: colors.muted, marginTop: -4, marginBottom: 14 },
+  validationSuccess: { color: colors.green, fontWeight: "700" },
+  sentencesToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    borderTopWidth: 1,
+    borderTopColor: "#C8E4CE",
+    paddingTop: 16,
+  },
+  settingsAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 12,
+    padding: 17,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 15,
+  },
   ttsPanel: { marginTop: 14 },
   ttsLabel: { marginTop: 18 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },

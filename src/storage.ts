@@ -12,6 +12,8 @@ export const emptyStore: StoreData = {
   cardRound: 0,
   settings: {
     apiKey: "",
+    apiKeyValidated: false,
+    showSentencesTab: false,
     apiUrl: "https://api.deepseek.com/chat/completions",
     model: "deepseek-chat",
     ttsProvider: "browser",

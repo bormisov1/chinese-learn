@@ -1,6 +1,15 @@
 import { Evaluation, Explanation, Sentence, Settings, Word } from './types';
 import { evaluateChinesePrompt, evaluatePrompt, explainPrompt, generatePrompt } from './prompts';
 
+export async function validateApiKey(apiKey: string, signal?: AbortSignal) {
+  const response = await fetch('https://api.deepseek.com/user/balance', {
+    headers: { Authorization: `Bearer ${apiKey}` },
+    signal,
+  });
+  if (response.status === 401) throw new Error('Invalid DeepSeek API key.');
+  if (!response.ok) throw new Error(`DeepSeek validation error ${response.status}.`);
+}
+
 async function call<T>(settings: Settings, system: string, user: string): Promise<T> {
   if (!settings.apiKey) throw new Error('Add your DeepSeek API key in Settings.');
   let response: Response;
