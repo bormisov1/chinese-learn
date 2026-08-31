@@ -8,10 +8,25 @@ export const DAY = 86_400_000;
 const retentionDays = [1, 3, 7, 14, 30, 60];
 
 export function fillActivePool(words: Word[], at = Date.now()): Word[] {
-  const activeCount = words.filter((word) => word.cardActive).length;
-  if (activeCount >= ACTIVE_CARD_LIMIT) return words;
+  const active = words
+    .filter((word) => word.cardActive)
+    .sort(
+      (a, b) =>
+        (a.cardIntroducedAt ?? a.createdAt) -
+          (b.cardIntroducedAt ?? b.createdAt) ||
+        a.createdAt - b.createdAt,
+    );
+  let normalized = words;
+  if (active.length > ACTIVE_CARD_LIMIT) {
+    const keep = new Set(active.slice(0, ACTIVE_CARD_LIMIT).map((word) => word.id));
+    normalized = words.map((word) =>
+      word.cardActive && !keep.has(word.id) ? { ...word, cardActive: false } : word,
+    );
+  }
+  const activeCount = normalized.filter((word) => word.cardActive).length;
+  if (activeCount >= ACTIVE_CARD_LIMIT) return normalized;
   const vacancies = ACTIVE_CARD_LIMIT - activeCount;
-  const candidates = words
+  const candidates = normalized
     .filter((word) => !word.cardActive && word.cardSrsLevel < CARD_GRADUATION_LEVEL)
     .sort(
       (a, b) =>
@@ -20,7 +35,7 @@ export function fillActivePool(words: Word[], at = Date.now()): Word[] {
     )
     .slice(0, vacancies);
   const selected = new Set(candidates.map((word) => word.id));
-  return words.map((word, index) =>
+  return normalized.map((word, index) =>
     selected.has(word.id)
       ? {
           ...word,
