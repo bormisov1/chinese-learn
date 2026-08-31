@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useStore } from "@/context";
 import { colors } from "@/theme";
 import { Button, Header, shell, SpeakerButton } from "@/ui";
-import { Sentence, Settings } from "@/types";
+import { Sentence, Settings, Word } from "@/types";
 import { copyText } from "@/clipboard";
 import {
   ACTIVE_CARD_LIMIT,
@@ -13,7 +13,8 @@ import {
   selectRound,
 } from "@/card-srs";
 
-type Phase = "ready" | "studying" | "complete";
+type Phase = "ready" | "studying" | "celebrating" | "complete";
+type Graduation = { learned: Word; replacement?: Word };
 
 export default function Cards() {
   const { data, patch, generating, generateBatch } = useStore();
@@ -23,7 +24,9 @@ export default function Cards() {
     [phase, setPhase] = useState<Phase>("ready"),
     [flipped, setFlipped] = useState(false),
     [revealed, setRevealed] = useState(false),
-    [mistakeIds, setMistakeIds] = useState<string[]>([]);
+    [mistakeIds, setMistakeIds] = useState<string[]>([]),
+    [graduations, setGraduations] = useState<Graduation[]>([]),
+    [roundEndsAfterCelebration, setRoundEndsAfterCelebration] = useState(false);
   const total = data.words.length;
   const upcoming = useMemo(
     () => selectRound(data.words, data.cardRound + 1),
@@ -72,6 +75,8 @@ export default function Cards() {
     setRoundIds(words.map((w) => w.id));
     setPosition(0);
     setMistakeIds([]);
+    setGraduations([]);
+    setRoundEndsAfterCelebration(false);
     setFlipped(false);
     setRevealed(false);
     setPhase("studying");
@@ -84,15 +89,44 @@ export default function Cards() {
   const grade = (correct: boolean) => {
     if (!word) return;
     const reviewedAt = Date.now();
+    const updatedWords = gradeCard(
+      data.words,
+      word.id,
+      correct,
+      studyRound,
+      reviewedAt,
+    );
     patch((d) => ({
       ...d,
       words: gradeCard(d.words, word.id, correct, studyRound, reviewedAt),
     }));
     if (!correct) setMistakeIds((ids) => [...ids, word.id]);
-    if (position + 1 === roundWords.length) setPhase("complete");
+    const learned = updatedWords.find(
+      (item) => item.id === word.id && word.cardActive && !item.cardActive,
+    );
+    const replacement = updatedWords.find(
+      (item) =>
+        item.id !== word.id &&
+        item.cardActive &&
+        !data.words.find((before) => before.id === item.id)?.cardActive,
+    );
+    const roundComplete = position + 1 === roundWords.length;
+    if (learned) {
+      setGraduations((items) => [...items, { learned, replacement }]);
+      setRoundEndsAfterCelebration(roundComplete);
+      setPhase("celebrating");
+    } else if (roundComplete) setPhase("complete");
     else setPosition((p) => p + 1);
     setFlipped(false);
     setRevealed(false);
+  };
+  const continueAfterCelebration = () => {
+    if (roundEndsAfterCelebration) setPhase("complete");
+    else {
+      setPosition((p) => p + 1);
+      setPhase("studying");
+    }
+    setRoundEndsAfterCelebration(false);
   };
 
   if (phase === "ready")
@@ -119,6 +153,25 @@ export default function Cards() {
       </ScrollView>
     );
 
+  if (phase === "celebrating") {
+    const graduation = graduations[graduations.length - 1];
+    return (
+      <ScrollView style={shell.page} contentContainerStyle={shell.content}>
+        <Header
+          eyebrow={`Round ${studyRound} · Milestone`}
+          title="Word learned!"
+          subtitle="A word graduated from your active card pool."
+        />
+        <GraduationCelebration graduation={graduation} />
+        <Button
+          label={roundEndsAfterCelebration ? "See round results" : "Continue round"}
+          icon="arrow-forward"
+          onPress={continueAfterCelebration}
+        />
+      </ScrollView>
+    );
+  }
+
   if (phase === "complete") {
     const mistaken = mistakeIds
       .map((id) => data.words.find((w) => w.id === id))
@@ -132,6 +185,13 @@ export default function Cards() {
           }
           subtitle={`${roundWords.length - mistaken.length} correct · ${mistaken.length} mistaken`}
         />
+        {graduations.map((graduation) => (
+          <GraduationCelebration
+            key={graduation.learned.id}
+            graduation={graduation}
+            compact
+          />
+        ))}
         <View style={styles.results}>
           {mistaken.length ? (
             <>
@@ -258,6 +318,37 @@ export default function Cards() {
   );
 }
 
+function GraduationCelebration({
+  graduation,
+  compact = false,
+}: {
+  graduation: Graduation;
+  compact?: boolean;
+}) {
+  return (
+    <View style={[styles.celebration, compact && styles.celebrationCompact]}>
+      <Text style={styles.confetti}>🎉</Text>
+      <Text style={styles.celebrationTitle}>LEARNED</Text>
+      <Text style={styles.learnedHanzi}>{graduation.learned.hanzi}</Text>
+      <Text style={styles.learnedPinyin}>{graduation.learned.pinyin}</Text>
+      <Text style={styles.learnedRussian}>{graduation.learned.russian}</Text>
+      {graduation.replacement ? (
+        <View style={styles.replacement}>
+          <Text style={styles.replacementLabel}>NEW IN THE ACTIVE POOL</Text>
+          <Text style={styles.replacementWord}>
+            {graduation.replacement.hanzi} · {graduation.replacement.pinyin}
+          </Text>
+          <Text style={styles.replacementRussian}>
+            {graduation.replacement.russian}
+          </Text>
+        </View>
+      ) : (
+        <Text style={styles.deckComplete}>No queued word is waiting to replace it.</Text>
+      )}
+    </View>
+  );
+}
+
 function ExampleRow({
   sentence,
   settings,
@@ -293,6 +384,49 @@ function ExampleRow({
 }
 
 const styles = StyleSheet.create({
+  celebration: {
+    marginBottom: 16,
+    borderRadius: 22,
+    backgroundColor: "#FFF4D6",
+    borderWidth: 1,
+    borderColor: "#E8C76A",
+    padding: 26,
+    alignItems: "center",
+  },
+  celebrationCompact: { padding: 20 },
+  confetti: { fontSize: 42, marginBottom: 8 },
+  celebrationTitle: {
+    color: colors.coral,
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1.8,
+  },
+  learnedHanzi: { color: colors.ink, fontSize: 54, fontWeight: "800", marginTop: 8 },
+  learnedPinyin: { color: colors.green, fontSize: 18, fontWeight: "700" },
+  learnedRussian: {
+    color: colors.ink,
+    fontSize: 18,
+    fontWeight: "600",
+    textAlign: "center",
+    marginTop: 8,
+  },
+  replacement: {
+    width: "100%",
+    marginTop: 22,
+    paddingTop: 18,
+    borderTopWidth: 1,
+    borderTopColor: "#E8C76A",
+    alignItems: "center",
+  },
+  replacementLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 1.4,
+  },
+  replacementWord: { color: colors.ink, fontSize: 22, fontWeight: "800", marginTop: 7 },
+  replacementRussian: { color: colors.muted, textAlign: "center", marginTop: 4 },
+  deckComplete: { color: colors.muted, textAlign: "center", marginTop: 20 },
   hanziRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   exampleChinese: {
     flex: 1,
