@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "Hanzi Deck",
+    "slug": "hanzi-deck",
+    "scheme": "hanzideck",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "plugins": ["expo-router", ["expo-image-picker", { "photosPermission": "Choose vocabulary screenshots to import." }]],
+    "web": { "bundler": "metro", "output": "single" }
+  }
+}
