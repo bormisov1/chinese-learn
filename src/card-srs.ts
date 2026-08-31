@@ -8,14 +8,17 @@ export const DAY = 86_400_000;
 const retentionDays = [1, 3, 7, 14, 30, 60];
 
 function activePriority(a: Word, b: Word) {
-  const aIntroduced = Boolean(a.cardIntroducedAt);
-  const bIntroduced = Boolean(b.cardIntroducedAt);
+  const aAttempts = a.cardSrsCorrect + a.cardSrsIncorrect;
+  const bAttempts = b.cardSrsCorrect + b.cardSrsIncorrect;
+  const aDifficulty = (a.cardSrsCorrect + 1) / (aAttempts + 2);
+  const bDifficulty = (b.cardSrsCorrect + 1) / (bAttempts + 2);
   return (
-    Number(bIntroduced) - Number(aIntroduced) ||
-    (aIntroduced ? a.cardSrsLevel - b.cardSrsLevel : 0) ||
+    Number(Boolean(b.cardActive)) - Number(Boolean(a.cardActive)) ||
+    aDifficulty - bDifficulty ||
+    bAttempts - aAttempts ||
+    a.cardSrsLevel - b.cardSrsLevel ||
     (b.cardLastIncorrectAt ?? 0) - (a.cardLastIncorrectAt ?? 0) ||
     (b.cardLapses ?? 0) - (a.cardLapses ?? 0) ||
-    Number(Boolean(b.cardActive)) - Number(Boolean(a.cardActive)) ||
     (a.cardIntroducedAt ?? a.createdAt) -
       (b.cardIntroducedAt ?? b.createdAt) ||
     a.createdAt - b.createdAt
@@ -53,7 +56,7 @@ export function migrateCardPool(words: Word[]): Word[] {
         word.cardIntroducedAt ?? (hadCardActivity ? word.createdAt : undefined),
       cardActive:
         word.cardActive ??
-        (hadCardActivity && word.cardSrsLevel < CARD_GRADUATION_LEVEL),
+        false,
       cardLastStudiedRound: word.cardLastStudiedRound,
       cardLastIncorrectAt:
         word.cardLastIncorrectAt ??
