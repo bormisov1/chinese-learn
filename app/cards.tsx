@@ -22,6 +22,7 @@ export default function Cards() {
     [position, setPosition] = useState(0),
     [phase, setPhase] = useState<Phase>("ready"),
     [flipped, setFlipped] = useState(false),
+    [revealed, setRevealed] = useState(false),
     [mistakeIds, setMistakeIds] = useState<string[]>([]);
   const total = data.words.length;
   const upcoming = useMemo(
@@ -72,6 +73,7 @@ export default function Cards() {
     setPosition(0);
     setMistakeIds([]);
     setFlipped(false);
+    setRevealed(false);
     setPhase("studying");
   };
   const startRound = () => begin(upcoming, data.cardRound + 1);
@@ -90,6 +92,7 @@ export default function Cards() {
     if (position + 1 === roundWords.length) setPhase("complete");
     else setPosition((p) => p + 1);
     setFlipped(false);
+    setRevealed(false);
   };
 
   if (phase === "ready")
@@ -181,7 +184,10 @@ export default function Cards() {
       </View>
       <Pressable
         style={[styles.card, flipped && styles.back]}
-        onPress={() => setFlipped(true)}
+        onPress={() => {
+          if (!revealed) setRevealed(true);
+          setFlipped((value) => !value);
+        }}
       >
         {!flipped ? (
           <>
@@ -223,7 +229,7 @@ export default function Cards() {
         )}
       </Pressable>
       <View style={styles.controls}>
-        {flipped ? (
+        {revealed ? (
           <>
             <Button
               secondary
@@ -241,7 +247,10 @@ export default function Cards() {
           <Button
             label="Reveal answer"
             icon="eye-outline"
-            onPress={() => setFlipped(true)}
+            onPress={() => {
+              setRevealed(true);
+              setFlipped(true);
+            }}
           />
         )}
       </View>
