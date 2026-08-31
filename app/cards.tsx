@@ -333,12 +333,18 @@ function GraduationCelebration({
       <Text style={styles.learnedPinyin}>{graduation.learned.pinyin}</Text>
       <Text style={styles.learnedRussian}>{graduation.learned.russian}</Text>
       {graduation.replacement ? (
-        <View style={styles.replacement}>
+        <View
+          style={[
+            styles.replacement,
+            compact && styles.replacementCompact,
+          ]}
+        >
           <Text style={styles.replacementLabel}>NEW IN THE ACTIVE POOL</Text>
-          <Text style={styles.replacementWord}>
-            {graduation.replacement.hanzi} · {graduation.replacement.pinyin}
-          </Text>
-          <Text style={styles.replacementRussian}>
+          <Text style={styles.confetti}>👀</Text>
+          <Text style={styles.learnTitle}>LEARN</Text>
+          <Text style={styles.learnedHanzi}>{graduation.replacement.hanzi}</Text>
+          <Text style={styles.learnedPinyin}>{graduation.replacement.pinyin}</Text>
+          <Text style={styles.learnedRussian}>
             {graduation.replacement.russian}
           </Text>
         </View>
@@ -392,6 +398,7 @@ const styles = StyleSheet.create({
     borderColor: "#E8C76A",
     padding: 26,
     alignItems: "center",
+    overflow: "hidden",
   },
   celebrationCompact: { padding: 20 },
   confetti: { fontSize: 42, marginBottom: 8 },
@@ -411,21 +418,33 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   replacement: {
-    width: "100%",
+    alignSelf: "stretch",
     marginTop: 22,
-    paddingTop: 18,
+    marginHorizontal: -26,
+    marginBottom: -26,
+    paddingVertical: 18,
+    paddingHorizontal: 12,
+    borderBottomLeftRadius: 21,
+    borderBottomRightRadius: 21,
+    backgroundColor: "#EAF6FF",
     borderTopWidth: 1,
-    borderTopColor: "#E8C76A",
+    borderColor: "#B9DDF5",
     alignItems: "center",
   },
+  replacementCompact: { marginHorizontal: -20, marginBottom: -20 },
   replacementLabel: {
     color: colors.muted,
     fontSize: 10,
     fontWeight: "800",
     letterSpacing: 1.4,
+    marginBottom: 10,
   },
-  replacementWord: { color: colors.ink, fontSize: 22, fontWeight: "800", marginTop: 7 },
-  replacementRussian: { color: colors.muted, textAlign: "center", marginTop: 4 },
+  learnTitle: {
+    color: colors.green,
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1.8,
+  },
   deckComplete: { color: colors.muted, textAlign: "center", marginTop: 20 },
   hanziRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   exampleChinese: {
