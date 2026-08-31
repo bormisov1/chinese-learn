@@ -17,7 +17,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const importWords = (items: ImportedWord[]) => {
     const existing = new Set(data.words.map(w => w.hanzi));
     const fresh = items.filter(w => !existing.has(w.hanzi));
-    if (fresh.length) setData(d => ({ ...d, words: fillActivePool([...d.words, ...fresh.map(w => ({ ...w, id: id(), exampleCount: 0, wordShownCount: 0, createdAt: Date.now(), srsLevel: 0, srsCorrect: 0, srsIncorrect: 0, srsDueAt: 0, cardSrsLevel: 0, cardSrsCorrect: 0, cardSrsIncorrect: 0, cardSrsDueAt: 0 }))]) }));
+    if (fresh.length) setData(d => ({ ...d, words: fillActivePool([...d.words, ...fresh.map(w => ({ ...w, id: id(), exampleCount: 0, wordShownCount: 0, createdAt: Date.now(), srsLevel: 0, srsCorrect: 0, srsIncorrect: 0, srsDueAt: 0, cardSrsLevel: 0, cardSrsCorrect: 0, cardSrsIncorrect: 0, cardSrsDueAt: 0, cardLapses: 0 }))]) }));
     return fresh.length;
   };
   const importWordBackup = (items: Omit<Word, 'id'>[]) => {

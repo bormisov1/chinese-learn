@@ -7,42 +7,39 @@ export const DAY = 86_400_000;
 
 const retentionDays = [1, 3, 7, 14, 30, 60];
 
+function activePriority(a: Word, b: Word) {
+  const aIntroduced = Boolean(a.cardIntroducedAt);
+  const bIntroduced = Boolean(b.cardIntroducedAt);
+  return (
+    Number(bIntroduced) - Number(aIntroduced) ||
+    (aIntroduced ? a.cardSrsLevel - b.cardSrsLevel : 0) ||
+    (b.cardLastIncorrectAt ?? 0) - (a.cardLastIncorrectAt ?? 0) ||
+    (b.cardLapses ?? 0) - (a.cardLapses ?? 0) ||
+    Number(Boolean(b.cardActive)) - Number(Boolean(a.cardActive)) ||
+    (a.cardIntroducedAt ?? a.createdAt) -
+      (b.cardIntroducedAt ?? b.createdAt) ||
+    a.createdAt - b.createdAt
+  );
+}
+
 export function fillActivePool(words: Word[], at = Date.now()): Word[] {
-  const active = words
-    .filter((word) => word.cardActive)
-    .sort(
-      (a, b) =>
-        (a.cardIntroducedAt ?? a.createdAt) -
-          (b.cardIntroducedAt ?? b.createdAt) ||
-        a.createdAt - b.createdAt,
-    );
-  let normalized = words;
-  if (active.length > ACTIVE_CARD_LIMIT) {
-    const keep = new Set(active.slice(0, ACTIVE_CARD_LIMIT).map((word) => word.id));
-    normalized = words.map((word) =>
-      word.cardActive && !keep.has(word.id) ? { ...word, cardActive: false } : word,
-    );
-  }
-  const activeCount = normalized.filter((word) => word.cardActive).length;
-  if (activeCount >= ACTIVE_CARD_LIMIT) return normalized;
-  const vacancies = ACTIVE_CARD_LIMIT - activeCount;
-  const candidates = normalized
-    .filter((word) => !word.cardActive && word.cardSrsLevel < CARD_GRADUATION_LEVEL)
-    .sort(
-      (a, b) =>
-        Number(Boolean(a.cardIntroducedAt)) - Number(Boolean(b.cardIntroducedAt)) ||
-        a.createdAt - b.createdAt,
-    )
-    .slice(0, vacancies);
-  const selected = new Set(candidates.map((word) => word.id));
-  return normalized.map((word, index) =>
+  const selected = new Set(
+    words
+      .filter((word) => word.cardSrsLevel < CARD_GRADUATION_LEVEL)
+      .sort(activePriority)
+      .slice(0, ACTIVE_CARD_LIMIT)
+      .map((word) => word.id),
+  );
+  return words.map((word, index) =>
     selected.has(word.id)
       ? {
           ...word,
           cardActive: true,
           cardIntroducedAt: word.cardIntroducedAt ?? at + index,
         }
-      : word,
+      : word.cardActive
+        ? { ...word, cardActive: false }
+        : word,
   );
 }
 
@@ -58,6 +55,12 @@ export function migrateCardPool(words: Word[]): Word[] {
         word.cardActive ??
         (hadCardActivity && word.cardSrsLevel < CARD_GRADUATION_LEVEL),
       cardLastStudiedRound: word.cardLastStudiedRound,
+      cardLastIncorrectAt:
+        word.cardLastIncorrectAt ??
+        (word.cardSrsIncorrect > 0 && word.cardSrsLevel === 0
+          ? word.cardIntroducedAt ?? word.createdAt
+          : undefined),
+      cardLapses: word.cardLapses ?? word.cardSrsIncorrect,
     };
   });
   const active = migrated
@@ -127,6 +130,8 @@ export function gradeCard(
         cardSrsLevel: 0,
         cardSrsCorrect: word.cardSrsCorrect,
         cardSrsIncorrect: word.cardSrsIncorrect + 1,
+        cardLastIncorrectAt: reviewedAt,
+        cardLapses: (word.cardLapses ?? 0) + 1,
         cardSrsDueAt: 0,
       };
 

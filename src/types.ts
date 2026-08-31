@@ -17,6 +17,8 @@ export type Word = {
   cardIntroducedAt?: number;
   cardActive?: boolean;
   cardLastStudiedRound?: number;
+  cardLastIncorrectAt?: number;
+  cardLapses?: number;
 };
 export type Sentence = {
   id: string;

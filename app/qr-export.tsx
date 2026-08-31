@@ -32,7 +32,7 @@ export default function QrExport() {
         const words = data.words.map(w => {
           const dictionaryId = dictionary.get(w.hanzi);
           const identity: unknown[] = dictionaryId === undefined ? [-1, w.hanzi, w.pinyin, w.russian] : [dictionaryId];
-          return [...identity, w.exampleCount, w.wordShownCount, w.createdAt, w.srsLevel, w.srsCorrect, w.srsIncorrect, w.srsDueAt, w.cardSrsLevel, w.cardSrsCorrect, w.cardSrsIncorrect, w.cardSrsDueAt, w.cardIntroducedAt ?? 0, w.cardActive ? 1 : 0, w.cardLastStudiedRound ?? -1];
+          return [...identity, w.exampleCount, w.wordShownCount, w.createdAt, w.srsLevel, w.srsCorrect, w.srsIncorrect, w.srsDueAt, w.cardSrsLevel, w.cardSrsCorrect, w.cardSrsIncorrect, w.cardSrsDueAt, w.cardIntroducedAt ?? 0, w.cardActive ? 1 : 0, w.cardLastStudiedRound ?? -1, w.cardLastIncorrectAt ?? 0, w.cardLapses ?? 0];
         });
         const json = JSON.stringify(['HD1', 'hsk-russian-v1', words]);
         const packed = compress(json), payload = `HD1:${base45(packed)}`;

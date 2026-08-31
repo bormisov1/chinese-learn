@@ -41,6 +41,8 @@ export async function loadStore(): Promise<StoreData> {
         cardSrsCorrect: w.cardSrsCorrect ?? 0,
         cardSrsIncorrect: w.cardSrsIncorrect ?? 0,
         cardSrsDueAt: w.cardSrsDueAt ?? 0,
+        cardLastIncorrectAt: w.cardLastIncorrectAt,
+        cardLapses: w.cardLapses ?? w.cardSrsIncorrect ?? 0,
       }))),
       cardRound: parsed.cardRound ?? 0,
       settings: { ...emptyStore.settings, ...parsed.settings },
