@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import { StoreData } from "./types";
+import { migrateCardPool } from "./card-srs";
 
 const KEY = "hanzi-deck:v1";
 export const emptyStore: StoreData = {
@@ -8,6 +9,7 @@ export const emptyStore: StoreData = {
   sentences: [],
   wordSentenceIndex: {},
   attempts: [],
+  cardRound: 0,
   settings: {
     apiKey: "",
     apiUrl: "https://api.deepseek.com/chat/completions",
@@ -29,7 +31,7 @@ export async function loadStore(): Promise<StoreData> {
     return {
       ...emptyStore,
       ...parsed,
-      words: (parsed.words ?? []).map((w) => ({
+      words: migrateCardPool((parsed.words ?? []).map((w) => ({
         ...w,
         srsLevel: w.srsLevel ?? 0,
         srsCorrect: w.srsCorrect ?? 0,
@@ -39,7 +41,8 @@ export async function loadStore(): Promise<StoreData> {
         cardSrsCorrect: w.cardSrsCorrect ?? 0,
         cardSrsIncorrect: w.cardSrsIncorrect ?? 0,
         cardSrsDueAt: w.cardSrsDueAt ?? 0,
-      })),
+      }))),
+      cardRound: parsed.cardRound ?? 0,
       settings: { ...emptyStore.settings, ...parsed.settings },
     };
   } catch {

@@ -25,6 +25,6 @@ export async function decodeQrBackup(payload: string): Promise<Omit<Word, 'id'>[
     const lexical = embedded ? [String(tuple[1]), String(tuple[2]), String(tuple[3])] : dictionary[dictionaryId];
     if (!lexical) throw new Error('QR dictionary version does not match this app.');
     const offset = embedded ? 4 : 1, values = tuple.slice(offset).map(Number);
-    return { hanzi: lexical[0], pinyin: lexical[1], russian: lexical[2], exampleCount: values[0], wordShownCount: values[1], createdAt: values[2], srsLevel: values[3], srsCorrect: values[4], srsIncorrect: values[5], srsDueAt: values[6], cardSrsLevel: values[7], cardSrsCorrect: values[8], cardSrsIncorrect: values[9], cardSrsDueAt: values[10] };
+    return { hanzi: lexical[0], pinyin: lexical[1], russian: lexical[2], exampleCount: values[0], wordShownCount: values[1], createdAt: values[2], srsLevel: values[3], srsCorrect: values[4], srsIncorrect: values[5], srsDueAt: values[6], cardSrsLevel: values[7], cardSrsCorrect: values[8], cardSrsIncorrect: values[9], cardSrsDueAt: values[10], cardIntroducedAt: values[11] || undefined, cardActive: values[12] === 1, cardLastStudiedRound: values[13] >= 0 ? values[13] : undefined };
   });
 }

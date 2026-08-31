@@ -22,18 +22,38 @@ import {
 
 export default function Settings() {
   const { data, patch } = useStore();
+  const [sort, setSort] = useState<{
+    column: "word" | "sentences" | "cards";
+    direction: 1 | -1;
+  }>({ column: "cards", direction: -1 });
   const update = <K extends keyof SettingsData>(
     key: K,
     value: SettingsData[K],
   ) => patch((d) => ({ ...d, settings: { ...d.settings, [key]: value } }));
   const now = Date.now();
-  const rankedWords = [...data.words].sort(
-    (a, b) =>
-      b.srsIncorrect +
-        b.cardSrsIncorrect -
-        a.srsIncorrect -
-        a.cardSrsIncorrect || a.hanzi.localeCompare(b.hanzi),
-  );
+  const toggleSort = (column: typeof sort.column) =>
+    setSort((current) => ({
+      column,
+      direction: current.column === column ? (current.direction === 1 ? -1 : 1) : -1,
+    }));
+  const score = (level: number, correct: number, incorrect: number) =>
+    level * 1_000 + correct * 10 - incorrect;
+  const rankedWords = [...data.words].sort((a, b) => {
+    const comparison =
+      sort.column === "word"
+        ? a.hanzi.localeCompare(b.hanzi)
+        : sort.column === "sentences"
+          ? score(a.srsLevel, a.srsCorrect, a.srsIncorrect) -
+            score(b.srsLevel, b.srsCorrect, b.srsIncorrect)
+          : score(a.cardSrsLevel, a.cardSrsCorrect, a.cardSrsIncorrect) -
+            score(b.cardSrsLevel, b.cardSrsCorrect, b.cardSrsIncorrect);
+    return comparison * sort.direction || a.hanzi.localeCompare(b.hanzi);
+  });
+  const sortLabel = (column: typeof sort.column, label: string) =>
+    `${label}${sort.column === column ? (sort.direction === 1 ? " ↑" : " ↓") : ""}`;
+  const activeWords = data.words
+    .filter((word) => word.cardActive)
+    .sort((a, b) => (a.cardIntroducedAt ?? 0) - (b.cardIntroducedAt ?? 0));
   const stat = (
     level: number,
     correct: number,
@@ -120,6 +140,22 @@ export default function Settings() {
       </View>
       <View style={styles.sectionHeading}>
         <View>
+          <Text style={styles.sectionTitle}>Active card set</Text>
+          <Text style={styles.help}>
+            {activeWords.length} of 12 words · six cards per full round
+          </Text>
+        </View>
+      </View>
+      <View style={styles.activeSet}>
+        {activeWords.map((word) => (
+          <View key={word.id} style={styles.activeWord}>
+            <Text style={styles.activeHanzi}>{word.hanzi}</Text>
+            <Text style={styles.activeStep}>step {Math.min(3, word.cardSrsLevel + 1)}/3</Text>
+          </View>
+        ))}
+      </View>
+      <View style={styles.sectionHeading}>
+        <View>
           <Text style={styles.sectionTitle}>Word SRS progress</Text>
           <Text style={styles.help}>
             Sentence and card progress tracked independently
@@ -128,9 +164,15 @@ export default function Settings() {
       </View>
       <View style={styles.table}>
         <View style={[styles.tableRow, styles.tableHeader]}>
-          <Text style={[styles.headerCell, styles.wordCell]}>WORD</Text>
-          <Text style={styles.headerCell}>SENTENCES</Text>
-          <Text style={styles.headerCell}>CARDS</Text>
+          <Pressable style={styles.wordCell} onPress={() => toggleSort("word")}>
+            <Text style={[styles.headerCell, styles.wordHeader]}>{sortLabel("word", "WORD")}</Text>
+          </Pressable>
+          <Pressable onPress={() => toggleSort("sentences")}>
+            <Text style={styles.headerCell}>{sortLabel("sentences", "SENTENCES")}</Text>
+          </Pressable>
+          <Pressable onPress={() => toggleSort("cards")}>
+            <Text style={styles.headerCell}>{sortLabel("cards", "CARDS")}</Text>
+          </Pressable>
         </View>
         {rankedWords.length ? (
           rankedWords.map((word, index) => (
@@ -326,6 +368,10 @@ const styles = StyleSheet.create({
   help: { color: colors.muted, marginTop: 5, lineHeight: 20 },
   sectionHeading: { marginTop: 30, marginBottom: 11 },
   sectionTitle: { color: colors.ink, fontSize: 21, fontWeight: "800" },
+  activeSet: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  activeWord: { backgroundColor: colors.pale, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 },
+  activeHanzi: { color: colors.ink, fontSize: 19, fontWeight: "800" },
+  activeStep: { color: colors.green, fontSize: 10, marginTop: 2 },
   table: {
     borderWidth: 1,
     borderColor: colors.line,
@@ -349,6 +395,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 0.4,
   },
+  wordHeader: { width: "auto", textAlign: "left" },
   wordCell: { flex: 1, minWidth: 0 },
   hanzi: { color: colors.ink, fontSize: 20, fontWeight: "800" },
   wordMeta: {

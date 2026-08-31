@@ -5,31 +5,30 @@ import { colors } from "@/theme";
 import { Button, Header, shell, SpeakerButton } from "@/ui";
 import { Sentence, Settings } from "@/types";
 import { copyText } from "@/clipboard";
+import {
+  ACTIVE_CARD_LIMIT,
+  CARD_GRADUATION_LEVEL,
+  CARD_ROUND_SIZE,
+  gradeCard,
+  selectRound,
+} from "@/card-srs";
 
-const DAY = 86_400_000;
-const intervals = [1, 3, 7, 14, 30];
 type Phase = "ready" | "studying" | "complete";
 
 export default function Cards() {
   const { data, patch, generating, generateBatch } = useStore();
-  const [roundNumber, setRoundNumber] = useState(1),
+  const [studyRound, setStudyRound] = useState(data.cardRound + 1),
     [roundIds, setRoundIds] = useState<string[]>([]),
     [position, setPosition] = useState(0),
     [phase, setPhase] = useState<Phase>("ready"),
     [flipped, setFlipped] = useState(false),
     [mistakeIds, setMistakeIds] = useState<string[]>([]);
   const total = data.words.length;
-  const orderedWords = useMemo(() => {
-    const now = Date.now();
-    return [...data.words].sort(
-      (a, b) =>
-        Number(a.cardSrsDueAt > now) - Number(b.cardSrsDueAt > now) ||
-        a.cardSrsLevel - b.cardSrsLevel ||
-        a.cardSrsDueAt - b.cardSrsDueAt ||
-        a.createdAt - b.createdAt,
-    );
-  }, [data.words]);
-  const upcoming = orderedWords.slice(0, 10);
+  const upcoming = useMemo(
+    () => selectRound(data.words, data.cardRound + 1),
+    [data.words, data.cardRound],
+  );
+  const activeCount = data.words.filter((item) => item.cardActive).length;
   const roundWords = roundIds
     .map((id) => data.words.find((w) => w.id === id))
     .filter(Boolean) as typeof data.words;
@@ -66,36 +65,26 @@ export default function Cards() {
       </ScrollView>
     );
 
-  const begin = (words: typeof data.words) => {
+  const begin = (words: typeof data.words, round: number) => {
+    setStudyRound(round);
+    patch((d) => ({ ...d, cardRound: Math.max(d.cardRound, round) }));
     setRoundIds(words.map((w) => w.id));
     setPosition(0);
     setMistakeIds([]);
     setFlipped(false);
     setPhase("studying");
   };
-  const startRound = () => begin(upcoming);
+  const startRound = () => begin(upcoming, data.cardRound + 1);
   const startNextRound = () => {
-    setRoundNumber((value) => value + 1);
-    begin(orderedWords.slice(0, 10));
+    const nextRound = data.cardRound + 1;
+    begin(selectRound(data.words, nextRound), nextRound);
   };
   const grade = (correct: boolean) => {
     if (!word) return;
     const reviewedAt = Date.now();
     patch((d) => ({
       ...d,
-      words: d.words.map((w) => {
-        if (w.id !== word.id) return w;
-        const nextLevel = correct ? Math.min(5, w.cardSrsLevel + 1) : 0;
-        return {
-          ...w,
-          cardSrsLevel: nextLevel,
-          cardSrsCorrect: w.cardSrsCorrect + (correct ? 1 : 0),
-          cardSrsIncorrect: w.cardSrsIncorrect + (correct ? 0 : 1),
-          cardSrsDueAt: correct
-            ? reviewedAt + intervals[nextLevel - 1] * DAY
-            : reviewedAt,
-        };
-      }),
+      words: gradeCard(d.words, word.id, correct, studyRound, reviewedAt),
     }));
     if (!correct) setMistakeIds((ids) => [...ids, word.id]);
     if (position + 1 === roundWords.length) setPhase("complete");
@@ -107,16 +96,16 @@ export default function Cards() {
     return (
       <ScrollView style={shell.page} contentContainerStyle={shell.content}>
         <Header
-          eyebrow={`Round ${roundNumber}`}
+          eyebrow={`Round ${data.cardRound + 1}`}
           title="Ready for a card round?"
-          subtitle={`${upcoming.length} cards · lowest SRS first`}
+          subtitle={`${upcoming.length} of ${CARD_ROUND_SIZE} cards · ${activeCount} of ${ACTIVE_CARD_LIMIT} active`}
         />
         <View style={styles.roundPanel}>
           <Text style={styles.roundIcon}>卡</Text>
-          <Text style={styles.roundTitle}>Round {roundNumber}</Text>
+          <Text style={styles.roundTitle}>Round {data.cardRound + 1}</Text>
           <Text style={styles.roundText}>
-            Recall each word, reveal the answer, then mark yourself Again or
-            Correct.
+            Correct cards skip the next round. Three correct appearances move
+            a word to retention review and bring in another deck word.
           </Text>
         </View>
         <Button
@@ -134,7 +123,7 @@ export default function Cards() {
     return (
       <ScrollView style={shell.page} contentContainerStyle={shell.content}>
         <Header
-          eyebrow={`Round ${roundNumber} complete`}
+          eyebrow={`Round ${studyRound} complete`}
           title={
             mistaken.length ? `${mistaken.length} to review` : "Perfect round!"
           }
@@ -178,9 +167,9 @@ export default function Cards() {
   return (
     <ScrollView style={shell.page} contentContainerStyle={shell.content}>
       <Header
-        eyebrow={`Round ${roundNumber} · Card ${position + 1} of ${roundWords.length}`}
+        eyebrow={`Round ${studyRound} · Card ${position + 1} of ${roundWords.length}`}
         title="Flashcards"
-        subtitle={`Card SRS level ${word.cardSrsLevel} · ${mistakeIds.length} mistaken this round`}
+        subtitle={`${word.cardSrsLevel < CARD_GRADUATION_LEVEL ? `Learning step ${word.cardSrsLevel + 1} of ${CARD_GRADUATION_LEVEL}` : `Retention level ${word.cardSrsLevel}`} · ${mistakeIds.length} mistaken`}
       />
       <View style={styles.progress}>
         <View

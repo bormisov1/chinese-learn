@@ -14,6 +14,9 @@ export type Word = {
   cardSrsCorrect: number;
   cardSrsIncorrect: number;
   cardSrsDueAt: number;
+  cardIntroducedAt?: number;
+  cardActive?: boolean;
+  cardLastStudiedRound?: number;
 };
 export type Sentence = {
   id: string;
@@ -61,5 +64,6 @@ export type StoreData = {
     direction?: PracticeDirection;
     at: number;
   }[];
+  cardRound: number;
   settings: Settings;
 };

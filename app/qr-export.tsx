@@ -32,7 +32,7 @@ export default function QrExport() {
         const words = data.words.map(w => {
           const dictionaryId = dictionary.get(w.hanzi);
           const identity: unknown[] = dictionaryId === undefined ? [-1, w.hanzi, w.pinyin, w.russian] : [dictionaryId];
-          return [...identity, w.exampleCount, w.wordShownCount, w.createdAt, w.srsLevel, w.srsCorrect, w.srsIncorrect, w.srsDueAt, w.cardSrsLevel, w.cardSrsCorrect, w.cardSrsIncorrect, w.cardSrsDueAt];
+          return [...identity, w.exampleCount, w.wordShownCount, w.createdAt, w.srsLevel, w.srsCorrect, w.srsIncorrect, w.srsDueAt, w.cardSrsLevel, w.cardSrsCorrect, w.cardSrsIncorrect, w.cardSrsDueAt, w.cardIntroducedAt ?? 0, w.cardActive ? 1 : 0, w.cardLastStudiedRound ?? -1];
         });
         const json = JSON.stringify(['HD1', 'hsk-russian-v1', words]);
         const packed = compress(json), payload = `HD1:${base45(packed)}`;
@@ -51,7 +51,7 @@ export default function QrExport() {
     <Header eyebrow="Local transfer experiment" title="Vocabulary + SRS QR" subtitle="Generated from this browser’s current data. Sentences and attempts excluded."/>
     <View style={styles.panel}>{image ? <Image source={{ uri: image }} style={styles.qr}/>: <Text style={styles.waiting}>{error || 'Compressing and generating QR…'}</Text>}</View>
     <Text style={styles.details}>{details}</Text>
-    <Text style={styles.note}>Contains vocabulary identity, example/shown counters, creation time, and separate sentence/card SRS levels, correct/incorrect counters, and due dates. Known vocabulary uses bundled dictionary indexes; unknown words embed Hanzi, pinyin, and Russian. For easiest import, take a screenshot of this QR rather than photographing the screen.</Text>
+    <Text style={styles.note}>Contains vocabulary identity, example/shown counters, creation time, active-pool state, and separate sentence/card SRS levels, correct/incorrect counters, and due dates. Known vocabulary uses bundled dictionary indexes; unknown words embed Hanzi, pinyin, and Russian. For easiest import, take a screenshot of this QR rather than photographing the screen.</Text>
   </ScrollView>;
 }
 

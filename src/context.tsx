@@ -3,6 +3,7 @@ import { generate } from './deepseek';
 import { emptyStore, loadStore, saveStore } from './storage';
 import { StoreData, Word } from './types';
 import { ImportedWord } from './ocr';
+import { fillActivePool } from './card-srs';
 
 type Context = { data: StoreData; ready: boolean; generating: boolean; error: string; importWords: (items: ImportedWord[]) => number; importWordBackup: (items: Omit<Word, 'id'>[]) => number; patch: (fn: (data: StoreData) => StoreData) => void; generateBatch: (mandatory?: Word) => Promise<void> };
 const StoreContext = createContext<Context>(null as never);
@@ -16,7 +17,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const importWords = (items: ImportedWord[]) => {
     const existing = new Set(data.words.map(w => w.hanzi));
     const fresh = items.filter(w => !existing.has(w.hanzi));
-    if (fresh.length) setData(d => ({ ...d, words: [...d.words, ...fresh.map(w => ({ ...w, id: id(), exampleCount: 0, wordShownCount: 0, createdAt: Date.now(), srsLevel: 0, srsCorrect: 0, srsIncorrect: 0, srsDueAt: 0, cardSrsLevel: 0, cardSrsCorrect: 0, cardSrsIncorrect: 0, cardSrsDueAt: 0 }))] }));
+    if (fresh.length) setData(d => ({ ...d, words: fillActivePool([...d.words, ...fresh.map(w => ({ ...w, id: id(), exampleCount: 0, wordShownCount: 0, createdAt: Date.now(), srsLevel: 0, srsCorrect: 0, srsIncorrect: 0, srsDueAt: 0, cardSrsLevel: 0, cardSrsCorrect: 0, cardSrsIncorrect: 0, cardSrsDueAt: 0 }))]) }));
     return fresh.length;
   };
   const importWordBackup = (items: Omit<Word, 'id'>[]) => {
@@ -24,7 +25,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const incoming = new Map(items.map(w => [w.hanzi, w]));
       const words = d.words.map(w => incoming.has(w.hanzi) ? { ...incoming.get(w.hanzi)!, id: w.id } : w);
       const existing = new Set(words.map(w => w.hanzi));
-      return { ...d, words: [...words, ...items.filter(w => !existing.has(w.hanzi)).map(w => ({ ...w, id: id() }))] };
+      return { ...d, words: fillActivePool([...words, ...items.filter(w => !existing.has(w.hanzi)).map(w => ({ ...w, id: id() }))]) };
     });
     return items.length;
   };
