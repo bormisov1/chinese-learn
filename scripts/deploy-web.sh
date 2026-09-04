@@ -4,6 +4,8 @@ set -Eeuo pipefail
 readonly NODE_HOME=/home/claude/.nvm/versions/node/v22.13.0
 readonly NODE_BIN="$NODE_HOME/bin"
 readonly LOCK_FILE=/tmp/chinese-learn-web-deploy.lock
+readonly CACHE_LOCK_FILE=/tmp/chinese-learn-web-dependency-cache.lock
+readonly DEPENDENCY_CACHE_ROOT=/home/claude/.cache/chinese-learn-web-dependencies
 
 REPO_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 WORKTREE_DIR=""
@@ -11,6 +13,7 @@ WORKTREE_PARENT=""
 OUTPUT_PARENT=""
 BUILD_OUTPUT=""
 DISPLACED_OUTPUT=""
+CACHE_STAGING=""
 
 log() {
   printf '[deploy-web] %s\n' "$*"
@@ -31,6 +34,10 @@ cleanup() {
 
   if [[ -n "$OUTPUT_PARENT" && -d "$OUTPUT_PARENT" ]]; then
     rm -rf -- "$OUTPUT_PARENT"
+  fi
+
+  if [[ -n "$CACHE_STAGING" && -d "$CACHE_STAGING" ]]; then
+    rm -rf -- "$CACHE_STAGING"
   fi
 
   if (( exit_code != 0 )); then
@@ -68,8 +75,41 @@ BUILD_OUTPUT="$OUTPUT_PARENT/dist"
 log "Creating a temporary worktree from origin/master."
 git worktree add --detach "$WORKTREE_DIR" origin/master
 
-log "Installing dependencies with Node $(node --version)."
-npm --prefix "$WORKTREE_DIR" ci
+mkdir -p -- "$DEPENDENCY_CACHE_ROOT"
+exec 8>"$CACHE_LOCK_FILE"
+flock 8
+
+PACKAGE_LOCK_HASH=$(sha256sum "$WORKTREE_DIR/package-lock.json" | awk '{print $1}')
+DEPENDENCY_CACHE="$DEPENDENCY_CACHE_ROOT/$PACKAGE_LOCK_HASH"
+
+if [[ -d "$DEPENDENCY_CACHE/node_modules" && \
+      -f "$DEPENDENCY_CACHE/complete" && \
+      "$(<"$DEPENDENCY_CACHE/complete")" == "$PACKAGE_LOCK_HASH" ]]; then
+  log "Restoring dependencies from cache $PACKAGE_LOCK_HASH."
+  if ! cp -a --reflink=auto "$DEPENDENCY_CACHE/node_modules" "$WORKTREE_DIR/"; then
+    log "Cached dependencies could not be restored; rebuilding them."
+    rm -rf -- "$WORKTREE_DIR/node_modules" "$DEPENDENCY_CACHE"
+  fi
+else
+  if [[ -e "$DEPENDENCY_CACHE" ]]; then
+    log "Removing incomplete dependency cache $PACKAGE_LOCK_HASH."
+    rm -rf -- "$DEPENDENCY_CACHE"
+  fi
+fi
+
+if [[ ! -d "$WORKTREE_DIR/node_modules" ]]; then
+  log "Dependency cache miss; installing with Node $(node --version)."
+  npm --prefix "$WORKTREE_DIR" ci
+
+  CACHE_STAGING=$(mktemp -d "$DEPENDENCY_CACHE_ROOT/.${PACKAGE_LOCK_HASH}.XXXXXX")
+  cp -a --reflink=auto "$WORKTREE_DIR/node_modules" "$CACHE_STAGING/node_modules"
+  printf '%s\n' "$PACKAGE_LOCK_HASH" > "$CACHE_STAGING/complete"
+  mv -- "$CACHE_STAGING" "$DEPENDENCY_CACHE"
+  CACHE_STAGING=""
+  log "Published dependency cache $PACKAGE_LOCK_HASH."
+fi
+
+flock -u 8
 
 log "Building into a temporary output directory."
 npm --prefix "$WORKTREE_DIR" run build:web -- --output-dir "$BUILD_OUTPUT"
