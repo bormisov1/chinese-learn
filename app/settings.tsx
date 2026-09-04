@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import {
   Animated,
   LayoutChangeEvent,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,6 +12,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useStore } from "@/context";
 import { colors } from "@/theme";
 import { Header, shell } from "@/ui";
@@ -38,8 +41,8 @@ export default function Settings() {
     cards: 0,
     progress: 0,
   });
-  const drawerPosition = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState<SettingsSection>("general");
+  const indicatorPosition = useRef(new Animated.Value(0)).current;
   const [keyValidation, setKeyValidation] = useState<
     "idle" | "checking" | "valid" | "invalid" | "error"
   >(data.settings.apiKeyValidated ? "valid" : "idle");
@@ -136,31 +139,79 @@ export default function Settings() {
     </View>
   );
 
-  const setDrawerOpen = (open: boolean) => {
-    setMenuOpen(open);
-    Animated.timing(drawerPosition, {
-      toValue: open ? 0 : -DRAWER_WIDTH,
-      duration: 220,
+  useEffect(() => {
+    const index = SETTINGS_SECTIONS.findIndex(({ key }) => key === activeSection);
+    Animated.spring(indicatorPosition, {
+      toValue: index * NAV_ITEM_HEIGHT,
+      damping: 18,
+      stiffness: 180,
+      mass: 0.7,
       useNativeDriver: true,
     }).start();
-  };
+  }, [activeSection, indicatorPosition]);
   const recordSection = (section: SettingsSection) => (event: LayoutChangeEvent) => {
     sectionOffsets.current[section] = event.nativeEvent.layout.y;
   };
+  const trackSection = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const position = event.nativeEvent.contentOffset.y + 120;
+    const visible = SETTINGS_SECTIONS.reduce<SettingsSection>(
+      (current, item) =>
+        sectionOffsets.current[item.key] <= position ? item.key : current,
+      "general",
+    );
+    setActiveSection((current) => (current === visible ? current : visible));
+  };
   const goToSection = (section: SettingsSection) => {
+    setActiveSection(section);
     scrollRef.current?.scrollTo({
       y: Math.max(0, sectionOffsets.current[section] - 16),
       animated: true,
     });
-    setDrawerOpen(false);
   };
 
   return (
     <View style={shell.page}>
+      <View style={styles.sideMenu} accessibilityRole="tablist">
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.sectionIndicator,
+            { transform: [{ translateY: indicatorPosition }] },
+          ]}
+        />
+        {SETTINGS_SECTIONS.map((item) => {
+          const selected = activeSection === item.key;
+          return (
+            <Pressable
+              key={item.key}
+              accessibilityRole="tab"
+              accessibilityLabel={`${item.label} settings`}
+              accessibilityState={{ selected }}
+              onPress={() => goToSection(item.key)}
+              style={({ pressed }) => [
+                styles.sideMenuItem,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Ionicons
+                name={item.icon}
+                size={23}
+                color={selected ? colors.green : "#8B8E86"}
+              />
+              <Text style={[styles.sideMenuLabel, selected && styles.sideMenuLabelActive]}>
+                {item.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
       <ScrollView
         ref={scrollRef}
+        style={styles.settingsScroll}
         contentContainerStyle={[shell.content, styles.settingsContent]}
         keyboardShouldPersistTaps="handled"
+        onScroll={trackSection}
+        scrollEventThrottle={32}
       >
         <Header
           eyebrow="Configuration"
@@ -374,56 +425,23 @@ export default function Settings() {
         )}
       </View>
       </ScrollView>
-      {menuOpen ? (
-        <Pressable
-          accessibilityLabel="Close settings navigation"
-          onPress={() => setDrawerOpen(false)}
-          style={styles.drawerBackdrop}
-        />
-      ) : null}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={
-          menuOpen ? "Close settings navigation" : "Open settings navigation"
-        }
-        onPress={() => setDrawerOpen(!menuOpen)}
-        style={({ pressed }) => [styles.menuButton, pressed && styles.pressed]}
-      >
-        <Text style={styles.menuButtonIcon}>{menuOpen ? "×" : "☰"}</Text>
-      </Pressable>
-      <Animated.View
-        pointerEvents={menuOpen ? "auto" : "none"}
-        style={[styles.drawer, { transform: [{ translateX: drawerPosition }] }]}
-      >
-        <Text style={styles.drawerEyebrow}>SETTINGS</Text>
-        <Text style={styles.drawerTitle}>Jump to</Text>
-        {SETTINGS_SECTIONS.map((item) => (
-          <Pressable
-            key={item.key}
-            accessibilityRole="button"
-            onPress={() => goToSection(item.key)}
-            style={({ pressed }) => [
-              styles.drawerItem,
-              pressed && styles.drawerItemPressed,
-            ]}
-          >
-            <Text style={styles.drawerItemText}>{item.label}</Text>
-            <Text style={styles.drawerArrow}>›</Text>
-          </Pressable>
-        ))}
-      </Animated.View>
     </View>
   );
 }
 
 type SettingsSection = "general" | "audio" | "vocabulary" | "cards" | "progress";
-const DRAWER_WIDTH = 268;
-const SETTINGS_SECTIONS: { key: SettingsSection; label: string }[] = [
-  { key: "general", label: "General" },
-  { key: "audio", label: "Mandarin audio" },
-  { key: "vocabulary", label: "Vocabulary" },
-  { key: "cards", label: "Active card set" },
-  { key: "progress", label: "SRS progress" },
+const SIDEBAR_WIDTH = 76;
+const NAV_ITEM_HEIGHT = 70;
+const SETTINGS_SECTIONS: {
+  key: SettingsSection;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}[] = [
+  { key: "general", label: "General", icon: "options-outline" },
+  { key: "audio", label: "Audio", icon: "volume-high-outline" },
+  { key: "vocabulary", label: "Words", icon: "book-outline" },
+  { key: "cards", label: "Cards", icon: "albums-outline" },
+  { key: "progress", label: "Progress", icon: "stats-chart-outline" },
 ];
 
 function HskAdder({
@@ -600,77 +618,44 @@ function Field(props: {
 
 const styles = StyleSheet.create({
   settingsContent: { paddingTop: 32 },
-  menuButton: {
+  settingsScroll: { marginLeft: SIDEBAR_WIDTH },
+  sideMenu: {
     position: "absolute",
-    left: 12,
-    top: 12,
-    zIndex: 4,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.green,
-    shadowColor: "#000",
-    shadowOpacity: 0.16,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 5,
-  },
-  menuButtonIcon: {
-    color: colors.white,
-    fontSize: 23,
-    fontWeight: "800",
-    lineHeight: 25,
-  },
-  pressed: { opacity: 0.72 },
-  drawerBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 2,
-    backgroundColor: "rgba(24, 35, 29, 0.32)",
-  },
-  drawer: {
-    position: "absolute",
-    zIndex: 3,
     top: 0,
     bottom: 0,
     left: 0,
-    width: DRAWER_WIDTH,
-    paddingTop: 78,
-    paddingHorizontal: 20,
+    zIndex: 2,
+    width: SIDEBAR_WIDTH,
+    paddingTop: 18,
+    alignItems: "center",
     backgroundColor: colors.card,
     borderRightWidth: 1,
     borderRightColor: colors.line,
-    shadowColor: "#000",
-    shadowOpacity: 0.18,
-    shadowRadius: 16,
-    shadowOffset: { width: 5, height: 0 },
-    elevation: 8,
   },
-  drawerEyebrow: {
-    color: colors.coral,
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 1.6,
-  },
-  drawerTitle: {
-    color: colors.ink,
-    fontSize: 25,
-    fontWeight: "800",
-    marginTop: 6,
-    marginBottom: 18,
-  },
-  drawerItem: {
-    minHeight: 48,
-    flexDirection: "row",
+  sideMenuItem: {
+    width: SIDEBAR_WIDTH,
+    height: NAV_ITEM_HEIGHT,
     alignItems: "center",
-    justifyContent: "space-between",
-    borderBottomWidth: 1,
-    borderBottomColor: colors.line,
+    justifyContent: "center",
+    gap: 4,
   },
-  drawerItemPressed: { opacity: 0.55 },
-  drawerItemText: { color: colors.ink, fontSize: 15, fontWeight: "700" },
-  drawerArrow: { color: colors.green, fontSize: 24 },
+  sideMenuLabel: {
+    color: "#8B8E86",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  sideMenuLabelActive: { color: colors.green },
+  sectionIndicator: {
+    position: "absolute",
+    zIndex: 1,
+    top: 18 + NAV_ITEM_HEIGHT - 3,
+    right: 12,
+    width: SIDEBAR_WIDTH - 24,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: colors.green,
+  },
+  pressed: { opacity: 0.55 },
   deepSeekValidated: { backgroundColor: "#EAF7ED", borderColor: "#AED8B7" },
   validationStatus: { color: colors.muted, marginTop: -4, marginBottom: 14 },
   validationSuccess: { color: colors.green, fontWeight: "700" },
