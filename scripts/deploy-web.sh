@@ -75,9 +75,9 @@ BUILD_OUTPUT="$OUTPUT_PARENT/dist"
 log "Creating a temporary worktree from origin/master."
 git worktree add --detach "$WORKTREE_DIR" origin/master
 
-mkdir -p -- "$DEPENDENCY_CACHE_ROOT"
 exec 8>"$CACHE_LOCK_FILE"
 flock 8
+mkdir -p -- "$DEPENDENCY_CACHE_ROOT"
 
 PACKAGE_LOCK_HASH=$(sha256sum "$WORKTREE_DIR/package-lock.json" | awk '{print $1}')
 DEPENDENCY_CACHE="$DEPENDENCY_CACHE_ROOT/$PACKAGE_LOCK_HASH"
