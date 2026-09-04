@@ -1,9 +1,72 @@
-import { router } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useStore } from '@/context';
-import { Button, Header, shell } from '@/ui';
-import { colors } from '@/theme';
+import { router } from "expo-router";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { useStore } from "@/context";
+import { Button, Header, shell } from "@/ui";
+import { colors } from "@/theme";
 
-export default function Home() { const { data, generating, error, generateBatch } = useStore(); const unseen = data.sentences.filter(s => !s.sentenceShownCount).length; return <ScrollView style={shell.page} contentContainerStyle={shell.content}><Header eyebrow="Your Mandarin study" title="Learn what matters.\nRemember what you learn." subtitle="A private vocabulary deck shaped around the words you choose."/><View style={styles.hero}><Text style={styles.heroMark}>好</Text><View style={{ flex: 1 }}><Text style={styles.heroTitle}>{data.words.length ? `${data.words.length} words in your deck` : 'Start with your own words'}</Text><Text style={styles.heroText}>{data.words.length ? `${data.sentences.length} examples · ${unseen} unseen exercises` : 'Import a screenshot or paste a vocabulary list. Nothing is hardcoded.'}</Text></View></View><View style={styles.stats}><Stat value={String(data.words.length)} label="WORDS"/><Stat value={String(data.sentences.length)} label="EXAMPLES"/><Stat value={String(data.attempts.length)} label="ATTEMPTS"/></View>{error ? <Text style={styles.error}>{error}</Text> : null}<View style={styles.actions}><Button label={data.words.length ? 'Study flashcards' : 'Import vocabulary'} icon={data.words.length ? 'albums-outline' : 'scan-outline'} onPress={() => router.push(data.words.length ? '/cards' : '/import')}/>{data.words.length > 0 && <Button secondary label={generating ? 'Generating…' : 'Generate 20 examples'} icon="sparkles-outline" disabled={generating} onPress={() => generateBatch()}/>}</View><Text style={styles.section}>RECENT VOCABULARY</Text><View style={shell.panel}>{data.words.length ? data.words.slice(-5).reverse().map((w, i) => <View key={w.id} style={[styles.word, i > 0 && styles.border]}><Text style={styles.hanzi}>{w.hanzi}</Text><View style={{ flex: 1 }}><Text style={styles.pinyin}>{w.pinyin}</Text><Text style={styles.russian}>{w.russian}</Text></View><Text style={styles.count}>{w.exampleCount} examples</Text></View>) : <Text style={styles.empty}>Your imported words will appear here.</Text>}</View></ScrollView> }
-function Stat({ value, label }: { value: string; label: string }) { return <View style={styles.stat}><Text style={styles.statValue}>{value}</Text><Text style={styles.statLabel}>{label}</Text></View> }
-const styles = StyleSheet.create({ hero: { backgroundColor: colors.green, borderRadius: 22, padding: 22, flexDirection: 'row', alignItems: 'center', gap: 18 }, heroMark: { width: 70, height: 70, textAlign: 'center', textAlignVertical: 'center', fontSize: 43, color: colors.white, backgroundColor: '#496C5D', borderRadius: 18 }, heroTitle: { color: colors.white, fontWeight: '800', fontSize: 19 }, heroText: { color: '#DCE9E2', marginTop: 6, lineHeight: 20 }, stats: { flexDirection: 'row', marginVertical: 22, gap: 10 }, stat: { flex: 1, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, padding: 15, borderRadius: 14 }, statValue: { fontSize: 24, fontWeight: '800', color: colors.ink }, statLabel: { fontSize: 10, color: colors.muted, letterSpacing: 1, marginTop: 3 }, actions: { gap: 10 }, section: { fontSize: 11, letterSpacing: 1.5, fontWeight: '800', color: colors.muted, marginTop: 28, marginBottom: 10 }, word: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 14 }, border: { borderTopWidth: 1, borderTopColor: colors.line }, hanzi: { fontSize: 27, fontWeight: '700', color: colors.ink, width: 70 }, pinyin: { color: colors.green, fontWeight: '700' }, russian: { color: colors.muted, marginTop: 3 }, count: { color: colors.muted, fontSize: 11 }, empty: { color: colors.muted, textAlign: 'center', padding: 20 }, error: { color: colors.red, marginBottom: 12 } });
+export default function Home() {
+  const { data, generating, error, generateBatch } = useStore();
+  const unseen = data.sentences.filter((sentence) => !sentence.sentenceShownCount).length;
+  return (
+    <ScrollView style={shell.page} contentContainerStyle={shell.content}>
+      <Header eyebrow="Your Mandarin study" title={"Learn what matters.\nRemember what you learn."} subtitle="A private vocabulary deck shaped around the words you choose." />
+      <View style={styles.hero}>
+        <Text style={styles.heroMark}>好</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.heroTitle}>{data.words.length ? `${data.words.length} words in your deck` : "Start with your own words"}</Text>
+          <Text style={styles.heroText}>{data.words.length ? `${data.sentences.length} examples · ${unseen} unseen exercises` : "Import a screenshot or paste a vocabulary list. Nothing is hardcoded."}</Text>
+        </View>
+      </View>
+      <View style={styles.stats}>
+        <Stat value={String(data.words.length)} label="WORDS" />
+        <Stat value={String(data.sentences.length)} label="EXAMPLES" />
+        <Stat value={String(data.cardRound)} label="CARD ROUNDS" />
+      </View>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+      <View style={styles.actions}>
+        <Button label={data.words.length ? "Study flashcards" : "Import vocabulary"} icon={data.words.length ? "albums-outline" : "scan-outline"} onPress={() => router.push(data.words.length ? "/cards" : "/import")} />
+        {data.words.length > 0 && <Button secondary label={generating ? "Generating…" : "Generate 20 examples"} icon="sparkles-outline" disabled={generating} onPress={() => generateBatch()} />}
+      </View>
+      <Text style={styles.section}>RECENT VOCABULARY</Text>
+      <View style={shell.panel}>
+        {data.words.length ? data.words.slice(-5).reverse().map((word, index) => (
+          <View key={word.id} style={[styles.word, index > 0 && styles.border]}>
+            <Text style={styles.hanzi}>{word.hanzi}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.pinyin}>{word.pinyin}</Text>
+              <Text style={styles.russian}>{word.russian}</Text>
+              <Text style={styles.guessStats}>✓ {word.cardSrsCorrect} · ✗ {word.cardSrsIncorrect}</Text>
+            </View>
+            <Text style={styles.count}>{word.exampleCount} examples</Text>
+          </View>
+        )) : <Text style={styles.empty}>Your imported words will appear here.</Text>}
+      </View>
+    </ScrollView>
+  );
+}
+
+function Stat({ value, label }: { value: string; label: string }) {
+  return <View style={styles.stat}><Text style={styles.statValue}>{value}</Text><Text style={styles.statLabel}>{label}</Text></View>;
+}
+
+const styles = StyleSheet.create({
+  hero: { backgroundColor: colors.green, borderRadius: 22, padding: 22, flexDirection: "row", alignItems: "center", gap: 18 },
+  heroMark: { width: 70, height: 70, textAlign: "center", textAlignVertical: "center", fontSize: 43, color: colors.white, backgroundColor: "#496C5D", borderRadius: 18 },
+  heroTitle: { color: colors.white, fontWeight: "800", fontSize: 19 },
+  heroText: { color: "#DCE9E2", marginTop: 6, lineHeight: 20 },
+  stats: { flexDirection: "row", marginVertical: 22, gap: 10 },
+  stat: { flex: 1, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, padding: 15, borderRadius: 14 },
+  statValue: { fontSize: 24, fontWeight: "800", color: colors.ink },
+  statLabel: { fontSize: 10, color: colors.muted, letterSpacing: 1, marginTop: 3 },
+  actions: { gap: 10 },
+  section: { fontSize: 11, letterSpacing: 1.5, fontWeight: "800", color: colors.muted, marginTop: 28, marginBottom: 10 },
+  word: { flexDirection: "row", alignItems: "center", paddingVertical: 12, gap: 14 },
+  border: { borderTopWidth: 1, borderTopColor: colors.line },
+  hanzi: { fontSize: 27, fontWeight: "700", color: colors.ink, width: 70 },
+  pinyin: { color: colors.green, fontWeight: "700" },
+  russian: { color: colors.muted, marginTop: 3 },
+  guessStats: { color: colors.muted, fontSize: 9, marginTop: 3 },
+  count: { color: colors.muted, fontSize: 11 },
+  empty: { color: colors.muted, textAlign: "center", padding: 20 },
+  error: { color: colors.red, marginBottom: 12 },
+});

@@ -205,6 +205,7 @@ export default function Cards() {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.mistakePinyin}>{w!.pinyin}</Text>
                     <Text style={styles.mistakeRussian}>{w!.russian}</Text>
+                    <WordGuessStats word={w!} />
                   </View>
                 </View>
               ))}
@@ -253,6 +254,7 @@ export default function Cards() {
           <>
             <Text style={styles.side}>RUSSIAN</Text>
             <Text style={styles.question}>{word.russian}</Text>
+            <WordGuessStats word={word} />
             <Text style={styles.hint}>Tap to reveal</Text>
           </>
         ) : (
@@ -332,6 +334,7 @@ function GraduationCelebration({
       <Text style={styles.learnedHanzi}>{graduation.learned.hanzi}</Text>
       <Text style={styles.learnedPinyin}>{graduation.learned.pinyin}</Text>
       <Text style={styles.learnedRussian}>{graduation.learned.russian}</Text>
+      <WordGuessStats word={graduation.learned} />
       {graduation.replacement ? (
         <View
           style={[
@@ -347,11 +350,20 @@ function GraduationCelebration({
           <Text style={styles.learnedRussian}>
             {graduation.replacement.russian}
           </Text>
+          <WordGuessStats word={graduation.replacement} />
         </View>
       ) : (
         <Text style={styles.deckComplete}>No queued word is waiting to replace it.</Text>
       )}
     </View>
+  );
+}
+
+function WordGuessStats({ word }: { word: Word }) {
+  return (
+    <Text style={styles.guessStats}>
+      ✓ {word.cardSrsCorrect} · ✗ {word.cardSrsIncorrect}
+    </Text>
   );
 }
 
@@ -446,6 +458,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.8,
   },
   deckComplete: { color: colors.muted, textAlign: "center", marginTop: 20 },
+  guessStats: { color: colors.muted, fontSize: 9, marginTop: 4 },
   hanziRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   exampleChinese: {
     flex: 1,
