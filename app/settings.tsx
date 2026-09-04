@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  Animated,
+  LayoutChangeEvent,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,6 +18,9 @@ import { router } from "expo-router";
 import { Settings as SettingsData } from "@/types";
 import { validateApiKey } from "@/deepseek";
 import { getActivePoolQueue } from "@/card-srs";
+import { ImportedWord } from "@/ocr";
+import hskLevels from "@/data/hsk-levels.json";
+import dictionaryRows from "@/data/hsk-russian.json";
 import {
   getTtsProvider,
   speakMandarin,
@@ -24,7 +29,17 @@ import {
 } from "@/tts";
 
 export default function Settings() {
-  const { data, patch } = useStore();
+  const { data, importWords, patch } = useStore();
+  const scrollRef = useRef<ScrollView>(null);
+  const sectionOffsets = useRef<Record<SettingsSection, number>>({
+    general: 0,
+    audio: 0,
+    vocabulary: 0,
+    cards: 0,
+    progress: 0,
+  });
+  const drawerPosition = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
+  const [menuOpen, setMenuOpen] = useState(false);
   const [keyValidation, setKeyValidation] = useState<
     "idle" | "checking" | "valid" | "invalid" | "error"
   >(data.settings.apiKeyValidated ? "valid" : "idle");
@@ -121,23 +136,44 @@ export default function Settings() {
     </View>
   );
 
+  const setDrawerOpen = (open: boolean) => {
+    setMenuOpen(open);
+    Animated.timing(drawerPosition, {
+      toValue: open ? 0 : -DRAWER_WIDTH,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  };
+  const recordSection = (section: SettingsSection) => (event: LayoutChangeEvent) => {
+    sectionOffsets.current[section] = event.nativeEvent.layout.y;
+  };
+  const goToSection = (section: SettingsSection) => {
+    scrollRef.current?.scrollTo({
+      y: Math.max(0, sectionOffsets.current[section] - 16),
+      animated: true,
+    });
+    setDrawerOpen(false);
+  };
+
   return (
-    <ScrollView
-      style={shell.page}
-      contentContainerStyle={shell.content}
-      keyboardShouldPersistTaps="handled"
-    >
-      <Header
-        eyebrow="Configuration"
-        title="Settings"
-        subtitle="Your key and study data stay in this app's local storage."
-      />
-      <View
-        style={[
-          shell.panel,
-          data.settings.apiKeyValidated && styles.deepSeekValidated,
-        ]}
+    <View style={shell.page}>
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={[shell.content, styles.settingsContent]}
+        keyboardShouldPersistTaps="handled"
       >
+        <Header
+          eyebrow="Configuration"
+          title="Settings"
+          subtitle="Your key and study data stay in this app's local storage."
+        />
+        <View
+          onLayout={recordSection("general")}
+          style={[
+            shell.panel,
+            data.settings.apiKeyValidated && styles.deepSeekValidated,
+          ]}
+        >
         <Field
           label="DEEPSEEK API KEY"
           value={data.settings.apiKey}
@@ -188,7 +224,9 @@ export default function Settings() {
           </View>
         ) : null}
       </View>
-      <TtsSettings settings={data.settings} update={update} />
+      <View onLayout={recordSection("audio")}>
+        <TtsSettings settings={data.settings} update={update} />
+      </View>
       <View style={styles.privacy}>
         <Text style={styles.icon}>⌁</Text>
         <View style={{ flex: 1 }}>
@@ -199,19 +237,29 @@ export default function Settings() {
           </Text>
         </View>
       </View>
-      <View style={styles.settingsAction}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.privacyTitle}>Import vocabulary</Text>
-          <Text style={styles.help}>
-            Add words from screenshots, HSK lists, or a QR backup.
-          </Text>
+      <View onLayout={recordSection("vocabulary")}>
+        <View style={styles.sectionHeading}>
+          <Text style={styles.sectionTitle}>Vocabulary</Text>
+          <Text style={styles.help}>Build your deck from an HSK level or another source.</Text>
         </View>
-        <Button
-          secondary
-          label="Import"
-          icon="scan-outline"
-          onPress={() => router.push("/import")}
+        <HskAdder
+          existing={new Set(data.words.map((word) => word.hanzi))}
+          onAdd={importWords}
         />
+        <View style={styles.settingsAction}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.privacyTitle}>Other import options</Text>
+            <Text style={styles.help}>
+              Add words from screenshots or restore a QR backup.
+            </Text>
+          </View>
+          <Button
+            secondary
+            label="Import"
+            icon="scan-outline"
+            onPress={() => router.push("/import")}
+          />
+        </View>
       </View>
       <View
         style={styles.settingsAction}
@@ -229,7 +277,7 @@ export default function Settings() {
           onPress={() => router.push("/qr-export")}
         />
       </View>
-      <View style={styles.sectionHeading}>
+      <View style={styles.sectionHeading} onLayout={recordSection("cards")}>
         <View>
           <Text style={styles.sectionTitle}>Active card set</Text>
           <Text style={styles.help}>
@@ -273,7 +321,7 @@ export default function Settings() {
           <Text style={styles.empty}>No words are waiting for an active slot.</Text>
         )}
       </View>
-      <View style={styles.sectionHeading}>
+      <View style={styles.sectionHeading} onLayout={recordSection("progress")}>
         <View>
           <Text style={styles.sectionTitle}>Word SRS progress</Text>
           <Text style={styles.help}>
@@ -325,7 +373,118 @@ export default function Settings() {
           </Text>
         )}
       </View>
-    </ScrollView>
+      </ScrollView>
+      {menuOpen ? (
+        <Pressable
+          accessibilityLabel="Close settings navigation"
+          onPress={() => setDrawerOpen(false)}
+          style={styles.drawerBackdrop}
+        />
+      ) : null}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={
+          menuOpen ? "Close settings navigation" : "Open settings navigation"
+        }
+        onPress={() => setDrawerOpen(!menuOpen)}
+        style={({ pressed }) => [styles.menuButton, pressed && styles.pressed]}
+      >
+        <Text style={styles.menuButtonIcon}>{menuOpen ? "×" : "☰"}</Text>
+      </Pressable>
+      <Animated.View
+        pointerEvents={menuOpen ? "auto" : "none"}
+        style={[styles.drawer, { transform: [{ translateX: drawerPosition }] }]}
+      >
+        <Text style={styles.drawerEyebrow}>SETTINGS</Text>
+        <Text style={styles.drawerTitle}>Jump to</Text>
+        {SETTINGS_SECTIONS.map((item) => (
+          <Pressable
+            key={item.key}
+            accessibilityRole="button"
+            onPress={() => goToSection(item.key)}
+            style={({ pressed }) => [
+              styles.drawerItem,
+              pressed && styles.drawerItemPressed,
+            ]}
+          >
+            <Text style={styles.drawerItemText}>{item.label}</Text>
+            <Text style={styles.drawerArrow}>›</Text>
+          </Pressable>
+        ))}
+      </Animated.View>
+    </View>
+  );
+}
+
+type SettingsSection = "general" | "audio" | "vocabulary" | "cards" | "progress";
+const DRAWER_WIDTH = 268;
+const SETTINGS_SECTIONS: { key: SettingsSection; label: string }[] = [
+  { key: "general", label: "General" },
+  { key: "audio", label: "Mandarin audio" },
+  { key: "vocabulary", label: "Vocabulary" },
+  { key: "cards", label: "Active card set" },
+  { key: "progress", label: "SRS progress" },
+];
+
+function HskAdder({
+  existing,
+  onAdd,
+}: {
+  existing: Set<string>;
+  onAdd: (words: ImportedWord[]) => number;
+}) {
+  const [level, setLevel] = useState(1);
+  const [message, setMessage] = useState("");
+  const dictionary = new Map(
+    (dictionaryRows as [string, string, string][]).map(([hanzi, pinyin, russian]) => [
+      hanzi,
+      { hanzi, pinyin, russian },
+    ]),
+  );
+  const cumulative = hskLevels as Record<string, string[]>;
+  const lowerLevelWords = new Set(level > 1 ? cumulative[String(level - 1)] : []);
+  const available = (cumulative[String(level)] ?? []).filter(
+    (hanzi) => !lowerLevelWords.has(hanzi) && dictionary.has(hanzi) && !existing.has(hanzi),
+  );
+  const addWords = () => {
+    const count = onAdd(available.slice(0, 7).map((hanzi) => dictionary.get(hanzi)!));
+    setMessage(
+      count
+        ? `Added ${count} new HSK ${level} word${count === 1 ? "" : "s"}.`
+        : `No more HSK ${level} words are available.`,
+    );
+  };
+
+  return (
+    <View style={styles.hskPanel}>
+      <Text style={styles.privacyTitle}>Add HSK words</Text>
+      <Text style={styles.help}>Choose a level and add seven new words at a time.</Text>
+      <View style={styles.hskLevels}>
+        {[1, 2, 3, 4, 5, 6].map((value) => (
+          <Choice
+            key={value}
+            label={`HSK ${value}`}
+            selected={level === value}
+            onPress={() => {
+              setLevel(value);
+              setMessage("");
+            }}
+          />
+        ))}
+      </View>
+      <Text style={styles.hskRemaining}>
+        {available.length} HSK {level} words remaining
+      </Text>
+      <View style={styles.hskButton}>
+        <Button
+          label={`Add 7 HSK ${level} words`}
+          icon="add-circle-outline"
+          disabled={!available.length}
+          onPress={addWords}
+        />
+      </View>
+      {message ? <Text style={styles.hskMessage}>{message}</Text> : null}
+    </View>
   );
 }
 
@@ -440,6 +599,78 @@ function Field(props: {
 }
 
 const styles = StyleSheet.create({
+  settingsContent: { paddingTop: 32 },
+  menuButton: {
+    position: "absolute",
+    left: 12,
+    top: 12,
+    zIndex: 4,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.green,
+    shadowColor: "#000",
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 5,
+  },
+  menuButtonIcon: {
+    color: colors.white,
+    fontSize: 23,
+    fontWeight: "800",
+    lineHeight: 25,
+  },
+  pressed: { opacity: 0.72 },
+  drawerBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 2,
+    backgroundColor: "rgba(24, 35, 29, 0.32)",
+  },
+  drawer: {
+    position: "absolute",
+    zIndex: 3,
+    top: 0,
+    bottom: 0,
+    left: 0,
+    width: DRAWER_WIDTH,
+    paddingTop: 78,
+    paddingHorizontal: 20,
+    backgroundColor: colors.card,
+    borderRightWidth: 1,
+    borderRightColor: colors.line,
+    shadowColor: "#000",
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    shadowOffset: { width: 5, height: 0 },
+    elevation: 8,
+  },
+  drawerEyebrow: {
+    color: colors.coral,
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1.6,
+  },
+  drawerTitle: {
+    color: colors.ink,
+    fontSize: 25,
+    fontWeight: "800",
+    marginTop: 6,
+    marginBottom: 18,
+  },
+  drawerItem: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderBottomWidth: 1,
+    borderBottomColor: colors.line,
+  },
+  drawerItemPressed: { opacity: 0.55 },
+  drawerItemText: { color: colors.ink, fontSize: 15, fontWeight: "700" },
+  drawerArrow: { color: colors.green, fontSize: 24 },
   deepSeekValidated: { backgroundColor: "#EAF7ED", borderColor: "#AED8B7" },
   validationStatus: { color: colors.muted, marginTop: -4, marginBottom: 14 },
   validationSuccess: { color: colors.green, fontWeight: "700" },
@@ -462,6 +693,17 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: 15,
   },
+  hskPanel: {
+    padding: 17,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 15,
+  },
+  hskLevels: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 14 },
+  hskRemaining: { color: colors.muted, fontSize: 12, marginTop: 14 },
+  hskButton: { alignSelf: "flex-start", marginTop: 12 },
+  hskMessage: { color: colors.green, fontWeight: "700", marginTop: 12 },
   ttsPanel: { marginTop: 14 },
   ttsLabel: { marginTop: 18 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
