@@ -526,8 +526,7 @@ function TtsSettings({
     <View style={[shell.panel, styles.ttsPanel]}>
       <Text style={styles.sectionTitle}>Mandarin audio</Text>
       <Text style={styles.help}>
-        Browser speech is free and stays on-device. Provider adapter can be
-        replaced later without changing cards.
+        Browser speech is free and stays on-device.
       </Text>
       {!provider.supported() ? (
         <Text style={styles.error}>Speech unavailable in this browser.</Text>
