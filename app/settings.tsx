@@ -15,6 +15,7 @@ import { Button } from "@/ui";
 import { router } from "expo-router";
 import { Settings as SettingsData } from "@/types";
 import { validateApiKey } from "@/deepseek";
+import { getActivePoolQueue } from "@/card-srs";
 import {
   getTtsProvider,
   speakMandarin,
@@ -102,6 +103,7 @@ export default function Settings() {
   const activeWords = data.words
     .filter((word) => word.cardActive)
     .sort((a, b) => (a.cardIntroducedAt ?? 0) - (b.cardIntroducedAt ?? 0));
+  const queuedWords = getActivePoolQueue(data.words);
   const stat = (
     level: number,
     correct: number,
@@ -242,6 +244,34 @@ export default function Settings() {
             <Text style={styles.activeStep}>step {Math.min(3, word.cardSrsLevel + 1)}/3</Text>
           </View>
         ))}
+      </View>
+      <View style={styles.queue}>
+        <Text style={styles.queueTitle}>UP NEXT</Text>
+        <Text style={[styles.help, styles.queueHelp]}>
+          Words enter the active set in this order as learning slots open.
+        </Text>
+        {queuedWords.length ? (
+          queuedWords.map((word, index) => (
+            <View
+              key={word.id}
+              style={[styles.queueRow, index > 0 && styles.tableBorder]}
+            >
+              <Text style={styles.queuePosition}>{index + 1}</Text>
+              <Text style={styles.queueHanzi}>{word.hanzi}</Text>
+              <View style={styles.wordCell}>
+                <Text style={styles.queuePinyin}>{word.pinyin}</Text>
+                <Text numberOfLines={1} style={styles.wordMeta}>
+                  {word.russian}
+                </Text>
+              </View>
+              <Text style={styles.queueScore}>
+                ✓{word.cardSrsCorrect} ✗{word.cardSrsIncorrect}
+              </Text>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.empty}>No words are waiting for an active slot.</Text>
+        )}
       </View>
       <View style={styles.sectionHeading}>
         <View>
@@ -483,6 +513,34 @@ const styles = StyleSheet.create({
   activeWord: { backgroundColor: colors.pale, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 },
   activeHanzi: { color: colors.ink, fontSize: 19, fontWeight: "800" },
   activeStep: { color: colors.green, fontSize: 10, marginTop: 2 },
+  queue: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 16,
+    backgroundColor: colors.card,
+    overflow: "hidden",
+    paddingTop: 14,
+  },
+  queueTitle: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 1.3,
+    paddingHorizontal: 14,
+  },
+  queueHelp: { paddingHorizontal: 14, paddingBottom: 8 },
+  queueRow: {
+    minHeight: 56,
+    marginHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  queuePosition: { width: 22, color: colors.muted, fontSize: 11 },
+  queueHanzi: { width: 52, color: colors.ink, fontSize: 20, fontWeight: "800" },
+  queuePinyin: { color: colors.green, fontSize: 12, fontWeight: "700" },
+  queueScore: { color: colors.muted, fontSize: 9 },
   table: {
     borderWidth: 1,
     borderColor: colors.line,

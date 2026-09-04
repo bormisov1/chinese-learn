@@ -25,6 +25,16 @@ function activePriority(a: Word, b: Word) {
   );
 }
 
+/** Words waiting to enter the active pool, in the exact order fillActivePool uses. */
+export function getActivePoolQueue(words: Word[]): Word[] {
+  return words
+    .filter(
+      (word) =>
+        !word.cardActive && word.cardSrsLevel < CARD_GRADUATION_LEVEL,
+    )
+    .sort(activePriority);
+}
+
 export function fillActivePool(words: Word[], at = Date.now()): Word[] {
   const selected = new Set(
     words
