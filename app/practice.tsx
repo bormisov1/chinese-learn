@@ -29,6 +29,7 @@ export default function Practice() {
   const [direction, setDirection] = useState<PracticeDirection>("zh-ru");
   const [lastSentenceId, setLastSentenceId] = useState<string>();
   const [answer, setAnswer] = useState(""),
+    [submittedAnswer, setSubmittedAnswer] = useState(""),
     [evaluation, setEvaluation] = useState<Evaluation>(),
     [explanation, setExplanation] = useState<Explanation>(),
     [busy, setBusy] = useState(false),
@@ -71,6 +72,7 @@ export default function Practice() {
 
   const resetAnswer = () => {
     setAnswer("");
+    setSubmittedAnswer("");
     setEvaluation(undefined);
     setExplanation(undefined);
     setError("");
@@ -81,14 +83,16 @@ export default function Practice() {
   };
   const run = async () => {
     if (!sentence || !answer.trim()) return;
+    const trimmedAnswer = answer.trim();
     setBusy(true);
     setError("");
     try {
       const result = await (direction === "zh-ru" ? evaluate : evaluateChinese)(
         data.settings,
         sentence,
-        answer.trim(),
+        trimmedAnswer,
       );
+      setSubmittedAnswer(trimmedAnswer);
       setEvaluation(result);
       patch((d) => ({
         ...d,
@@ -96,7 +100,7 @@ export default function Practice() {
           ...d.attempts,
           {
             sentenceId: sentence.id,
-            answer: answer.trim(),
+            answer: trimmedAnswer,
             evaluation: result,
             direction,
             at: Date.now(),
@@ -281,6 +285,12 @@ export default function Practice() {
           <Text style={styles.feedbackTitle}>
             {evaluation.correct ? "✓  Correct" : "Not quite yet"}
           </Text>
+          {!evaluation.correct && (
+            <View style={styles.translationResult}>
+              <Text style={styles.resultLabel}>YOUR TRANSLATION</Text>
+              <Text style={styles.submittedAnswer}>{submittedAnswer}</Text>
+            </View>
+          )}
           <Text style={styles.pinyin}>{evaluation.pinyin}</Text>
           {evaluation.correction && (
             <View style={styles.audioRow}>
@@ -391,6 +401,18 @@ const styles = StyleSheet.create({
   correct: { backgroundColor: "#EEF5F0", borderColor: "#C9DBCF" },
   incorrect: { backgroundColor: "#FFF4F0", borderColor: "#EDCFC5" },
   feedbackTitle: { fontSize: 18, fontWeight: "800", color: colors.ink },
+  translationResult: { marginTop: 14 },
+  resultLabel: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1.4,
+  },
+  submittedAnswer: {
+    color: colors.red,
+    fontSize: 18,
+    marginTop: 5,
+  },
   pinyin: { color: colors.green, fontSize: 16, marginTop: 12 },
   correction: {
     color: colors.ink,
