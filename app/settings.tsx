@@ -286,9 +286,17 @@ export default function Settings() {
           );
         })}
       </Animated.View>
-      <ScrollView
+      <Animated.ScrollView
         ref={scrollRef}
-        style={styles.settingsScroll}
+        style={[
+          styles.settingsScroll,
+          {
+            marginLeft: sidebarCollapse.interpolate({
+              inputRange: [0, 1],
+              outputRange: [SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH],
+            }),
+          },
+        ]}
         contentContainerStyle={[shell.content, styles.settingsContent]}
         keyboardShouldPersistTaps="handled"
         onScroll={trackSection}
@@ -541,7 +549,7 @@ export default function Settings() {
           </Text>
         )}
       </View>
-      </ScrollView>
+      </Animated.ScrollView>
       <WordDetailsModal
         word={selectedWord}
         settings={data.settings}
@@ -804,7 +812,7 @@ function Field(props: {
 
 const styles = StyleSheet.create({
   settingsContent: { paddingTop: 32 },
-  settingsScroll: { marginLeft: SIDEBAR_WIDTH },
+  settingsScroll: {},
   sideMenu: {
     position: "absolute",
     top: 0,
