@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Animated,
   LayoutChangeEvent,
@@ -45,9 +45,6 @@ export default function Settings() {
   const [activeSection, setActiveSection] = useState<SettingsSection>("general");
   const [selectedWord, setSelectedWord] = useState<Word | null>(null);
   const indicatorPosition = useRef(new Animated.Value(0)).current;
-  const sidebarCollapse = useRef(new Animated.Value(0)).current;
-  const sidebarCollapsed = useRef(false);
-  const sidebarTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [keyValidation, setKeyValidation] = useState<
     "idle" | "checking" | "valid" | "invalid" | "error"
   >(data.settings.apiKeyValidated ? "valid" : "idle");
@@ -154,44 +151,10 @@ export default function Settings() {
       useNativeDriver: true,
     }).start();
   }, [activeSection, indicatorPosition]);
-  const animateSidebar = useCallback(
-    (collapsed: boolean) => {
-      if (sidebarCollapsed.current === collapsed) return;
-      sidebarCollapsed.current = collapsed;
-      sidebarCollapse.stopAnimation();
-      Animated.timing(sidebarCollapse, {
-        toValue: collapsed ? 1 : 0,
-        duration: SIDEBAR_ANIMATION_MS,
-        useNativeDriver: false,
-      }).start();
-    },
-    [sidebarCollapse],
-  );
-  const showSidebar = useCallback(() => {
-    if (sidebarTimer.current) clearTimeout(sidebarTimer.current);
-    sidebarTimer.current = null;
-    animateSidebar(false);
-  }, [animateSidebar]);
-  const scheduleSidebarCollapse = useCallback(() => {
-    if (sidebarTimer.current) clearTimeout(sidebarTimer.current);
-    sidebarTimer.current = setTimeout(() => {
-      sidebarTimer.current = null;
-      animateSidebar(true);
-    }, SIDEBAR_IDLE_MS);
-  }, [animateSidebar]);
-  useEffect(() => {
-    scheduleSidebarCollapse();
-    return () => {
-      if (sidebarTimer.current) clearTimeout(sidebarTimer.current);
-      sidebarCollapse.stopAnimation();
-    };
-  }, [scheduleSidebarCollapse, sidebarCollapse]);
   const recordSection = (section: SettingsSection) => (event: LayoutChangeEvent) => {
     sectionOffsets.current[section] = event.nativeEvent.layout.y;
   };
   const trackSection = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    showSidebar();
-    scheduleSidebarCollapse();
     const position = event.nativeEvent.contentOffset.y + 120;
     const visible = SETTINGS_SECTIONS.reduce<SettingsSection>(
       (current, item) =>
@@ -201,8 +164,6 @@ export default function Settings() {
     setActiveSection((current) => (current === visible ? current : visible));
   };
   const goToSection = (section: SettingsSection) => {
-    showSidebar();
-    scheduleSidebarCollapse();
     setActiveSection(section);
     scrollRef.current?.scrollTo({
       y: Math.max(0, sectionOffsets.current[section] - 16),
@@ -211,35 +172,13 @@ export default function Settings() {
   };
 
   return (
-    <View
-      style={shell.page}
-      onTouchStart={showSidebar}
-      onTouchEnd={scheduleSidebarCollapse}
-      onTouchCancel={scheduleSidebarCollapse}
-    >
-      <Animated.View
-        style={[
-          styles.sideMenu,
-          {
-            width: sidebarCollapse.interpolate({
-              inputRange: [0, 1],
-              outputRange: [SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH],
-            }),
-          },
-        ]}
-        accessibilityRole="tablist"
-      >
+    <View style={shell.page}>
+      <View style={styles.sideMenu} accessibilityRole="tablist">
         <Animated.View
           pointerEvents="none"
           style={[
             styles.sectionIndicator,
-            {
-              width: sidebarCollapse.interpolate({
-                inputRange: [0, 1],
-                outputRange: [SIDEBAR_WIDTH - 24, SIDEBAR_COLLAPSED_WIDTH - 24],
-              }),
-              transform: [{ translateY: indicatorPosition }],
-            },
+            { transform: [{ translateY: indicatorPosition }] },
           ]}
         />
         {SETTINGS_SECTIONS.map((item) => {
@@ -261,49 +200,19 @@ export default function Settings() {
                 size={23}
                 color={selected ? colors.green : "#8B8E86"}
               />
-              <Animated.Text
-                numberOfLines={1}
-                style={[
-                  styles.sideMenuLabel,
-                  selected && styles.sideMenuLabelActive,
-                  {
-                    height: sidebarCollapse.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [12, 0],
-                    }),
-                    marginTop: sidebarCollapse.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [4, 0],
-                    }),
-                    opacity: sidebarCollapse.interpolate({
-                      inputRange: [0, 0.6, 1],
-                      outputRange: [1, 0, 0],
-                    }),
-                  },
-                ]}
-              >
+              <Text style={[styles.sideMenuLabel, selected && styles.sideMenuLabelActive]}>
                 {item.label}
-              </Animated.Text>
+              </Text>
             </Pressable>
           );
         })}
-      </Animated.View>
-      <Animated.ScrollView
+      </View>
+      <ScrollView
         ref={scrollRef}
-        style={[
-          styles.settingsScroll,
-          {
-            marginLeft: sidebarCollapse.interpolate({
-              inputRange: [0, 1],
-              outputRange: [SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH],
-            }),
-          },
-        ]}
+        style={styles.settingsScroll}
         contentContainerStyle={[shell.content, styles.settingsContent]}
         keyboardShouldPersistTaps="handled"
         onScroll={trackSection}
-        onMomentumScrollBegin={showSidebar}
-        onMomentumScrollEnd={scheduleSidebarCollapse}
         scrollEventThrottle={32}
       >
         <Header
@@ -549,7 +458,7 @@ export default function Settings() {
           </Text>
         )}
       </View>
-      </Animated.ScrollView>
+      </ScrollView>
       <WordDetailsModal
         word={selectedWord}
         settings={data.settings}
@@ -623,9 +532,6 @@ function WordDetailsModal({
 
 type SettingsSection = "general" | "audio" | "vocabulary" | "cards" | "progress";
 const SIDEBAR_WIDTH = 76;
-const SIDEBAR_COLLAPSED_WIDTH = 48;
-const SIDEBAR_IDLE_MS = 700;
-const SIDEBAR_ANIMATION_MS = 220;
 const NAV_ITEM_HEIGHT = 70;
 const SETTINGS_SECTIONS: {
   key: SettingsSection;
@@ -812,7 +718,7 @@ function Field(props: {
 
 const styles = StyleSheet.create({
   settingsContent: { paddingTop: 32 },
-  settingsScroll: {},
+  settingsScroll: { marginLeft: SIDEBAR_WIDTH },
   sideMenu: {
     position: "absolute",
     top: 0,
@@ -827,17 +733,16 @@ const styles = StyleSheet.create({
     borderRightColor: colors.line,
   },
   sideMenuItem: {
-    width: "100%",
+    width: SIDEBAR_WIDTH,
     height: NAV_ITEM_HEIGHT,
     alignItems: "center",
     justifyContent: "center",
+    gap: 4,
   },
   sideMenuLabel: {
     color: "#8B8E86",
     fontSize: 10,
-    lineHeight: 12,
     fontWeight: "700",
-    overflow: "hidden",
   },
   sideMenuLabelActive: { color: colors.green },
   sectionIndicator: {
@@ -845,6 +750,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
     top: 18 + NAV_ITEM_HEIGHT - 3,
     right: 12,
+    width: SIDEBAR_WIDTH - 24,
     height: 3,
     borderRadius: 2,
     backgroundColor: colors.green,
