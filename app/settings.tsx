@@ -190,6 +190,8 @@ export default function Settings() {
     sectionOffsets.current[section] = event.nativeEvent.layout.y;
   };
   const trackSection = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    showSidebar();
+    scheduleSidebarCollapse();
     const position = event.nativeEvent.contentOffset.y + 120;
     const visible = SETTINGS_SECTIONS.reduce<SettingsSection>(
       (current, item) =>
@@ -300,8 +302,6 @@ export default function Settings() {
         contentContainerStyle={[shell.content, styles.settingsContent]}
         keyboardShouldPersistTaps="handled"
         onScroll={trackSection}
-        onScrollBeginDrag={showSidebar}
-        onScrollEndDrag={scheduleSidebarCollapse}
         onMomentumScrollBegin={showSidebar}
         onMomentumScrollEnd={scheduleSidebarCollapse}
         scrollEventThrottle={32}
