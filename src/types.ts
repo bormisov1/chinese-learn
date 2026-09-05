@@ -55,6 +55,7 @@ export type Settings = {
   ttsProvider: string;
   ttsVoiceURI: string;
   ttsRate: number;
+  automaticWordAddition: boolean;
 };
 export type PracticeDirection = "zh-ru" | "ru-zh";
 export type StoreData = {
@@ -69,5 +70,6 @@ export type StoreData = {
     at: number;
   }[];
   cardRound: number;
+  onboardingComplete: boolean;
   settings: Settings;
 };

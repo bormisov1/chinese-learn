@@ -4,8 +4,9 @@ import { emptyStore, loadStore, saveStore } from './storage';
 import { StoreData, Word } from './types';
 import { ImportedWord } from './ocr';
 import { fillActivePool } from './card-srs';
+import { replenishAutomaticWords } from './hsk-vocabulary';
 
-type Context = { data: StoreData; ready: boolean; generating: boolean; error: string; importWords: (items: ImportedWord[]) => number; importWordBackup: (items: Omit<Word, 'id'>[]) => number; patch: (fn: (data: StoreData) => StoreData) => void; generateBatch: (mandatory?: Word) => Promise<void> };
+type Context = { data: StoreData; ready: boolean; generating: boolean; error: string; importWords: (items: ImportedWord[]) => number; importWordBackup: (items: Omit<Word, 'id'>[]) => number; patch: (fn: (data: StoreData) => StoreData) => void; setAutomaticWordAddition: (enabled: boolean, completeOnboarding?: boolean) => void; generateBatch: (mandatory?: Word) => Promise<void> };
 const StoreContext = createContext<Context>(null as never);
 const id = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -13,7 +14,22 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [data, setData] = useState<StoreData>(emptyStore), [ready, setReady] = useState(false), [generating, setGenerating] = useState(false), [error, setError] = useState('');
   useEffect(() => { loadStore().then(value => { setData(value); setReady(true); }); }, []);
   useEffect(() => { if (ready) saveStore(data); }, [data, ready]);
+  useEffect(() => {
+    if (!ready || !data.onboardingComplete || !data.settings.automaticWordAddition) return;
+    setData(current => {
+      const words = replenishAutomaticWords(current.words);
+      return words === current.words ? current : { ...current, words };
+    });
+  }, [ready, data.onboardingComplete, data.settings.automaticWordAddition, data.words]);
   const patch = (fn: (value: StoreData) => StoreData) => setData(fn);
+  const setAutomaticWordAddition = (enabled: boolean, completeOnboarding = false) => {
+    setData(current => ({
+      ...current,
+      onboardingComplete: completeOnboarding || current.onboardingComplete,
+      settings: { ...current.settings, automaticWordAddition: enabled },
+      words: enabled ? replenishAutomaticWords(current.words) : current.words,
+    }));
+  };
   const importWords = (items: ImportedWord[]) => {
     const existing = new Set(data.words.map(w => w.hanzi));
     const fresh = items.filter(w => !existing.has(w.hanzi));
@@ -48,7 +64,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       });
     } catch (e) { setError(e instanceof Error ? e.message : 'Generation failed'); } finally { setGenerating(false); }
   };
-  const value = useMemo(() => ({ data, ready, generating, error, importWords, importWordBackup, patch, generateBatch }), [data, ready, generating, error]);
+  const value = useMemo(() => ({ data, ready, generating, error, importWords, importWordBackup, patch, setAutomaticWordAddition, generateBatch }), [data, ready, generating, error]);
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
 export const useStore = () => useContext(StoreContext);
