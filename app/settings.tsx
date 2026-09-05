@@ -477,6 +477,10 @@ function WordDetailsModal({
   settings: SettingsData;
   onClose: () => void;
 }) {
+  const lastWord = useRef<Word | null>(word);
+  if (word) lastWord.current = word;
+  const displayedWord = lastWord.current;
+
   return (
     <Modal
       animationType="fade"
@@ -504,16 +508,20 @@ function WordDetailsModal({
           >
             <Ionicons name="close" size={24} color={colors.muted} />
           </Pressable>
-          {word ? (
+          {displayedWord ? (
             <>
               <Text style={styles.detailsLabel}>WORD DETAILS</Text>
               <View style={styles.detailsHanziRow}>
-                <Text style={styles.detailsHanzi}>{word.hanzi}</Text>
-                <SpeakerButton text={word.hanzi} settings={settings} size={23} />
+                <Text style={styles.detailsHanzi}>{displayedWord.hanzi}</Text>
+                <SpeakerButton
+                  text={displayedWord.hanzi}
+                  settings={settings}
+                  size={23}
+                />
               </View>
-              <Text style={styles.detailsPinyin}>{word.pinyin}</Text>
+              <Text style={styles.detailsPinyin}>{displayedWord.pinyin}</Text>
               <View style={styles.detailsRule} />
-              <Text style={styles.detailsTranslation}>{word.russian}</Text>
+              <Text style={styles.detailsTranslation}>{displayedWord.russian}</Text>
             </>
           ) : null}
         </Pressable>
