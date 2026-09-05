@@ -428,15 +428,26 @@ function ExampleRow({
         <SpeakerButton text={sentence.chinese} settings={settings} />
       </View>
       <View style={styles.exampleHelp}>
-        <Text style={styles.examplePinyin}>{sentence.pinyin}</Text>
-        <Text style={styles.exampleRussian}>{sentence.russian}</Text>
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.exampleTranslationCover,
-            { opacity: translationCoverOpacity },
-          ]}
-        />
+        <View style={styles.exampleCoveredLine}>
+          <Text style={styles.examplePinyin}>{sentence.pinyin}</Text>
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.exampleTranslationCover,
+              { opacity: translationCoverOpacity },
+            ]}
+          />
+        </View>
+        <View style={[styles.exampleCoveredLine, styles.exampleRussianLine]}>
+          <Text style={styles.exampleRussian}>{sentence.russian}</Text>
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.exampleTranslationCover,
+              { opacity: translationCoverOpacity },
+            ]}
+          />
+        </View>
       </View>
     </Pressable>
   );
@@ -634,16 +645,20 @@ const styles = StyleSheet.create({
     borderLeftWidth: 1,
     borderLeftColor: colors.line,
     paddingLeft: 18,
+  },
+  exampleCoveredLine: {
+    alignSelf: "flex-start",
+    maxWidth: "100%",
     position: "relative",
   },
   exampleTranslationCover: {
     ...StyleSheet.absoluteFillObject,
-    left: 18,
     borderRadius: 4,
-    backgroundColor: colors.white,
+    backgroundColor: colors.line,
   },
   examplePinyin: { color: colors.green, fontSize: 14, fontWeight: "700" },
-  exampleRussian: { color: colors.muted, fontSize: 13, marginTop: 3 },
+  exampleRussianLine: { marginTop: 3 },
+  exampleRussian: { color: colors.muted, fontSize: 13 },
   waiting: { color: colors.muted, marginTop: 20 },
   controls: { flexDirection: "row", gap: 10, marginTop: 16 },
 });
