@@ -10,6 +10,7 @@ export const emptyStore: StoreData = {
   wordSentenceIndex: {},
   attempts: [],
   cardRound: 0,
+  onboardingComplete: false,
   settings: {
     apiKey: "",
     apiKeyValidated: false,
@@ -19,6 +20,7 @@ export const emptyStore: StoreData = {
     ttsProvider: "browser",
     ttsVoiceURI: "",
     ttsRate: 0.85,
+    automaticWordAddition: false,
   },
 };
 
@@ -47,6 +49,8 @@ export async function loadStore(): Promise<StoreData> {
         cardLapses: w.cardLapses ?? w.cardSrsIncorrect ?? 0,
       }))),
       cardRound: parsed.cardRound ?? 0,
+      onboardingComplete:
+        parsed.onboardingComplete ?? (parsed.words?.length ?? 0) > 0,
       settings: { ...emptyStore.settings, ...parsed.settings },
     };
   } catch {

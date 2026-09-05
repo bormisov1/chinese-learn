@@ -32,7 +32,7 @@ import {
 } from "@/tts";
 
 export default function Settings() {
-  const { data, importWords, patch } = useStore();
+  const { data, importWords, patch, setAutomaticWordAddition } = useStore();
   const scrollRef = useRef<ScrollView>(null);
   const sectionOffsets = useRef<Record<SettingsSection, number>>({
     general: 0,
@@ -292,6 +292,19 @@ export default function Settings() {
         <View style={styles.sectionHeading}>
           <Text style={styles.sectionTitle}>Vocabulary</Text>
           <Text style={styles.help}>Build your deck from an HSK level or another source.</Text>
+        </View>
+        <View style={styles.autoWords}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.privacyTitle}>Automatic word addition</Text>
+            <Text style={styles.help}>
+              Keep 20 learning words ready, adding them in order from HSK 1 onward.
+            </Text>
+          </View>
+          <Switch
+            value={data.settings.automaticWordAddition}
+            onValueChange={setAutomaticWordAddition}
+            trackColor={{ false: colors.line, true: colors.green }}
+          />
         </View>
         <HskAdder
           existing={new Set(data.words.map((word) => word.hanzi))}
@@ -684,6 +697,7 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: 15,
   },
+  autoWords: { flexDirection: "row", alignItems: "center", gap: 14, padding: 17, marginBottom: 12, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: 15 },
   hskLevels: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 14 },
   hskRemaining: { color: colors.muted, fontSize: 12, marginTop: 14 },
   hskButton: { alignSelf: "flex-start", marginTop: 12 },
