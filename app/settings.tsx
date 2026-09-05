@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   Animated,
   LayoutChangeEvent,
+  Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
@@ -15,10 +16,10 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useStore } from "@/context";
 import { colors } from "@/theme";
-import { Header, shell } from "@/ui";
+import { Header, shell, SpeakerButton } from "@/ui";
 import { Button } from "@/ui";
 import { router } from "expo-router";
-import { Settings as SettingsData } from "@/types";
+import { Settings as SettingsData, Word } from "@/types";
 import { validateApiKey } from "@/deepseek";
 import { getActivePoolQueue } from "@/card-srs";
 import { ImportedWord } from "@/ocr";
@@ -42,6 +43,7 @@ export default function Settings() {
     progress: 0,
   });
   const [activeSection, setActiveSection] = useState<SettingsSection>("general");
+  const [selectedWord, setSelectedWord] = useState<Word | null>(null);
   const indicatorPosition = useRef(new Animated.Value(0)).current;
   const [keyValidation, setKeyValidation] = useState<
     "idle" | "checking" | "valid" | "invalid" | "error"
@@ -351,10 +353,16 @@ export default function Settings() {
       </View>
       <View style={styles.activeSet}>
         {activeWords.map((word) => (
-          <View key={word.id} style={styles.activeWord}>
+          <Pressable
+            key={word.id}
+            accessibilityRole="button"
+            accessibilityLabel={`View details for ${word.hanzi}`}
+            onPress={() => setSelectedWord(word)}
+            style={({ pressed }) => [styles.activeWord, pressed && styles.pressed]}
+          >
             <Text style={styles.activeHanzi}>{word.hanzi}</Text>
             <Text style={styles.activeStep}>step {Math.min(3, word.cardSrsLevel + 1)}/3</Text>
-          </View>
+          </Pressable>
         ))}
       </View>
       <View style={styles.queue}>
@@ -364,9 +372,16 @@ export default function Settings() {
         </Text>
         {queuedWords.length ? (
           queuedWords.map((word, index) => (
-            <View
+            <Pressable
               key={word.id}
-              style={[styles.queueRow, index > 0 && styles.tableBorder]}
+              accessibilityRole="button"
+              accessibilityLabel={`View details for ${word.hanzi}`}
+              onPress={() => setSelectedWord(word)}
+              style={({ pressed }) => [
+                styles.queueRow,
+                index > 0 && styles.tableBorder,
+                pressed && styles.pressed,
+              ]}
             >
               <Text style={styles.queuePosition}>{index + 1}</Text>
               <Text style={styles.queueHanzi}>{word.hanzi}</Text>
@@ -379,7 +394,7 @@ export default function Settings() {
               <Text style={styles.queueScore}>
                 ✓{word.cardSrsCorrect} ✗{word.cardSrsIncorrect}
               </Text>
-            </View>
+            </Pressable>
           ))
         ) : (
           <Text style={styles.empty}>No words are waiting for an active slot.</Text>
@@ -407,9 +422,16 @@ export default function Settings() {
         </View>
         {rankedWords.length ? (
           rankedWords.map((word, index) => (
-            <View
+            <Pressable
               key={word.id}
-              style={[styles.tableRow, index > 0 && styles.tableBorder]}
+              accessibilityRole="button"
+              accessibilityLabel={`View details for ${word.hanzi}`}
+              onPress={() => setSelectedWord(word)}
+              style={({ pressed }) => [
+                styles.tableRow,
+                index > 0 && styles.tableBorder,
+                pressed && styles.pressed,
+              ]}
             >
               <View style={styles.wordCell}>
                 <Text style={styles.hanzi}>{word.hanzi}</Text>
@@ -429,7 +451,7 @@ export default function Settings() {
                 word.cardSrsIncorrect,
                 word.cardSrsDueAt,
               )}
-            </View>
+            </Pressable>
           ))
         ) : (
           <Text style={styles.empty}>
@@ -438,7 +460,66 @@ export default function Settings() {
         )}
       </View>
       </ScrollView>
+      <WordDetailsModal
+        word={selectedWord}
+        settings={data.settings}
+        onClose={() => setSelectedWord(null)}
+      />
     </View>
+  );
+}
+
+function WordDetailsModal({
+  word,
+  settings,
+  onClose,
+}: {
+  word: Word | null;
+  settings: SettingsData;
+  onClose: () => void;
+}) {
+  return (
+    <Modal
+      animationType="fade"
+      transparent
+      visible={word !== null}
+      onRequestClose={onClose}
+    >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Close word details"
+        onPress={onClose}
+        style={styles.modalBackdrop}
+      >
+        <Pressable
+          accessibilityRole="none"
+          onPress={(event) => event.stopPropagation()}
+          style={styles.wordDetails}
+        >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            hitSlop={10}
+            onPress={onClose}
+            style={({ pressed }) => [styles.modalClose, pressed && styles.pressed]}
+          >
+            <Ionicons name="close" size={24} color={colors.muted} />
+          </Pressable>
+          {word ? (
+            <>
+              <Text style={styles.detailsLabel}>WORD DETAILS</Text>
+              <View style={styles.detailsHanziRow}>
+                <Text style={styles.detailsHanzi}>{word.hanzi}</Text>
+                <SpeakerButton text={word.hanzi} settings={settings} size={23} />
+              </View>
+              <Text style={styles.detailsPinyin}>{word.pinyin}</Text>
+              <View style={styles.detailsRule} />
+              <Text style={styles.detailsTranslation}>{word.russian}</Text>
+            </>
+          ) : null}
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -668,6 +749,60 @@ const styles = StyleSheet.create({
     backgroundColor: colors.green,
   },
   pressed: { opacity: 0.55 },
+  modalBackdrop: {
+    flex: 1,
+    padding: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(29, 35, 30, 0.46)",
+  },
+  wordDetails: {
+    width: "100%",
+    maxWidth: 440,
+    padding: 28,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.card,
+    shadowColor: "#1D231E",
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 10 },
+  },
+  modalClose: {
+    position: "absolute",
+    zIndex: 1,
+    top: 14,
+    right: 14,
+    width: 38,
+    height: 38,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 19,
+    backgroundColor: colors.paper,
+  },
+  detailsLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 1.5,
+  },
+  detailsHanziRow: {
+    marginTop: 16,
+    paddingRight: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  detailsHanzi: { color: colors.ink, fontSize: 52, fontWeight: "800" },
+  detailsPinyin: {
+    marginTop: 5,
+    color: colors.green,
+    fontSize: 20,
+    fontWeight: "700",
+  },
+  detailsRule: { height: 1, marginVertical: 20, backgroundColor: colors.line },
+  detailsTranslation: { color: colors.ink, fontSize: 17, lineHeight: 25 },
   deepSeekValidated: { backgroundColor: "#EAF7ED", borderColor: "#AED8B7" },
   validationStatus: { color: colors.muted, marginTop: -4, marginBottom: 14 },
   validationSuccess: { color: colors.green, fontWeight: "700" },
