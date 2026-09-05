@@ -1,5 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Animated,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useStore } from "@/context";
 import { colors } from "@/theme";
 import { Button, Header, shell, SpeakerButton } from "@/ui";
@@ -374,15 +381,20 @@ function ExampleRow({
   sentence: Sentence;
   settings: Settings;
 }) {
-  const [revealed, setRevealed] = useState(false);
+  const translationOpacity = useRef(new Animated.Value(0)).current;
+  const revealed = useRef(false);
+  const setTranslationVisible = (visible: boolean) => {
+    revealed.current = visible;
+    translationOpacity.setValue(visible ? 1 : 0);
+  };
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${sentence.chinese.replaceAll(" ", "")}. Copy sentence`}
-      onHoverIn={() => setRevealed(true)}
-      onHoverOut={() => setRevealed(false)}
+      onHoverIn={() => setTranslationVisible(true)}
+      onHoverOut={() => setTranslationVisible(false)}
       onPress={() => {
-        setRevealed((v) => !v);
+        setTranslationVisible(!revealed.current);
         copyText(sentence.chinese.replaceAll(" ", ""));
       }}
       style={styles.exampleRow}
@@ -393,10 +405,12 @@ function ExampleRow({
         </Text>
         <SpeakerButton text={sentence.chinese} settings={settings} />
       </View>
-      <View style={[styles.exampleHelp, !revealed && styles.hidden]}>
+      <Animated.View
+        style={[styles.exampleHelp, { opacity: translationOpacity }]}
+      >
         <Text style={styles.examplePinyin}>{sentence.pinyin}</Text>
         <Text style={styles.exampleRussian}>{sentence.russian}</Text>
-      </View>
+      </Animated.View>
     </Pressable>
   );
 }
@@ -589,7 +603,6 @@ const styles = StyleSheet.create({
     borderLeftColor: colors.line,
     paddingLeft: 18,
   },
-  hidden: { opacity: 0 },
   examplePinyin: { color: colors.green, fontSize: 14, fontWeight: "700" },
   exampleRussian: { color: colors.muted, fontSize: 13, marginTop: 3 },
   waiting: { color: colors.muted, marginTop: 20 },
