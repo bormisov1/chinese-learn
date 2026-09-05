@@ -239,11 +239,10 @@ export default function Settings() {
           value={data.settings.apiUrl}
           onChangeText={(v) => update("apiUrl", v)}
         />
-        <Field
-          label="MODEL"
-          value={data.settings.model}
-          onChangeText={(v) => update("model", v)}
-        />
+        <Text style={styles.modelRouting}>
+          Sentence generation and explanations use DeepSeek V4 Pro. Translation
+          checks use DeepSeek V4 Flash.
+        </Text>
         {data.settings.apiKey ? (
           <Text
             style={[
@@ -805,6 +804,7 @@ const styles = StyleSheet.create({
   detailsTranslation: { color: colors.ink, fontSize: 17, lineHeight: 25 },
   deepSeekValidated: { backgroundColor: "#EAF7ED", borderColor: "#AED8B7" },
   validationStatus: { color: colors.muted, marginTop: -4, marginBottom: 14 },
+  modelRouting: { color: colors.muted, lineHeight: 20, marginBottom: 18 },
   validationSuccess: { color: colors.green, fontWeight: "700" },
   sentencesToggle: {
     flexDirection: "row",
