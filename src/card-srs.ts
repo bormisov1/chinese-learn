@@ -7,42 +7,82 @@ export const DAY = 86_400_000;
 
 const retentionDays = [1, 3, 7, 14, 30, 60];
 
-function activePriority(a: Word, b: Word) {
-  const aAttempts = a.cardSrsCorrect + a.cardSrsIncorrect;
-  const bAttempts = b.cardSrsCorrect + b.cardSrsIncorrect;
-  const aDifficulty = (a.cardSrsCorrect + 1) / (aAttempts + 2);
-  const bDifficulty = (b.cardSrsCorrect + 1) / (bAttempts + 2);
-  return (
-    Number(Boolean(b.cardActive)) - Number(Boolean(a.cardActive)) ||
-    aDifficulty - bDifficulty ||
-    bAttempts - aAttempts ||
-    a.cardSrsLevel - b.cardSrsLevel ||
-    (b.cardLastIncorrectAt ?? 0) - (a.cardLastIncorrectAt ?? 0) ||
-    (b.cardLapses ?? 0) - (a.cardLapses ?? 0) ||
-    (a.cardIntroducedAt ?? a.createdAt) -
-      (b.cardIntroducedAt ?? b.createdAt) ||
-    a.createdAt - b.createdAt
-  );
+const attempts = (word: Word) => word.cardSrsCorrect + word.cardSrsIncorrect;
+
+const inferredRound = (words: Word[]) =>
+  Math.max(0, ...words.map((word) => word.cardLastStudiedRound ?? 0));
+
+const roundsWaiting = (word: Word, round: number) =>
+  Math.max(0, round - (word.cardLastStudiedRound ?? 0));
+
+export function cardLearningNeed(word: Word, round: number): number {
+  const total = attempts(word);
+  const failureRate = (word.cardSrsIncorrect + 1) / (total + 2);
+  const novelty = 1 / Math.sqrt(total + 1);
+  const waiting = Math.min(1, roundsWaiting(word, round) / 10);
+  return 0.55 * failureRate + 0.3 * novelty + 0.15 * waiting;
 }
 
-/** Words waiting to enter the active pool, in the exact order fillActivePool uses. */
-export function getActivePoolQueue(words: Word[]): Word[] {
+const learningNeedComparator = (round: number) => (a: Word, b: Word) =>
+  cardLearningNeed(b, round) - cardLearningNeed(a, round) ||
+  a.createdAt - b.createdAt ||
+  a.id.localeCompare(b.id);
+
+const explorationComparator = (round: number) => (a: Word, b: Word) =>
+  attempts(a) - attempts(b) ||
+  roundsWaiting(b, round) - roundsWaiting(a, round) ||
+  a.createdAt - b.createdAt ||
+  a.id.localeCompare(b.id);
+
+/** Words waiting to enter the active pool, ordered by learning need. */
+export function getActivePoolQueue(
+  words: Word[],
+  round = inferredRound(words),
+): Word[] {
   return words
     .filter(
       (word) =>
         !word.cardActive && word.cardSrsLevel < CARD_GRADUATION_LEVEL,
     )
-    .sort(activePriority);
+    .sort(learningNeedComparator(round));
 }
 
-export function fillActivePool(words: Word[], at = Date.now()): Word[] {
-  const selected = new Set(
-    words
-      .filter((word) => word.cardSrsLevel < CARD_GRADUATION_LEVEL)
-      .sort(activePriority)
-      .slice(0, ACTIVE_CARD_LIMIT)
-      .map((word) => word.id),
+export function fillActivePool(
+  words: Word[],
+  at = Date.now(),
+  round = inferredRound(words),
+): Word[] {
+  const active = words.filter(
+    (word) => word.cardActive && word.cardSrsLevel < CARD_GRADUATION_LEVEL,
   );
+  const selected = new Set(
+    active.slice(0, ACTIVE_CARD_LIMIT).map((word) => word.id),
+  );
+  const openSlots = ACTIVE_CARD_LIMIT - selected.size;
+  const waiting = words.filter(
+    (word) => !selected.has(word.id) && word.cardSrsLevel < CARD_GRADUATION_LEVEL,
+  );
+
+  if (openSlots > 0 && waiting.length) {
+    // Reserve roughly one third of each admission batch for exploration. A
+    // single opened slot also uses this lane, which prevents unseen words from
+    // starving when graduations normally free only one slot at a time.
+    const explorationSlots = Math.min(
+      openSlots,
+      Math.max(1, Math.floor(openSlots / 3)),
+    );
+    const needSlots = openSlots - explorationSlots;
+    const need = [...waiting]
+      .sort(learningNeedComparator(round))
+      .slice(0, needSlots);
+    need.forEach((word) => selected.add(word.id));
+    [...waiting]
+      .filter((word) => !selected.has(word.id))
+      .sort(explorationComparator(round))
+      .slice(0, explorationSlots)
+      .forEach((word) => selected.add(word.id));
+  }
+
   return words.map((word, index) =>
     selected.has(word.id)
       ? {
@@ -56,7 +96,10 @@ export function fillActivePool(words: Word[], at = Date.now()): Word[] {
   );
 }
 
-export function migrateCardPool(words: Word[]): Word[] {
+export function migrateCardPool(
+  words: Word[],
+  round = inferredRound(words),
+): Word[] {
   let migrated = words.map((word) => {
     const hadCardActivity =
       word.cardSrsLevel > 0 || word.cardSrsCorrect > 0 || word.cardSrsIncorrect > 0;
@@ -89,7 +132,7 @@ export function migrateCardPool(words: Word[]): Word[] {
       word.cardActive && !keep.has(word.id) ? { ...word, cardActive: false } : word,
     );
   }
-  return fillActivePool(migrated);
+  return fillActivePool(migrated, Date.now(), round);
 }
 
 export function selectRound(words: Word[], round: number, now = Date.now()) {
@@ -166,20 +209,17 @@ export function gradeCard(
   });
 
   // A failed retention review must return to the bounded pool. Pause the
-  // newest other learner if all twelve slots were already occupied.
+  // learner that currently needs the least practice if all slots are occupied.
   const active = updated.filter((word) => word.cardActive);
   if (active.length > ACTIVE_CARD_LIMIT) {
     const toPause = active
       .filter((word) => word.id !== wordId)
-      .sort(
-        (a, b) =>
-          (b.cardIntroducedAt ?? b.createdAt) -
-          (a.cardIntroducedAt ?? a.createdAt),
-      )[0];
+      .sort(learningNeedComparator(round))
+      .at(-1);
     if (toPause)
       updated = updated.map((word) =>
         word.id === toPause.id ? { ...word, cardActive: false } : word,
       );
   }
-  return fillActivePool(updated, reviewedAt);
+  return fillActivePool(updated, reviewedAt, round);
 }

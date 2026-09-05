@@ -17,7 +17,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!ready || !data.onboardingComplete || !data.settings.automaticWordAddition) return;
     setData(current => {
-      const words = replenishAutomaticWords(current.words);
+      const words = replenishAutomaticWords(current.words, Date.now(), current.cardRound);
       return words === current.words ? current : { ...current, words };
     });
   }, [ready, data.onboardingComplete, data.settings.automaticWordAddition, data.words]);
@@ -27,13 +27,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       ...current,
       onboardingComplete: completeOnboarding || current.onboardingComplete,
       settings: { ...current.settings, automaticWordAddition: enabled },
-      words: enabled ? replenishAutomaticWords(current.words) : current.words,
+      words: enabled ? replenishAutomaticWords(current.words, Date.now(), current.cardRound) : current.words,
     }));
   };
   const importWords = (items: ImportedWord[]) => {
     const existing = new Set(data.words.map(w => w.hanzi));
     const fresh = items.filter(w => !existing.has(w.hanzi));
-    if (fresh.length) setData(d => ({ ...d, words: fillActivePool([...d.words, ...fresh.map(w => ({ ...w, id: id(), exampleCount: 0, wordShownCount: 0, createdAt: Date.now(), srsLevel: 0, srsCorrect: 0, srsIncorrect: 0, srsDueAt: 0, cardSrsLevel: 0, cardSrsCorrect: 0, cardSrsIncorrect: 0, cardSrsDueAt: 0, cardLapses: 0 }))]) }));
+    if (fresh.length) setData(d => ({ ...d, words: fillActivePool([...d.words, ...fresh.map(w => ({ ...w, id: id(), exampleCount: 0, wordShownCount: 0, createdAt: Date.now(), srsLevel: 0, srsCorrect: 0, srsIncorrect: 0, srsDueAt: 0, cardSrsLevel: 0, cardSrsCorrect: 0, cardSrsIncorrect: 0, cardSrsDueAt: 0, cardLapses: 0 }))], Date.now(), d.cardRound) }));
     return fresh.length;
   };
   const importWordBackup = (items: Omit<Word, 'id'>[]) => {
@@ -41,7 +41,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const incoming = new Map(items.map(w => [w.hanzi, w]));
       const words = d.words.map(w => incoming.has(w.hanzi) ? { ...incoming.get(w.hanzi)!, id: w.id } : w);
       const existing = new Set(words.map(w => w.hanzi));
-      return { ...d, words: fillActivePool([...words, ...items.filter(w => !existing.has(w.hanzi)).map(w => ({ ...w, id: id() }))]) };
+      return { ...d, words: fillActivePool([...words, ...items.filter(w => !existing.has(w.hanzi)).map(w => ({ ...w, id: id() }))], Date.now(), d.cardRound) };
     });
     return items.length;
   };

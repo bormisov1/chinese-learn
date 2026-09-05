@@ -121,7 +121,7 @@ export default function Settings() {
   const activeWords = data.words
     .filter((word) => word.cardActive)
     .sort((a, b) => (a.cardIntroducedAt ?? 0) - (b.cardIntroducedAt ?? 0));
-  const queuedWords = getActivePoolQueue(data.words);
+  const queuedWords = getActivePoolQueue(data.words, data.cardRound);
   const stat = (
     level: number,
     correct: number,

@@ -24,7 +24,11 @@ const wordId = () =>
   `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 /** Keep twenty not-yet-graduated words available, following HSK order. */
-export function replenishAutomaticWords(words: Word[], at = Date.now()): Word[] {
+export function replenishAutomaticWords(
+  words: Word[],
+  at = Date.now(),
+  round?: number,
+): Word[] {
   const learningCount = words.filter(
     (word) => word.cardSrsLevel < CARD_GRADUATION_LEVEL,
   ).length;
@@ -51,5 +55,5 @@ export function replenishAutomaticWords(words: Word[], at = Date.now()): Word[] 
       cardSrsDueAt: 0,
       cardLapses: 0,
     }));
-  return additions.length ? fillActivePool([...words, ...additions], at) : words;
+  return additions.length ? fillActivePool([...words, ...additions], at, round) : words;
 }
