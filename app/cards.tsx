@@ -169,7 +169,10 @@ export default function Cards() {
           title="Word learned!"
           subtitle="A word graduated from your active card pool."
         />
-        <GraduationCelebration graduation={graduation} />
+        <GraduationCelebration
+          graduation={graduation}
+          settings={data.settings}
+        />
         <Button
           label={roundEndsAfterCelebration ? "See round results" : "Continue round"}
           icon="arrow-forward"
@@ -196,6 +199,7 @@ export default function Cards() {
           <GraduationCelebration
             key={graduation.learned.id}
             graduation={graduation}
+            settings={data.settings}
             compact
           />
         ))}
@@ -329,16 +333,25 @@ export default function Cards() {
 
 function GraduationCelebration({
   graduation,
+  settings,
   compact = false,
 }: {
   graduation: Graduation;
+  settings: Settings;
   compact?: boolean;
 }) {
   return (
     <View style={[styles.celebration, compact && styles.celebrationCompact]}>
       <Text style={styles.confetti}>🎉</Text>
       <Text style={styles.celebrationTitle}>LEARNED</Text>
-      <Text style={styles.learnedHanzi}>{graduation.learned.hanzi}</Text>
+      <View style={styles.graduationWordRow}>
+        <Text style={styles.learnedHanzi}>{graduation.learned.hanzi}</Text>
+        <SpeakerButton
+          text={graduation.learned.hanzi}
+          settings={settings}
+          size={24}
+        />
+      </View>
       <Text style={styles.learnedPinyin}>{graduation.learned.pinyin}</Text>
       <Text style={styles.learnedRussian}>{graduation.learned.russian}</Text>
       <WordGuessStats word={graduation.learned} />
@@ -352,7 +365,16 @@ function GraduationCelebration({
           <Text style={styles.replacementLabel}>NEW IN THE ACTIVE POOL</Text>
           <Text style={styles.confetti}>👀</Text>
           <Text style={styles.learnTitle}>LEARN</Text>
-          <Text style={styles.learnedHanzi}>{graduation.replacement.hanzi}</Text>
+          <View style={styles.graduationWordRow}>
+            <Text style={styles.learnedHanzi}>
+              {graduation.replacement.hanzi}
+            </Text>
+            <SpeakerButton
+              text={graduation.replacement.hanzi}
+              settings={settings}
+              size={24}
+            />
+          </View>
           <Text style={styles.learnedPinyin}>{graduation.replacement.pinyin}</Text>
           <Text style={styles.learnedRussian}>
             {graduation.replacement.russian}
@@ -433,6 +455,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 1.8,
+  },
+  graduationWordRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
   learnedHanzi: { color: colors.ink, fontSize: 54, fontWeight: "800", marginTop: 8 },
   learnedPinyin: { color: colors.green, fontSize: 18, fontWeight: "700" },
