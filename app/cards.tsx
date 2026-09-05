@@ -403,11 +403,11 @@ function ExampleRow({
   sentence: Sentence;
   settings: Settings;
 }) {
-  const translationOpacity = useRef(new Animated.Value(0)).current;
+  const translationCoverOpacity = useRef(new Animated.Value(1)).current;
   const revealed = useRef(false);
   const setTranslationVisible = (visible: boolean) => {
     revealed.current = visible;
-    translationOpacity.setValue(visible ? 1 : 0);
+    translationCoverOpacity.setValue(visible ? 0 : 1);
   };
   return (
     <Pressable
@@ -427,12 +427,17 @@ function ExampleRow({
         </Text>
         <SpeakerButton text={sentence.chinese} settings={settings} />
       </View>
-      <Animated.View
-        style={[styles.exampleHelp, { opacity: translationOpacity }]}
-      >
+      <View style={styles.exampleHelp}>
         <Text style={styles.examplePinyin}>{sentence.pinyin}</Text>
         <Text style={styles.exampleRussian}>{sentence.russian}</Text>
-      </Animated.View>
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.exampleTranslationCover,
+            { opacity: translationCoverOpacity },
+          ]}
+        />
+      </View>
     </Pressable>
   );
 }
@@ -629,6 +634,13 @@ const styles = StyleSheet.create({
     borderLeftWidth: 1,
     borderLeftColor: colors.line,
     paddingLeft: 18,
+    position: "relative",
+  },
+  exampleTranslationCover: {
+    ...StyleSheet.absoluteFillObject,
+    left: 18,
+    borderRadius: 4,
+    backgroundColor: colors.white,
   },
   examplePinyin: { color: colors.green, fontSize: 14, fontWeight: "700" },
   exampleRussian: { color: colors.muted, fontSize: 13, marginTop: 3 },
