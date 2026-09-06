@@ -70,6 +70,7 @@ export function SpeakerButton({
   accessibilityLabel?: string;
 }) {
   const disabled = !text || !getTtsProvider(settings).supported();
+  const buttonSize = Math.max(34, size + 16);
   return (
     <Pressable
       accessibilityRole="button"
@@ -82,6 +83,7 @@ export function SpeakerButton({
       }}
       style={({ pressed }) => [
         s.speaker,
+        { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2 },
         (pressed || disabled) && { opacity: 0.4 },
       ]}
     >
@@ -141,9 +143,6 @@ const s = StyleSheet.create({
   },
   buttonText: { color: colors.white, fontWeight: "700", fontSize: 15 },
   speaker: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
     backgroundColor: colors.pale,
     alignItems: "center",
     justifyContent: "center",
