@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useStore } from "@/context";
 import { evaluate, explain } from "@/deepseek";
 import { Evaluation, Explanation, Sentence, Word } from "@/types";
@@ -104,9 +104,15 @@ export default function Listening() {
         title="Listen. Recognize. Recall."
         subtitle={`${position % items.length + 1} of ${items.length} · ${includesSentences ? "words and sentences mixed" : "words only"}`}
       />
-      <View style={styles.card}>
+      <Pressable
+        accessibilityRole={item.kind === "word" ? "button" : undefined}
+        accessibilityLabel={item.kind === "word" ? revealed ? "Hide answer" : "Reveal answer" : undefined}
+        disabled={item.kind === "sentence"}
+        onPress={() => setRevealed((value) => !value)}
+        style={styles.card}
+      >
         <SpeakerButton text={item.chinese} settings={data.settings} size={42} accessibilityLabel="Play listening prompt" />
-      </View>
+      </Pressable>
 
       {item.kind === "word" && revealed && (
         <View style={styles.answer}>

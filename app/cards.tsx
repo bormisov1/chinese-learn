@@ -255,10 +255,15 @@ export default function Cards() {
         />
       </View>
       <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={flipped ? "Hide answer" : "Reveal answer"}
         style={[styles.card, flipped && styles.back]}
         onPress={() => {
-          if (!revealed) setRevealed(true);
-          setFlipped((value) => !value);
+          setFlipped((value) => {
+            const next = !value;
+            setRevealed(next);
+            return next;
+          });
         }}
       >
         {!flipped ? (
