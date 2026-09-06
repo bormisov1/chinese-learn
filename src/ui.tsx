@@ -62,16 +62,18 @@ export function SpeakerButton({
   text,
   settings,
   size = 18,
+  accessibilityLabel,
 }: {
   text: string;
   settings: Settings;
   size?: number;
+  accessibilityLabel?: string;
 }) {
   const disabled = !text || !getTtsProvider(settings).supported();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Play ${text}`}
+      accessibilityLabel={accessibilityLabel ?? `Play ${text}`}
       disabled={disabled}
       hitSlop={8}
       onPress={(event) => {
