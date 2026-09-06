@@ -1,9 +1,8 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useStore } from "@/context";
 import { Button, Header, shell, SpeakerButton } from "@/ui";
 import { colors } from "@/theme";
-import { speakMandarin } from "@/tts";
 import { evaluate, evaluateChinese } from "@/deepseek";
 import { Evaluation, PracticeDirection, Sentence } from "@/types";
 
@@ -29,6 +28,7 @@ export default function Mix() {
         chinese: "hanzi" in listeningSource ? listeningSource.hanzi : listeningSource.chinese.replaceAll(" ", ""),
         pinyin: listeningSource.pinyin,
         russian: listeningSource.russian,
+        sentence: "hanzi" in listeningSource ? undefined : listeningSource,
       });
     }
     return mixed;
@@ -49,8 +49,8 @@ export default function Mix() {
   );
 
   const listening = item.mode === "listening";
-  const sentence = item.mode === "sentence" ? item.sentence : undefined;
-  const chineseFirst = direction === "zh-ru";
+  const sentence = item.sentence;
+  const chineseFirst = listening || direction === "zh-ru";
   const resetAnswer = () => {
     setAnswer("");
     setEvaluation(undefined);
@@ -84,37 +84,34 @@ export default function Mix() {
   return (
     <ScrollView style={shell.page} contentContainerStyle={shell.content}>
       <Header eyebrow={`Mix · ${item.mode}`} title="Everything in one round." subtitle={`${position % items.length + 1} of ${items.length} · words, sentences, and listening`} />
-      {sentence ? (
+      {sentence && !listening ? (
         <View style={styles.direction}>
           <Button secondary={!chineseFirst} label="Chinese → Russian" onPress={() => changeDirection("zh-ru")} />
           <Button secondary={chineseFirst} label="Russian → Chinese" onPress={() => changeDirection("ru-zh")} />
         </View>
       ) : null}
-      <Pressable
-        accessibilityRole={listening ? "button" : undefined}
-        accessibilityLabel={listening ? `Listen to ${item.chinese}` : undefined}
-        onPress={listening ? () => speakMandarin(item.chinese, data.settings) : undefined}
-        style={styles.card}
-      >
+      <View style={styles.card}>
         <Text style={styles.side}>{item.mode.toUpperCase()}</Text>
-        <Text style={listening ? styles.chinese : sentence && chineseFirst ? styles.chinese : styles.prompt}>
-          {listening || (sentence && chineseFirst) ? item.chinese : item.russian}
-        </Text>
-        {sentence && chineseFirst ? <SpeakerButton text={item.chinese} settings={data.settings} size={22} /> : null}
         {listening ? (
           <View style={styles.listenRow}>
-            <SpeakerButton text={item.chinese} settings={data.settings} size={24} />
-            <Text style={styles.hint}>Tap the card to listen</Text>
+            <SpeakerButton text={item.chinese} settings={data.settings} size={42} accessibilityLabel="Play listening prompt" />
           </View>
-        ) : null}
+        ) : (
+          <>
+            <Text style={sentence && chineseFirst ? styles.chinese : styles.prompt}>
+              {sentence && chineseFirst ? item.chinese : item.russian}
+            </Text>
+            {sentence && chineseFirst ? <SpeakerButton text={item.chinese} settings={data.settings} size={22} /> : null}
+          </>
+        )}
         {revealed ? (
           <View style={styles.answer}>
-            {!listening && (!sentence || !chineseFirst) ? <Text style={styles.chinese}>{item.chinese}</Text> : null}
+            {listening || (!sentence || !chineseFirst) ? <Text style={styles.chinese}>{item.chinese}</Text> : null}
             <Text style={styles.pinyin}>{item.pinyin}</Text>
             {listening || (sentence && chineseFirst) ? <Text style={styles.translation}>{item.russian}</Text> : null}
           </View>
         ) : !sentence ? <Text style={styles.hint}>Answer hidden until you reveal it</Text> : null}
-      </Pressable>
+      </View>
       {sentence ? (
         <>
           <Text style={styles.label}>{chineseFirst ? "YOUR RUSSIAN TRANSLATION" : "ВАШ ПЕРЕВОД НА КИТАЙСКИЙ"}</Text>
