@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useStore } from "@/context";
 import { Button, Header, shell, SpeakerButton } from "@/ui";
 import { colors } from "@/theme";
@@ -90,7 +90,13 @@ export default function Mix() {
           <Button secondary={chineseFirst} label="Russian → Chinese" onPress={() => changeDirection("ru-zh")} />
         </View>
       ) : null}
-      <View style={styles.card}>
+      <Pressable
+        accessibilityRole={sentence ? undefined : "button"}
+        accessibilityLabel={sentence ? undefined : revealed ? "Hide answer" : "Reveal answer"}
+        disabled={Boolean(sentence)}
+        onPress={() => setRevealed((value) => !value)}
+        style={styles.card}
+      >
         <Text style={styles.side}>{item.mode.toUpperCase()}</Text>
         {listening ? (
           <View style={styles.listenRow}>
@@ -111,7 +117,7 @@ export default function Mix() {
             {listening || (sentence && chineseFirst) ? <Text style={styles.translation}>{item.russian}</Text> : null}
           </View>
         ) : !sentence ? <Text style={styles.hint}>Answer hidden until you reveal it</Text> : null}
-      </View>
+      </Pressable>
       {sentence ? (
         <>
           <Text style={styles.label}>{chineseFirst ? "YOUR RUSSIAN TRANSLATION" : "ВАШ ПЕРЕВОД НА КИТАЙСКИЙ"}</Text>
