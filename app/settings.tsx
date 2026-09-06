@@ -288,6 +288,19 @@ export default function Settings() {
             trackColor={{ false: colors.line, true: colors.green }}
           />
         </View>
+        <View style={styles.sentencesToggle}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.privacyTitle}>Mix menu</Text>
+            <Text style={styles.help}>
+              Show Mix in the bottom menu for words, sentences, and listening together.
+            </Text>
+          </View>
+          <Switch
+            value={data.settings.showMixTab}
+            onValueChange={(value) => update("showMixTab", value)}
+            trackColor={{ false: colors.line, true: colors.green }}
+          />
+        </View>
       </View>
       <View onLayout={recordSection("audio")}>
         <TtsSettings settings={data.settings} update={update} />
