@@ -279,7 +279,8 @@ export default function Settings() {
           <View style={{ flex: 1 }}>
             <Text style={styles.privacyTitle}>Listening menu</Text>
             <Text style={styles.help}>
-              Show Listening in the bottom menu with words and sentences.
+              Show Listening in the bottom menu. Words work without DeepSeek;
+              sentences are included when the API key is validated.
             </Text>
           </View>
           <Switch

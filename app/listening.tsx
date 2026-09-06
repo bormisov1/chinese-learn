@@ -17,13 +17,15 @@ export default function Listening() {
   const { data, patch } = useStore();
   const items = useMemo<ListeningItem[]>(() => {
     const words: ListeningItem[] = data.words.map((word) => ({ kind: "word", id: `word:${word.id}`, chinese: word.hanzi, pinyin: word.pinyin, russian: word.russian, word }));
-    const sentences: ListeningItem[] = data.sentences.map((sentence) => ({ kind: "sentence", id: `sentence:${sentence.id}`, chinese: sentence.chinese.replaceAll(" ", ""), pinyin: sentence.pinyin, russian: sentence.russian, sentence }));
+    const sentences: ListeningItem[] = data.settings.apiKeyValidated
+      ? data.sentences.map((sentence) => ({ kind: "sentence", id: `sentence:${sentence.id}`, chinese: sentence.chinese.replaceAll(" ", ""), pinyin: sentence.pinyin, russian: sentence.russian, sentence }))
+      : [];
     return [...words, ...sentences].sort((a, b) => {
       const aSeen = a.kind === "word" ? a.word.wordShownCount : a.sentence.sentenceShownCount;
       const bSeen = b.kind === "word" ? b.word.wordShownCount : b.sentence.sentenceShownCount;
       return aSeen - bSeen || a.id.localeCompare(b.id);
     });
-  }, [data.words, data.sentences]);
+  }, [data.words, data.sentences, data.settings.apiKeyValidated]);
   const [position, setPosition] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [answer, setAnswer] = useState("");
@@ -33,6 +35,7 @@ export default function Listening() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const item = items[position % Math.max(1, items.length)];
+  const includesSentences = items.some(({ kind }) => kind === "sentence");
 
   if (!item) return (
     <ScrollView style={shell.page} contentContainerStyle={shell.content}>
@@ -96,7 +99,11 @@ export default function Listening() {
 
   return (
     <ScrollView style={shell.page} contentContainerStyle={shell.content} keyboardShouldPersistTaps="handled">
-      <Header eyebrow={`Listening · ${item.kind}`} title="Listen. Recognize. Recall." subtitle={`${position % items.length + 1} of ${items.length} · words and sentences mixed`} />
+      <Header
+        eyebrow={`Listening · ${item.kind}`}
+        title="Listen. Recognize. Recall."
+        subtitle={`${position % items.length + 1} of ${items.length} · ${includesSentences ? "words and sentences mixed" : "words only"}`}
+      />
       <View style={styles.card}>
         <SpeakerButton text={item.chinese} settings={data.settings} size={42} accessibilityLabel="Play listening prompt" />
       </View>
