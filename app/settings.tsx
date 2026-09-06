@@ -275,6 +275,19 @@ export default function Settings() {
             />
           </View>
         ) : null}
+        <View style={styles.sentencesToggle}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.privacyTitle}>Listening menu</Text>
+            <Text style={styles.help}>
+              Show Listening in the bottom menu with words and sentences.
+            </Text>
+          </View>
+          <Switch
+            value={data.settings.showListeningTab}
+            onValueChange={(value) => update("showListeningTab", value)}
+            trackColor={{ false: colors.line, true: colors.green }}
+          />
+        </View>
       </View>
       <View onLayout={recordSection("audio")}>
         <TtsSettings settings={data.settings} update={update} />

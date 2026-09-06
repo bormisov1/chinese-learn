@@ -15,6 +15,7 @@ export const emptyStore: StoreData = {
     apiKey: "",
     apiKeyValidated: false,
     showSentencesTab: false,
+    showListeningTab: false,
     apiUrl: "https://api.deepseek.com/chat/completions",
     model: "deepseek-v4-pro",
     ttsProvider: "browser",

@@ -50,6 +50,7 @@ export type Settings = {
   apiKey: string;
   apiKeyValidated: boolean;
   showSentencesTab: boolean;
+  showListeningTab: boolean;
   apiUrl: string;
   model: string;
   ttsProvider: string;
