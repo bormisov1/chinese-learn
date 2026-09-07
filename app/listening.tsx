@@ -5,9 +5,7 @@ import { evaluate, explain } from "@/deepseek";
 import { Evaluation, Explanation, Sentence, Word } from "@/types";
 import { Button, Header, shell, SpeakerButton } from "@/ui";
 import { colors } from "@/theme";
-
-const DAY = 86_400_000;
-const intervals = [1, 3, 7, 14, 30];
+import { finishExercise } from "@/exercise-progress";
 
 type ListeningItem =
   | { kind: "word"; id: string; chinese: string; pinyin: string; russian: string; word: Word }
@@ -49,26 +47,9 @@ export default function Listening() {
   };
   const next = () => {
     if (item.kind === "sentence") {
-      const correct = evaluation?.correct === true;
-      const reviewedAt = Date.now();
-      patch((current) => ({
-        ...current,
-        sentences: current.sentences.map((sentence) => sentence.id === item.sentence.id ? { ...sentence, sentenceShownCount: sentence.sentenceShownCount + 1, lastShownAt: reviewedAt } : sentence),
-        words: current.words.map((word) => {
-          if (!item.sentence.wordIds.includes(word.id)) return word;
-          const nextLevel = correct ? Math.min(5, word.srsLevel + 1) : 0;
-          return {
-            ...word,
-            wordShownCount: word.wordShownCount + 1,
-            srsLevel: nextLevel,
-            srsCorrect: word.srsCorrect + (correct ? 1 : 0),
-            srsIncorrect: word.srsIncorrect + (correct ? 0 : 1),
-            srsDueAt: correct ? reviewedAt + intervals[nextLevel - 1] * DAY : reviewedAt,
-          };
-        }),
-      }));
+      patch((current) => finishExercise(current, { kind: "sentence", sentenceId: item.sentence.id, correct: evaluation?.correct === true }));
     } else {
-      patch((current) => ({ ...current, words: current.words.map((word) => word.id === item.word.id ? { ...word, wordShownCount: word.wordShownCount + 1 } : word) }));
+      patch((current) => finishExercise(current, { kind: "word", wordId: item.word.id }));
     }
     setPosition((value) => value + 1);
     reset();
@@ -138,7 +119,7 @@ export default function Listening() {
 
       {item.kind === "sentence" && evaluation && (
         <View style={[styles.feedback, evaluation.correct ? styles.correct : styles.incorrect]}>
-          <Text style={styles.feedbackTitle}>{evaluation.correct ? "✓  Correct" : "Not quite yet"}</Text>
+          <Text style={styles.feedbackTitle}>{evaluation.correct ? "✓ Correct" : "Not quite yet"}</Text>
           {!evaluation.correct && (
             <View style={styles.translationResult}>
               <Text style={styles.resultLabel}>YOUR TRANSLATION</Text>

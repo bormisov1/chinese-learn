@@ -72,6 +72,8 @@ export type StoreData = {
     at: number;
   }[];
   cardRound: number;
+  mixQueue: string[];
+  mixPosition: number;
   onboardingComplete: boolean;
   settings: Settings;
 };
