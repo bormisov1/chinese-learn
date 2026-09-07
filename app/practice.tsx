@@ -14,9 +14,7 @@ import { Evaluation, Explanation, PracticeDirection } from "@/types";
 import { colors } from "@/theme";
 import { Button, Header, shell, SpeakerButton } from "@/ui";
 import { copyText } from "@/clipboard";
-
-const DAY = 86_400_000;
-const intervals = [1, 3, 7, 14, 30];
+import { finishExercise } from "@/exercise-progress";
 
 export default function Practice() {
   const {
@@ -128,34 +126,13 @@ export default function Practice() {
   const next = () => {
     if (sentence) {
       setLastSentenceId(sentence.id);
-      const correct = evaluation?.correct === true;
-      const reviewedAt = Date.now();
-      patch((d) => ({
-        ...d,
-        sentences: d.sentences.map((s) =>
-          s.id === sentence.id
-            ? {
-                ...s,
-                sentenceShownCount: s.sentenceShownCount + 1,
-                lastShownAt: reviewedAt,
-              }
-            : s,
-        ),
-        words: d.words.map((w) => {
-          if (!sentence.wordIds.includes(w.id)) return w;
-          const nextLevel = correct ? Math.min(5, w.srsLevel + 1) : 0;
-          return {
-            ...w,
-            wordShownCount: w.wordShownCount + 1,
-            srsLevel: nextLevel,
-            srsCorrect: w.srsCorrect + (correct ? 1 : 0),
-            srsIncorrect: w.srsIncorrect + (correct ? 0 : 1),
-            srsDueAt: correct
-              ? reviewedAt + intervals[nextLevel - 1] * DAY
-              : reviewedAt,
-          };
+      patch((d) =>
+        finishExercise(d, {
+          kind: "sentence",
+          sentenceId: sentence.id,
+          correct: evaluation?.correct === true,
         }),
-      }));
+      );
     }
     resetAnswer();
     if (ordered.filter((s) => !s.sentenceShownCount).length < 10)
@@ -283,7 +260,7 @@ export default function Practice() {
           ]}
         >
           <Text style={styles.feedbackTitle}>
-            {evaluation.correct ? "✓  Correct" : "Not quite yet"}
+            {evaluation.correct ? "✓ Correct" : "Not quite yet"}
           </Text>
           {!evaluation.correct && (
             <View style={styles.translationResult}>

@@ -16,9 +16,9 @@ import {
   ACTIVE_CARD_LIMIT,
   CARD_GRADUATION_LEVEL,
   CARD_ROUND_SIZE,
-  gradeCard,
   selectRound,
 } from "@/card-srs";
+import { finishExercise } from "@/exercise-progress";
 
 type Phase = "ready" | "studying" | "celebrating" | "complete";
 type Graduation = { learned: Word; replacement?: Word };
@@ -96,17 +96,18 @@ export default function Cards() {
   const grade = (correct: boolean) => {
     if (!word) return;
     const reviewedAt = Date.now();
-    const updatedWords = gradeCard(
-      data.words,
-      word.id,
-      correct,
-      studyRound,
+    const updatedWords = finishExercise(
+      data,
+      { kind: "card", wordId: word.id, correct, round: studyRound },
       reviewedAt,
+    ).words;
+    patch((d) =>
+      finishExercise(
+        d,
+        { kind: "card", wordId: word.id, correct, round: studyRound },
+        reviewedAt,
+      ),
     );
-    patch((d) => ({
-      ...d,
-      words: gradeCard(d.words, word.id, correct, studyRound, reviewedAt),
-    }));
     if (!correct) setMistakeIds((ids) => [...ids, word.id]);
     const learned = updatedWords.find(
       (item) => item.id === word.id && word.cardActive && !item.cardActive,
@@ -311,12 +312,12 @@ export default function Cards() {
           <>
             <Button
               secondary
-              label="Again"
+              label="I don't know"
               icon="close"
               onPress={() => grade(false)}
             />
             <Button
-              label="Correct"
+              label="I know"
               icon="checkmark"
               onPress={() => grade(true)}
             />
