@@ -1,16 +1,9 @@
 import { fillActivePool, CARD_GRADUATION_LEVEL } from "./card-srs";
 import hskLevels from "./data/hsk-levels.json";
-import dictionaryRows from "./data/hsk-russian.json";
 import { Word } from "./types";
+import type { Dictionary } from "./dictionary";
 
 export const AUTOMATIC_WORD_TARGET = 20;
-
-const dictionary = new Map(
-  (dictionaryRows as [string, string, string][]).map(([hanzi, pinyin, russian]) => [
-    hanzi,
-    { hanzi, pinyin, russian },
-  ]),
-);
 
 const cumulative = hskLevels as Record<string, string[]>;
 const hskLevelByWord = new Map<string, number>();
@@ -28,7 +21,7 @@ export function getHskLevel(hanzi: string): number | undefined {
 const orderedHskWords = [1, 2, 3, 4, 5, 6].flatMap((level) => {
   const previous = new Set(level > 1 ? cumulative[String(level - 1)] : []);
   return (cumulative[String(level)] ?? []).filter(
-    (hanzi) => !previous.has(hanzi) && dictionary.has(hanzi),
+    (hanzi) => !previous.has(hanzi),
   );
 });
 
@@ -38,6 +31,7 @@ const wordId = () =>
 /** Keep twenty not-yet-graduated words available, following HSK order. */
 export function replenishAutomaticWords(
   words: Word[],
+  dictionary: Dictionary,
   at = Date.now(),
   round?: number,
 ): Word[] {

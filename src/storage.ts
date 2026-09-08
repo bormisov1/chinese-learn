@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import { StoreData } from "./types";
 import { migrateCardPool } from "./card-srs";
+import { isAppLanguage } from "./i18n";
 
 const KEY = "hanzi-deck:v1";
 export const emptyStore: StoreData = {
@@ -13,7 +14,9 @@ export const emptyStore: StoreData = {
   mixQueue: [],
   mixPosition: 0,
   onboardingComplete: false,
+  languageSelected: false,
   settings: {
+    language: "en",
     apiKey: "",
     apiKeyValidated: false,
     showSentencesTab: false,
@@ -60,7 +63,12 @@ export async function loadStore(): Promise<StoreData> {
       mixPosition: parsed.mixPosition ?? 0,
       onboardingComplete:
         parsed.onboardingComplete ?? (parsed.words?.length ?? 0) > 0,
-      settings: { ...emptyStore.settings, ...parsed.settings },
+      languageSelected: parsed.languageSelected ?? false,
+      settings: {
+        ...emptyStore.settings,
+        ...parsed.settings,
+        language: isAppLanguage(parsed.settings?.language) ? parsed.settings.language : "en",
+      },
     };
   } catch {
     return emptyStore;

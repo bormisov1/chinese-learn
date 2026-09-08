@@ -1,20 +1,20 @@
 import { Platform } from 'react-native';
-import ocrRows from './data/hsk-ocr.json';
+import ocrRows from './data/hsk-ocr-index.json';
+import type { Dictionary } from './dictionary';
 
 export type ImportedWord = { hanzi: string; pinyin: string; russian: string };
 type Box = { x0: number; y0: number; x1: number; y1: number };
 type OcrWord = { text: string; confidence: number; bbox: Box };
 type OcrLine = { text: string; words: OcrWord[]; bbox: Box };
-type Record = ImportedWord & { english: string[] };
+type Record = { hanzi: string; pinyin: string };
 type Evidence = { baseline: string; pinyin: string; gloss: string };
 
-const records: Record[] = (ocrRows as [string, string, string, string[]][]).map(([hanzi, pinyin, russian, english]) => ({ hanzi, pinyin, russian, english }));
+const records: Record[] = (ocrRows as [string, string][]).map(([hanzi, pinyin]) => ({ hanzi, pinyin }));
 const dictionary = new Map(records.map(record => [record.hanzi, record]));
 const hanPattern = /\p{Script=Han}/u;
 const onlyHan = (text: string) => [...text].filter(character => hanPattern.test(character)).join('');
 const height = (box: Box) => box.y1 - box.y0;
 const normalizePinyin = (value: string) => value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f\s0-9'’:\-]/g, '').replaceAll('ü', 'v').replaceAll('u:', 'v').replace(/[^a-zv]/g, '');
-const wordsOf = (value: string) => new Set(value.toLowerCase().replace(/[^a-z]+/g, ' ').trim().split(/\s+/).filter(word => word.length > 1));
 
 function distance(a: string, b: string) {
   const row = Array.from({ length: b.length + 1 }, (_, index) => index);
@@ -72,23 +72,20 @@ function spatialEvidence(line: OcrLine): Evidence | undefined {
 function resolveConservatively(evidence: Evidence) {
   const observed = normalizePinyin(evidence.pinyin);
   if (!observed) return evidence.baseline;
-  const observedGloss = wordsOf(evidence.gloss);
-  const overlap = (record: Record) => [...observedGloss].filter(token => wordsOf(record.english.join(' ')).has(token)).length;
   const tolerance = Math.max(1, Math.floor(observed.length * .25));
-  const candidates = records.map(record => ({ record, pinyinDistance: distance(normalizePinyin(record.pinyin), observed), overlap: overlap(record) })).filter(candidate => candidate.pinyinDistance <= tolerance && candidate.record.hanzi.length === evidence.baseline.length);
-  candidates.sort((a, b) => b.overlap - a.overlap || a.pinyinDistance - b.pinyinDistance || Number(b.record.hanzi === evidence.baseline) - Number(a.record.hanzi === evidence.baseline));
+  const candidates = records.map(record => ({ record, pinyinDistance: distance(normalizePinyin(record.pinyin), observed) })).filter(candidate => candidate.pinyinDistance <= tolerance && candidate.record.hanzi.length === evidence.baseline.length);
+  candidates.sort((a, b) => a.pinyinDistance - b.pinyinDistance || Number(b.record.hanzi === evidence.baseline) - Number(a.record.hanzi === evidence.baseline));
   const replacement = candidates[0];
-  const baseline = dictionary.get(evidence.baseline)!;
-  return replacement && replacement.overlap > overlap(baseline) ? replacement.record.hanzi : evidence.baseline;
+  return replacement?.pinyinDistance === 0 ? replacement.record.hanzi : evidence.baseline;
 }
 
-export function parseVocabulary(text: string): ImportedWord[] {
-  const found = new Map<string, ImportedWord>();
-  for (const line of text.split(/\r?\n/)) { const word = textFallback(line); const item = word && dictionary.get(word); if (item) found.set(item.hanzi, item); }
-  return [...found.values()].map(({ hanzi, pinyin, russian }) => ({ hanzi, pinyin, russian }));
+export function parseVocabulary(text: string, meanings: Dictionary): ImportedWord[] {
+  const found = new Set<string>();
+  for (const line of text.split(/\r?\n/)) { const word = textFallback(line); if (word) found.add(word); }
+  return [...found].flatMap(hanzi => meanings.has(hanzi) ? [meanings.get(hanzi)!] : []);
 }
 
-export async function recognizeVocabulary(uri: string, onProgress: (value: number) => void): Promise<ImportedWord[]> {
+export async function recognizeVocabulary(uri: string, meanings: Dictionary, onProgress: (value: number) => void): Promise<ImportedWord[]> {
   if (Platform.OS !== 'web') throw new Error('OCR currently runs in the web app.');
   const { createWorker, PSM } = await import('tesseract.js');
   const worker = await createWorker('chi_sim', 1, { logger: message => { if (typeof message.progress === 'number') onProgress(message.progress); } });
@@ -101,7 +98,8 @@ export async function recognizeVocabulary(uri: string, onProgress: (value: numbe
       if (!evidence && /[>›》]\s*$/u.test(line.text.trim())) { const baseline = textFallback(line.text); if (baseline) evidence = { baseline, pinyin: '', gloss: line.text }; }
       if (!evidence) continue;
       const item = dictionary.get(resolveConservatively(evidence));
-      if (item) found.set(item.hanzi, { hanzi: item.hanzi, pinyin: item.pinyin, russian: item.russian });
+      const localized = item && meanings.get(item.hanzi);
+      if (localized) found.set(item.hanzi, localized);
     }
     return [...found.values()];
   } finally { await worker.terminate(); }

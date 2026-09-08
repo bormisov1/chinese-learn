@@ -1,9 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Text } from "@/i18n";
+import { useEffect,
+  useMemo,
+  useState } from 'react';
+import { Image,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
 import QRCode from 'qrcode';
 import { deflate } from 'pako';
 import { useStore } from '@/context';
-import dictionaryRows from '@/data/hsk-russian.json';
 import { colors } from '@/theme';
 import { Header, shell } from '@/ui';
 
@@ -23,18 +29,16 @@ const compress = (value: string) => deflate(new TextEncoder().encode(value));
 export default function QrExport() {
   const { data, ready } = useStore();
   const [image, setImage] = useState(''), [details, setDetails] = useState(''), [error, setError] = useState('');
-  const dictionary = useMemo(() => new Map((dictionaryRows as [string, string, string][]).map((row, index) => [row[0], index])), []);
 
   useEffect(() => {
     if (!ready) return;
     (async () => {
       try {
         const words = data.words.map(w => {
-          const dictionaryId = dictionary.get(w.hanzi);
-          const identity: unknown[] = dictionaryId === undefined ? [-1, w.hanzi, w.pinyin, w.russian] : [dictionaryId];
+          const identity: unknown[] = [w.hanzi, w.pinyin, w.russian];
           return [...identity, w.exampleCount, w.wordShownCount, w.createdAt, w.srsLevel, w.srsCorrect, w.srsIncorrect, w.srsDueAt, w.cardSrsLevel, w.cardSrsCorrect, w.cardSrsIncorrect, w.cardSrsDueAt, w.cardIntroducedAt ?? 0, w.cardActive ? 1 : 0, w.cardLastStudiedRound ?? -1, w.cardLastIncorrectAt ?? 0, w.cardLapses ?? 0];
         });
-        const json = JSON.stringify(['HD1', 'hsk-russian-v1', words]);
+        const json = JSON.stringify(['HD2', data.settings.language, words]);
         const packed = compress(json), payload = `HD1:${base45(packed)}`;
         let level: 'Q' | 'M' = 'Q';
         let qr;
@@ -45,13 +49,13 @@ export default function QrExport() {
         setDetails(`${data.words.length} words · no sentences · ${json.length} JSON bytes → ${packed.length} compressed bytes → ${payload.length} QR characters · version ${qr.version} · ECC ${level}`);
       } catch (e) { setError(e instanceof Error ? e.message : 'Could not create QR.'); }
     })();
-  }, [ready, data.words, dictionary]);
+  }, [ready, data.words, data.settings.language]);
 
   return <ScrollView style={shell.page} contentContainerStyle={shell.content}>
     <Header eyebrow="Local transfer experiment" title="Vocabulary + SRS QR" subtitle="Generated from this browser’s current data. Sentences and attempts excluded."/>
     <View style={styles.panel}>{image ? <Image source={{ uri: image }} style={styles.qr}/>: <Text style={styles.waiting}>{error || 'Compressing and generating QR…'}</Text>}</View>
     <Text style={styles.details}>{details}</Text>
-    <Text style={styles.note}>Contains vocabulary identity, example/shown counters, creation time, active-pool state, and separate sentence/card SRS levels, correct/incorrect counters, and due dates. Known vocabulary uses bundled dictionary indexes; unknown words embed Hanzi, pinyin, and Russian. For easiest import, take a screenshot of this QR rather than photographing the screen.</Text>
+    <Text style={styles.note}>Contains vocabulary identity and study progress in your selected language. Sentences are excluded. For easiest import, take a screenshot of this QR rather than photographing the screen.</Text>
   </ScrollView>;
 }
 

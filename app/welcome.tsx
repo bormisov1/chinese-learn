@@ -1,10 +1,30 @@
-import { Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { Pressable, SafeAreaView, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useStore } from "@/context";
 import { colors } from "@/theme";
+import { LANGUAGES, Text, suggestedLanguage } from "@/i18n";
+import type { AppLanguage } from "@/types";
 
 export default function Welcome() {
-  const { setAutomaticWordAddition } = useStore();
+  const { data, selectLanguage, setAutomaticWordAddition } = useStore();
+  const suggestion = suggestedLanguage();
+  const [language, setLanguage] = useState<AppLanguage>(data.languageSelected ? data.settings.language : suggestion);
+  if (!data.languageSelected) return (
+    <SafeAreaView style={styles.page}>
+      <View style={styles.content}>
+        <Text style={styles.title}>Choose your language</Text>
+        <Text style={styles.subtitle}>You can change it later in Settings.</Text>
+        <View style={styles.languages} accessibilityRole="radiogroup">
+          {LANGUAGES.map(item => <Pressable key={item.code} accessibilityRole="radio" accessibilityState={{ checked: language === item.code }} onPress={() => setLanguage(item.code)} style={[styles.language, language === item.code && styles.languageSelected]}>
+            <Text style={styles.optionTitle}>{item.nativeLabel}</Text>
+            {item.code === suggestion ? <Text style={styles.suggestion}>Suggested</Text> : null}
+          </Pressable>)}
+        </View>
+        <Pressable accessibilityRole="button" onPress={() => selectLanguage(language)} style={styles.continue}><Text style={styles.continueText}>Continue</Text></Pressable>
+      </View>
+    </SafeAreaView>
+  );
   return (
     <SafeAreaView style={styles.page}>
       <View style={styles.content}>
@@ -62,4 +82,10 @@ const styles = StyleSheet.create({
   badge: { color: colors.green, backgroundColor: colors.pale, borderRadius: 99, paddingHorizontal: 8, paddingVertical: 4, fontSize: 9, fontWeight: "900", letterSpacing: 0.8 },
   description: { color: colors.muted, lineHeight: 20, marginTop: 5 },
   note: { color: colors.muted, marginTop: "auto", fontSize: 12 },
+  languages: { gap: 9, marginTop: 28 },
+  language: { minHeight: 52, paddingHorizontal: 16, borderWidth: 1, borderColor: colors.line, borderRadius: 14, backgroundColor: colors.card, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  languageSelected: { borderColor: colors.green, backgroundColor: colors.pale },
+  suggestion: { color: colors.green, fontSize: 11, fontWeight: "800" },
+  continue: { minHeight: 52, borderRadius: 14, backgroundColor: colors.green, alignItems: "center", justifyContent: "center", marginTop: 18 },
+  continueText: { color: colors.white, fontSize: 16, fontWeight: "800" },
 });
