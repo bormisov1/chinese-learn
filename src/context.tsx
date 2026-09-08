@@ -18,12 +18,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { if (ready) saveStore(data); }, [data, ready]);
   useEffect(() => {
     if (!ready || !data.languageSelected) return;
+    const language = data.settings.language;
     let active = true;
     setDictionary(null); setDictionaryLoading(true); setError('');
-    downloadDictionary(data.settings.language).then(value => {
+    downloadDictionary(language).then(value => {
       if (!active) return;
       setDictionary(value);
-      setData(current => ({ ...current, words: current.words.map(word => ({ ...word, ...(value.get(word.hanzi) ?? {}) })) }));
+      setData(current => ({ ...current, words: current.words.map(word => {
+        const localized = value.get(word.hanzi);
+        if (localized) return { ...word, ...localized };
+        return language === 'th' ? { ...word, russian: 'ยังไม่มีคำแปล' } : word;
+      }) }));
     }).catch(reason => { if (active) setError(reason instanceof Error ? reason.message : 'Dictionary download failed.'); })
       .finally(() => { if (active) setDictionaryLoading(false); });
     return () => { active = false; };
