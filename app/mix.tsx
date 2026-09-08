@@ -13,7 +13,7 @@ import { evaluate, evaluateChinese, explain } from "@/deepseek";
 import { finishExercise } from "@/exercise-progress";
 import { colors } from "@/theme";
 import { Evaluation, Explanation, PracticeDirection, Sentence, Word } from "@/types";
-import { Button, Header, shell, SpeakerButton } from "@/ui";
+import { Button, Header, HskBadge, shell, SpeakerButton } from "@/ui";
 import { copyText } from "@/clipboard";
 
 type MixItem =
@@ -128,7 +128,7 @@ export default function Mix() {
           <Pressable onPress={() => copyText(sentence && chineseFirst ? chinese : russian)}><Text style={sentence && chineseFirst ? styles.sentenceChinese : styles.prompt}>{sentence && chineseFirst ? chinese : russian}</Text></Pressable>
           {sentence && chineseFirst && <SpeakerButton text={chinese} settings={data.settings} size={22} />}
         </View>}
-        {revealed && !sentence && <View style={styles.answer}><Text style={styles.chinese}>{chinese}</Text><Text style={styles.pinyin}>{pinyin}</Text><Text style={styles.translation}>{russian}</Text></View>}
+        {revealed && !sentence && <View style={styles.answer}><View style={styles.wordHeading}><Text style={styles.chinese}>{chinese}</Text><HskBadge hanzi={chinese} /></View><Text style={styles.pinyin}>{pinyin}</Text><Text style={styles.translation}>{russian}</Text></View>}
       </Pressable>
       {sentence && !answered && <><Text style={styles.label}>{chineseFirst ? "YOUR TRANSLATION" : "YOUR CHINESE TRANSLATION"}</Text><TextInput value={answer} onChangeText={setAnswer} multiline placeholder={chineseFirst ? "Enter your translation…" : "输入中文翻译…"} placeholderTextColor="#9A9D95" style={styles.input} /><View style={styles.actions}><Button secondary label="I don't know" disabled={busy} onPress={showHelp} /><Button label="Check answer" icon="checkmark" disabled={!answer.trim() || busy} onPress={checkAnswer} /></View></>}
       {busy && <ActivityIndicator style={styles.busy} color={colors.green} />}
@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
   card: { minHeight: 230, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: 22, padding: 24, marginBottom: 18, alignItems: "center", justifyContent: "center" },
   sentenceCard: { minHeight: 180, backgroundColor: colors.green, borderWidth: 0 }, centered: { alignItems: "center", gap: 10 }, direction: { flexDirection: "row", gap: 8, marginBottom: 14 },
   side: { color: colors.coral, fontSize: 11, fontWeight: "800", letterSpacing: 1.6, marginBottom: 20 }, prompt: { color: colors.ink, fontSize: 27, lineHeight: 38, fontWeight: "700", textAlign: "center" }, sentenceChinese: { color: colors.white, fontSize: 35, lineHeight: 50, fontWeight: "600", textAlign: "center" },
-  chinese: { color: colors.ink, fontSize: 34, lineHeight: 46, fontWeight: "800", textAlign: "center" }, answer: { width: "100%", borderTopWidth: 1, borderTopColor: colors.line, marginTop: 26, paddingTop: 22, alignItems: "center", gap: 8 }, pinyin: { color: colors.green, fontSize: 20, fontWeight: "700", textAlign: "center" }, translation: { color: colors.ink, fontSize: 20, lineHeight: 28, textAlign: "center" },
+  chinese: { color: colors.ink, fontSize: 34, lineHeight: 46, fontWeight: "800", textAlign: "center" }, wordHeading: { flexDirection: "row", alignItems: "center", gap: 8 }, answer: { width: "100%", borderTopWidth: 1, borderTopColor: colors.line, marginTop: 26, paddingTop: 22, alignItems: "center", gap: 8 }, pinyin: { color: colors.green, fontSize: 20, fontWeight: "700", textAlign: "center" }, translation: { color: colors.ink, fontSize: 20, lineHeight: 28, textAlign: "center" },
   label: { color: colors.muted, fontSize: 11, fontWeight: "800", letterSpacing: 1.4, marginTop: 6, marginBottom: 9 }, input: { minHeight: 115, borderRadius: 15, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.card, padding: 15, fontSize: 18, color: colors.ink, textAlignVertical: "top" }, actions: { flexDirection: "row", gap: 8, marginTop: 14 }, busy: { margin: 18 }, error: { color: colors.red, marginTop: 12 },
   feedback: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: 18, padding: 20, marginTop: 18, gap: 12 }, correct: { borderColor: colors.green }, incorrect: { borderColor: colors.coral }, feedbackTitle: { color: colors.ink, fontSize: 20, fontWeight: "800" }, translationResult: { borderLeftWidth: 3, borderLeftColor: colors.coral, paddingLeft: 12 }, resultLabel: { color: colors.muted, fontSize: 10, fontWeight: "800", letterSpacing: 1.2 }, submittedAnswer: { color: colors.red, fontSize: 17, marginTop: 4 }, correction: { color: colors.ink, fontSize: 18, fontWeight: "700" }, muted: { color: colors.muted, lineHeight: 21 }, audioRow: { flexDirection: "row", alignItems: "center", gap: 8 }, word: { flex: 1, color: colors.ink }, wordHanzi: { fontWeight: "800" },
 });

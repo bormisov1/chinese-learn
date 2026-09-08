@@ -6,6 +6,18 @@ import type { Dictionary } from "./dictionary";
 export const AUTOMATIC_WORD_TARGET = 20;
 
 const cumulative = hskLevels as Record<string, string[]>;
+const hskLevelByWord = new Map<string, number>();
+[1, 2, 3, 4, 5, 6].forEach((level) => {
+  for (const hanzi of cumulative[String(level)] ?? []) {
+    if (!hskLevelByWord.has(hanzi)) hskLevelByWord.set(hanzi, level);
+  }
+});
+
+/** Return the earliest HSK level containing an exact vocabulary match. */
+export function getHskLevel(hanzi: string): number | undefined {
+  return hskLevelByWord.get(hanzi.trim());
+}
+
 const orderedHskWords = [1, 2, 3, 4, 5, 6].flatMap((level) => {
   const previous = new Set(level > 1 ? cumulative[String(level - 1)] : []);
   return (cumulative[String(level)] ?? []).filter(

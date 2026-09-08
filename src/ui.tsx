@@ -8,6 +8,7 @@ import { Pressable,
 import { colors } from "./theme";
 import { Settings } from "./types";
 import { getTtsProvider, speakMandarin } from "./tts";
+import { getHskLevel } from "./hsk-vocabulary";
 
 export function Header({
   eyebrow,
@@ -95,6 +96,16 @@ export function SpeakerButton({
     </Pressable>
   );
 }
+
+export function HskBadge({ hanzi }: { hanzi: string }) {
+  const level = getHskLevel(hanzi);
+  if (!level) return null;
+  return (
+    <View style={s.hskBadge} accessibilityLabel={`HSK level ${level}`}>
+      <Text style={s.hskBadgeText}>HSK-{level}</Text>
+    </View>
+  );
+}
 export const shell = StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.paper },
   content: {
@@ -150,5 +161,20 @@ const s = StyleSheet.create({
     backgroundColor: colors.pale,
     alignItems: "center",
     justifyContent: "center",
+  },
+  hskBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: colors.pale,
+    borderWidth: 1,
+    borderColor: "#CCDCD1",
+  },
+  hskBadgeText: {
+    color: colors.green,
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: "800",
+    letterSpacing: 0.3,
   },
 });

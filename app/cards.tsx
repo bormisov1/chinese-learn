@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { useStore } from "@/context";
 import { colors } from "@/theme";
-import { Button, Header, shell, SpeakerButton } from "@/ui";
+import { Button, Header, HskBadge, shell, SpeakerButton } from "@/ui";
 import { Sentence, Settings, Word } from "@/types";
 import { copyText } from "@/clipboard";
 import {
@@ -283,6 +283,7 @@ export default function Cards() {
               <Pressable onPress={() => copyText(word.hanzi)}>
                 <Text style={styles.hanzi}>{word.hanzi}</Text>
               </Pressable>
+              <HskBadge hanzi={word.hanzi} />
               <SpeakerButton
                 text={word.hanzi}
                 settings={data.settings}
