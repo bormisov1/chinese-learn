@@ -13,7 +13,9 @@ export const emptyStore: StoreData = {
   mixQueue: [],
   mixPosition: 0,
   onboardingComplete: false,
+  languageSelected: false,
   settings: {
+    language: "en",
     apiKey: "",
     apiKeyValidated: false,
     showSentencesTab: false,
@@ -60,6 +62,7 @@ export async function loadStore(): Promise<StoreData> {
       mixPosition: parsed.mixPosition ?? 0,
       onboardingComplete:
         parsed.onboardingComplete ?? (parsed.words?.length ?? 0) > 0,
+      languageSelected: parsed.languageSelected ?? false,
       settings: { ...emptyStore.settings, ...parsed.settings },
     };
   } catch {

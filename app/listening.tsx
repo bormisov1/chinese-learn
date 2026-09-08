@@ -1,5 +1,12 @@
-import { useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Text, TextInput } from "@/i18n";
+import { useMemo,
+  useState } from "react";
+import { ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
 import { useStore } from "@/context";
 import { evaluate, explain } from "@/deepseek";
 import { Evaluation, Explanation, Sentence, Word } from "@/types";
@@ -106,7 +113,7 @@ export default function Listening() {
       {item.kind === "sentence" && !answered && (
         <>
           <Text style={styles.label}>YOUR RUSSIAN TRANSLATION</Text>
-          <TextInput value={answer} onChangeText={setAnswer} multiline placeholder="Введите перевод на русском…" placeholderTextColor="#9A9D95" style={styles.input} />
+          <TextInput value={answer} onChangeText={setAnswer} multiline placeholder="Enter your translation…" placeholderTextColor="#9A9D95" style={styles.input} />
           <View style={styles.actions}>
             <Button secondary label="I don't know" disabled={busy} onPress={showHelp} />
             <Button label="Check answer" icon="checkmark" disabled={!answer.trim() || busy} onPress={checkAnswer} />

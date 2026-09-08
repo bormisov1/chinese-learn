@@ -1,6 +1,10 @@
+import { Text } from "./i18n";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable,
+  StyleSheet,
+  View,
+} from "react-native";
 import { colors } from "./theme";
 import { Settings } from "./types";
 import { getTtsProvider, speakMandarin } from "./tts";

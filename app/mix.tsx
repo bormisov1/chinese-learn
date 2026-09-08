@@ -1,5 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { LANGUAGES, Text, TextInput, useTranslation } from "@/i18n";
+import { useEffect,
+  useMemo,
+  useState } from "react";
+import { ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
 import { useStore } from "@/context";
 import { evaluate, evaluateChinese, explain } from "@/deepseek";
 import { finishExercise } from "@/exercise-progress";
@@ -37,6 +45,7 @@ function reconcileQueue(queue: string[], items: PrioritizedItem[]) {
 const isSentence = (source: Word | Sentence): source is Sentence => "chinese" in source;
 
 export default function Mix() {
+  const t = useTranslation();
   const { data, patch } = useStore();
   const candidates = useMemo<PrioritizedItem[]>(() => [
     ...data.words.flatMap((word): PrioritizedItem[] => [
@@ -110,8 +119,8 @@ export default function Mix() {
     <ScrollView style={shell.page} contentContainerStyle={shell.content} keyboardShouldPersistTaps="handled">
       <Header eyebrow={`Mix · ${item.mode}${listening ? ` · ${item.sourceKind}` : ""}`} title="Everything in one round." subtitle={`${position + 1} of ${queue.length} · words, sentences, and listening`} />
       {sentence && !listening && !answered && <View style={styles.direction}>
-        <Button secondary={!chineseFirst} label="Chinese → Russian" onPress={() => { setDirection("zh-ru"); reset(); }} />
-        <Button secondary={chineseFirst} label="Russian → Chinese" onPress={() => { setDirection("ru-zh"); reset(); }} />
+        <Button secondary={!chineseFirst} label={`${t("Chinese")} → ${LANGUAGES.find(item => item.code === data.settings.language)?.nativeLabel}`} onPress={() => { setDirection("zh-ru"); reset(); }} />
+        <Button secondary={chineseFirst} label={`${LANGUAGES.find(item => item.code === data.settings.language)?.nativeLabel} → ${t("Chinese")}`} onPress={() => { setDirection("ru-zh"); reset(); }} />
       </View>}
       <Pressable accessibilityRole={word || (listening && !sentence) ? "button" : undefined} accessibilityLabel={word || (listening && !sentence) ? revealed ? "Hide answer" : "Reveal answer" : undefined} disabled={Boolean(sentence)} onPress={() => setRevealed((value) => !value)} style={[styles.card, sentence && !listening && styles.sentenceCard]}>
         <Text style={styles.side}>{item.mode.toUpperCase()}</Text>
@@ -121,7 +130,7 @@ export default function Mix() {
         </View>}
         {revealed && !sentence && <View style={styles.answer}><Text style={styles.chinese}>{chinese}</Text><Text style={styles.pinyin}>{pinyin}</Text><Text style={styles.translation}>{russian}</Text></View>}
       </Pressable>
-      {sentence && !answered && <><Text style={styles.label}>{chineseFirst ? "YOUR RUSSIAN TRANSLATION" : "ВАШ ПЕРЕВОД НА КИТАЙСКИЙ"}</Text><TextInput value={answer} onChangeText={setAnswer} multiline placeholder={chineseFirst ? "Введите перевод на русском…" : "输入中文翻译…"} placeholderTextColor="#9A9D95" style={styles.input} /><View style={styles.actions}><Button secondary label="I don't know" disabled={busy} onPress={showHelp} /><Button label="Check answer" icon="checkmark" disabled={!answer.trim() || busy} onPress={checkAnswer} /></View></>}
+      {sentence && !answered && <><Text style={styles.label}>{chineseFirst ? "YOUR TRANSLATION" : "YOUR CHINESE TRANSLATION"}</Text><TextInput value={answer} onChangeText={setAnswer} multiline placeholder={chineseFirst ? "Enter your translation…" : "输入中文翻译…"} placeholderTextColor="#9A9D95" style={styles.input} /><View style={styles.actions}><Button secondary label="I don't know" disabled={busy} onPress={showHelp} /><Button label="Check answer" icon="checkmark" disabled={!answer.trim() || busy} onPress={checkAnswer} /></View></>}
       {busy && <ActivityIndicator style={styles.busy} color={colors.green} />}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {sentence && evaluation && <View style={[styles.feedback, evaluation.correct ? styles.correct : styles.incorrect]}><Text style={styles.feedbackTitle}>{evaluation.correct ? "✓ Correct" : "Not quite yet"}</Text>{!evaluation.correct && <View style={styles.translationResult}><Text style={styles.resultLabel}>YOUR TRANSLATION</Text><Text style={styles.submittedAnswer}>{submittedAnswer}</Text></View>}{listening && <Text style={styles.chinese}>{chinese}</Text>}<Text style={styles.pinyin}>{evaluation.pinyin}</Text>{evaluation.correction ? <Text style={styles.correction}>{evaluation.correction}</Text> : null}<Text style={styles.muted}>{evaluation.feedback}</Text></View>}

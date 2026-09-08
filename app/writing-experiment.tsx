@@ -1,5 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Text } from "@/i18n";
+import { useEffect,
+  useMemo,
+  useRef,
+  useState } from 'react';
+import { Platform,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
 import { useStore } from '@/context';
 import { colors } from '@/theme';
 import { Button, Header, shell } from '@/ui';

@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
+import { LANGUAGES, Text, TextInput, useTranslation } from "@/i18n";
+import { useMemo,
+  useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from "react-native";
 import { useStore } from "@/context";
@@ -24,6 +24,8 @@ export default function Practice() {
     error: generationError,
     generateBatch,
   } = useStore();
+  const t = useTranslation();
+  const studyLanguage = LANGUAGES.find(item => item.code === data.settings.language)?.nativeLabel ?? "English";
   const [direction, setDirection] = useState<PracticeDirection>("zh-ru");
   const [lastSentenceId, setLastSentenceId] = useState<string>();
   const [answer, setAnswer] = useState(""),
@@ -184,12 +186,12 @@ export default function Practice() {
       <View style={styles.direction}>
         <Button
           secondary={!chineseFirst}
-          label="Chinese → Russian"
+          label={`${t("Chinese")} → ${studyLanguage}`}
           onPress={() => changeDirection("zh-ru")}
         />
         <Button
           secondary={chineseFirst}
-          label="Russian → Chinese"
+          label={`${studyLanguage} → ${t("Chinese")}`}
           onPress={() => changeDirection("ru-zh")}
         />
       </View>
@@ -224,15 +226,15 @@ export default function Practice() {
         <>
           <Text style={styles.label}>
             {chineseFirst
-              ? "YOUR RUSSIAN TRANSLATION"
-              : "ВАШ ПЕРЕВОД НА КИТАЙСКИЙ"}
+              ? `${t("YOUR TRANSLATION")} · ${studyLanguage}`
+              : t("YOUR CHINESE TRANSLATION")}
           </Text>
           <TextInput
             value={answer}
             onChangeText={setAnswer}
             multiline
             placeholder={
-              chineseFirst ? "Введите перевод на русском…" : "输入中文翻译…"
+              chineseFirst ? t("Enter your translation…") : "输入中文翻译…"
             }
             placeholderTextColor="#9A9D95"
             style={styles.input}

@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Text } from "@/i18n";
+import { useEffect,
+  useMemo,
+  useRef,
+  useState } from "react";
 import {
   Animated,
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
 import { useStore } from "@/context";

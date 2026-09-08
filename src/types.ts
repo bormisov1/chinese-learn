@@ -47,6 +47,7 @@ export type Explanation = {
   grammar: string;
 };
 export type Settings = {
+  language: AppLanguage;
   apiKey: string;
   apiKeyValidated: boolean;
   showSentencesTab: boolean;
@@ -59,6 +60,7 @@ export type Settings = {
   ttsRate: number;
   automaticWordAddition: boolean;
 };
+export type AppLanguage = "en" | "ru" | "de" | "fr" | "sr" | "th" | "fil";
 export type PracticeDirection = "zh-ru" | "ru-zh";
 export type StoreData = {
   words: Word[];
@@ -75,5 +77,6 @@ export type StoreData = {
   mixQueue: string[];
   mixPosition: number;
   onboardingComplete: boolean;
+  languageSelected: boolean;
   settings: Settings;
 };

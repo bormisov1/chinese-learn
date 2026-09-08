@@ -1,5 +1,9 @@
+import { Text } from "@/i18n";
 import { router } from "expo-router";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
 import { useStore } from "@/context";
 import { Button, Header, shell } from "@/ui";
 import { colors } from "@/theme";

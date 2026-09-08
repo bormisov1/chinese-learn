@@ -1,33 +1,54 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { generate } from './deepseek';
 import { emptyStore, loadStore, saveStore } from './storage';
-import { StoreData, Word } from './types';
+import { AppLanguage, StoreData, Word } from './types';
 import { ImportedWord } from './ocr';
 import { fillActivePool } from './card-srs';
 import { replenishAutomaticWords } from './hsk-vocabulary';
+import { Dictionary, downloadDictionary } from './dictionary';
 
-type Context = { data: StoreData; ready: boolean; generating: boolean; error: string; importWords: (items: ImportedWord[]) => number; importWordBackup: (items: Omit<Word, 'id'>[]) => number; patch: (fn: (data: StoreData) => StoreData) => void; setAutomaticWordAddition: (enabled: boolean, completeOnboarding?: boolean) => void; generateBatch: (mandatory?: Word) => Promise<void> };
+type Context = { data: StoreData; ready: boolean; generating: boolean; error: string; dictionary: Dictionary | null; dictionaryLoading: boolean; selectLanguage: (language: AppLanguage) => void; importWords: (items: ImportedWord[]) => number; importWordBackup: (items: Omit<Word, 'id'>[]) => number; patch: (fn: (data: StoreData) => StoreData) => void; setAutomaticWordAddition: (enabled: boolean, completeOnboarding?: boolean) => void; generateBatch: (mandatory?: Word) => Promise<void> };
 const StoreContext = createContext<Context>(null as never);
 const id = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [data, setData] = useState<StoreData>(emptyStore), [ready, setReady] = useState(false), [generating, setGenerating] = useState(false), [error, setError] = useState('');
+  const [dictionary, setDictionary] = useState<Dictionary | null>(null), [dictionaryLoading, setDictionaryLoading] = useState(false);
   useEffect(() => { loadStore().then(value => { setData(value); setReady(true); }); }, []);
   useEffect(() => { if (ready) saveStore(data); }, [data, ready]);
   useEffect(() => {
-    if (!ready || !data.onboardingComplete || !data.settings.automaticWordAddition) return;
+    if (!ready || !data.languageSelected) return;
+    let active = true;
+    setDictionary(null); setDictionaryLoading(true); setError('');
+    downloadDictionary(data.settings.language).then(value => {
+      if (!active) return;
+      setDictionary(value);
+      setData(current => ({ ...current, words: current.words.map(word => ({ ...word, ...(value.get(word.hanzi) ?? {}) })) }));
+    }).catch(reason => { if (active) setError(reason instanceof Error ? reason.message : 'Dictionary download failed.'); })
+      .finally(() => { if (active) setDictionaryLoading(false); });
+    return () => { active = false; };
+  }, [ready, data.languageSelected, data.settings.language]);
+  useEffect(() => {
+    if (!ready || !dictionary || !data.onboardingComplete || !data.settings.automaticWordAddition) return;
     setData(current => {
-      const words = replenishAutomaticWords(current.words, Date.now(), current.cardRound);
+      const words = replenishAutomaticWords(current.words, dictionary, Date.now(), current.cardRound);
       return words === current.words ? current : { ...current, words };
     });
-  }, [ready, data.onboardingComplete, data.settings.automaticWordAddition, data.words]);
+  }, [ready, dictionary, data.onboardingComplete, data.settings.automaticWordAddition, data.words]);
+  const selectLanguage = (language: AppLanguage) => setData(current => ({
+    ...current, languageSelected: true,
+    settings: { ...current.settings, language },
+    sentences: current.settings.language === language ? current.sentences : [],
+    wordSentenceIndex: current.settings.language === language ? current.wordSentenceIndex : {},
+    attempts: current.settings.language === language ? current.attempts : [],
+  }));
   const patch = (fn: (value: StoreData) => StoreData) => setData(fn);
   const setAutomaticWordAddition = (enabled: boolean, completeOnboarding = false) => {
     setData(current => ({
       ...current,
       onboardingComplete: completeOnboarding || current.onboardingComplete,
       settings: { ...current.settings, automaticWordAddition: enabled },
-      words: enabled ? replenishAutomaticWords(current.words, Date.now(), current.cardRound) : current.words,
+      words: enabled && dictionary ? replenishAutomaticWords(current.words, dictionary, Date.now(), current.cardRound) : current.words,
     }));
   };
   const importWords = (items: ImportedWord[]) => {
@@ -38,10 +59,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   };
   const importWordBackup = (items: Omit<Word, 'id'>[]) => {
     setData(d => {
-      const incoming = new Map(items.map(w => [w.hanzi, w]));
+      const localized = items.map(w => ({ ...w, ...(dictionary?.get(w.hanzi) ?? {}) }));
+      const incoming = new Map(localized.map(w => [w.hanzi, w]));
       const words = d.words.map(w => incoming.has(w.hanzi) ? { ...incoming.get(w.hanzi)!, id: w.id } : w);
       const existing = new Set(words.map(w => w.hanzi));
-      return { ...d, words: fillActivePool([...words, ...items.filter(w => !existing.has(w.hanzi)).map(w => ({ ...w, id: id() }))], Date.now(), d.cardRound) };
+      return { ...d, words: fillActivePool([...words, ...localized.filter(w => !existing.has(w.hanzi)).map(w => ({ ...w, id: id() }))], Date.now(), d.cardRound) };
     });
     return items.length;
   };
@@ -64,7 +86,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       });
     } catch (e) { setError(e instanceof Error ? e.message : 'Generation failed'); } finally { setGenerating(false); }
   };
-  const value = useMemo(() => ({ data, ready, generating, error, importWords, importWordBackup, patch, setAutomaticWordAddition, generateBatch }), [data, ready, generating, error]);
+  const value = useMemo(() => ({ data, ready, generating, error, dictionary, dictionaryLoading, selectLanguage, importWords, importWordBackup, patch, setAutomaticWordAddition, generateBatch }), [data, ready, generating, error, dictionary, dictionaryLoading]);
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
 export const useStore = () => useContext(StoreContext);

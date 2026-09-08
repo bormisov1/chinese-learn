@@ -38,4 +38,6 @@ The next deployment will recreate the directory and perform a cold `npm ci`.
 
 Add a DeepSeek API key under Settings. Screenshot OCR runs locally on web via Tesseract.js. Native apps support pasted vocabulary text; on-device native OCR requires a platform OCR module and development build.
 
-Screenshot import extracts only Hanzi. Pinyin and Russian meanings come from the bundled HSK 1–6 dictionary; screenshot pronunciation/translation columns are ignored. Dictionary data: `argb/hanzi-data` (`hsk-russian.csv`), MIT licensed. Reimports merge by Hanzi and preserve all study counters.
+On first launch the app suggests a supported language from the browser locale and asks the learner to confirm it. The language can be changed later in Settings. Changing it refreshes saved word meanings and clears generated sentences because their translations belong to the previous language.
+
+HSK dictionaries are lazy-loaded from the fixed, same-origin `/dictionaries/hsk-<language>.json` allowlist. The loader rejects oversized and malformed files; a stored language value can never become a download URL. Only the selected dictionary is requested. Screenshot OCR uses a translation-free Hanzi/pinyin index, and reimports merge by Hanzi while preserving study counters.

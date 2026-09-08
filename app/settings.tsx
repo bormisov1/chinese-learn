@@ -1,4 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { LANGUAGES, Text, TextInput } from "@/i18n";
+import { useEffect,
+  useRef,
+  useState } from "react";
 import {
   Animated,
   LayoutChangeEvent,
@@ -9,8 +12,6 @@ import {
   ScrollView,
   StyleSheet,
   Switch,
-  Text,
-  TextInput,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -24,7 +25,6 @@ import { validateApiKey } from "@/deepseek";
 import { getActivePoolQueue } from "@/card-srs";
 import { ImportedWord } from "@/ocr";
 import hskLevels from "@/data/hsk-levels.json";
-import dictionaryRows from "@/data/hsk-russian.json";
 import {
   getTtsProvider,
   speakMandarin,
@@ -33,7 +33,7 @@ import {
 } from "@/tts";
 
 export default function Settings() {
-  const { data, importWords, patch, setAutomaticWordAddition } = useStore();
+  const { data, dictionary, importWords, patch, selectLanguage, setAutomaticWordAddition } = useStore();
   const scrollRef = useRef<ScrollView>(null);
   const sectionOffsets = useRef<Record<SettingsSection, number>>({
     general: 0,
@@ -227,6 +227,10 @@ export default function Settings() {
             data.settings.apiKeyValidated && styles.deepSeekValidated,
           ]}
         >
+        <Text style={styles.label}>LANGUAGE</Text>
+        <View style={styles.chips}>
+          {LANGUAGES.map(item => <Choice key={item.code} label={item.nativeLabel} selected={data.settings.language === item.code} onPress={() => selectLanguage(item.code)} />)}
+        </View>
         <Field
           label="DEEPSEEK API KEY"
           value={data.settings.apiKey}
@@ -335,6 +339,7 @@ export default function Settings() {
           />
         </View>
         <HskAdder
+          dictionary={dictionary}
           existing={new Set(data.words.map((word) => word.hanzi))}
           onAdd={importWords}
         />
@@ -573,27 +578,23 @@ const SETTINGS_SECTIONS: {
 ];
 
 function HskAdder({
+  dictionary,
   existing,
   onAdd,
 }: {
+  dictionary: import("@/dictionary").Dictionary | null;
   existing: Set<string>;
   onAdd: (words: ImportedWord[]) => number;
 }) {
   const [level, setLevel] = useState(1);
   const [message, setMessage] = useState("");
-  const dictionary = new Map(
-    (dictionaryRows as [string, string, string][]).map(([hanzi, pinyin, russian]) => [
-      hanzi,
-      { hanzi, pinyin, russian },
-    ]),
-  );
   const cumulative = hskLevels as Record<string, string[]>;
   const lowerLevelWords = new Set(level > 1 ? cumulative[String(level - 1)] : []);
   const available = (cumulative[String(level)] ?? []).filter(
-    (hanzi) => !lowerLevelWords.has(hanzi) && dictionary.has(hanzi) && !existing.has(hanzi),
+    (hanzi) => !lowerLevelWords.has(hanzi) && !!dictionary?.has(hanzi) && !existing.has(hanzi),
   );
   const addWords = () => {
-    const count = onAdd(available.slice(0, 7).map((hanzi) => dictionary.get(hanzi)!));
+    const count = onAdd(available.slice(0, 7).map((hanzi) => dictionary!.get(hanzi)!));
     setMessage(
       count
         ? `Added ${count} new HSK ${level} word${count === 1 ? "" : "s"}.`
