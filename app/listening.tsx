@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { useStore } from "@/context";
 import { evaluate, explain } from "@/deepseek";
 import { Evaluation, Explanation, Sentence, Word } from "@/types";
-import { Button, Header, shell, SpeakerButton } from "@/ui";
+import { Button, Header, HskBadge, shell, SpeakerButton } from "@/ui";
 import { colors } from "@/theme";
 import { finishExercise } from "@/exercise-progress";
 
@@ -97,7 +97,10 @@ export default function Listening() {
 
       {item.kind === "word" && revealed && (
         <View style={styles.answer}>
-          <Text style={styles.chinese}>{item.chinese}</Text>
+          <View style={styles.wordHeading}>
+            <Text style={styles.chinese}>{item.chinese}</Text>
+            <HskBadge hanzi={item.chinese} />
+          </View>
           <Text style={styles.pinyin}>{item.pinyin}</Text>
           <Text style={styles.russian}>{item.russian}</Text>
         </View>
@@ -165,6 +168,7 @@ export default function Listening() {
 const styles = StyleSheet.create({
   card: { minHeight: 230, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: 22, padding: 24, marginBottom: 18, alignItems: "center", justifyContent: "center" },
   answer: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: 18, padding: 22, marginBottom: 18, alignItems: "center", gap: 8 },
+  wordHeading: { flexDirection: "row", alignItems: "center", gap: 8 },
   chinese: { color: colors.ink, fontSize: 34, lineHeight: 46, fontWeight: "800", textAlign: "center" },
   pinyin: { color: colors.green, fontSize: 20, fontWeight: "700", textAlign: "center" },
   russian: { color: colors.ink, fontSize: 20, lineHeight: 28, textAlign: "center" },
