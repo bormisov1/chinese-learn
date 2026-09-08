@@ -13,6 +13,7 @@ export const LANGUAGES: { code: AppLanguage; label: string; nativeLabel: string 
   { code: "th", label: "Thai", nativeLabel: "ไทย" },
   { code: "fil", label: "Filipino", nativeLabel: "Filipino" },
 ];
+export const isAppLanguage = (value: unknown): value is AppLanguage => LANGUAGES.some(item => item.code === value);
 
 const LanguageContext = createContext<AppLanguage>("en");
 export const I18nProvider = LanguageContext.Provider;

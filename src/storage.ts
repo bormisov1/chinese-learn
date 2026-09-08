@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import { StoreData } from "./types";
 import { migrateCardPool } from "./card-srs";
+import { isAppLanguage } from "./i18n";
 
 const KEY = "hanzi-deck:v1";
 export const emptyStore: StoreData = {
@@ -63,7 +64,11 @@ export async function loadStore(): Promise<StoreData> {
       onboardingComplete:
         parsed.onboardingComplete ?? (parsed.words?.length ?? 0) > 0,
       languageSelected: parsed.languageSelected ?? false,
-      settings: { ...emptyStore.settings, ...parsed.settings },
+      settings: {
+        ...emptyStore.settings,
+        ...parsed.settings,
+        language: isAppLanguage(parsed.settings?.language) ? parsed.settings.language : "en",
+      },
     };
   } catch {
     return emptyStore;

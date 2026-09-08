@@ -11,7 +11,9 @@ const ASSETS: Record<AppLanguage, string> = {
 const MAX_BYTES = 2_000_000;
 
 export async function downloadDictionary(language: AppLanguage): Promise<Dictionary> {
-  const response = await fetch(ASSETS[language], { credentials: "same-origin", cache: "force-cache" });
+  const asset = ASSETS[language];
+  if (!asset) throw new Error("Unsupported dictionary language.");
+  const response = await fetch(asset, { credentials: "same-origin", cache: "force-cache" });
   if (!response.ok) throw new Error(`Dictionary download failed (${response.status}).`);
   const length = Number(response.headers.get("content-length") || 0);
   if (length > MAX_BYTES) throw new Error("Dictionary file is unexpectedly large.");
