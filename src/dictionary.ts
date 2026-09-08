@@ -9,6 +9,12 @@ const ASSETS: Record<AppLanguage, string> = {
   fil: "/dictionaries/hsk-fil.json",
 };
 const MAX_BYTES = 2_000_000;
+const METADATA_GLOSS = /^(?:CL:|(?:also |Taiwan )?pr\.|(?:old )?variant of |see |abbr\. for )/i;
+
+export function cleanDictionaryMeaning(value: string): string {
+  const meanings = value.split(";").map(part => part.trim()).filter(part => part && !METADATA_GLOSS.test(part));
+  return meanings.join("; ") || value.trim();
+}
 
 export async function downloadDictionary(language: AppLanguage): Promise<Dictionary> {
   const asset = ASSETS[language];
@@ -24,7 +30,8 @@ export async function downloadDictionary(language: AppLanguage): Promise<Diction
   const dictionary: Dictionary = new Map();
   for (const row of rows) {
     if (!Array.isArray(row) || row.length !== 3 || row.some(value => typeof value !== "string" || value.length > 2_000)) throw new Error("Invalid dictionary entry.");
-    const [hanzi, pinyin, meaning] = row;
+    const [hanzi, pinyin, rawMeaning] = row;
+    const meaning = cleanDictionaryMeaning(rawMeaning);
     if (!hanzi || !pinyin || !meaning || !/^\p{Script=Han}/u.test(hanzi)) throw new Error("Invalid dictionary entry.");
     dictionary.set(hanzi, { hanzi, pinyin, russian: meaning });
   }
