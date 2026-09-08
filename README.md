@@ -1,6 +1,6 @@
 # Hanzi Deck
 
-Local-first Expo app for Chinese vocabulary study.
+Local-first Expo app for Chinese vocabulary study. The import screen accepts a Chinese word or sentence and segments it into vocabulary entries using the bundled dictionary.
 
 ```bash
 npm install
