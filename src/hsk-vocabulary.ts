@@ -43,7 +43,7 @@ export function replenishAutomaticWords(
 
   const existing = new Set(words.map((word) => word.hanzi));
   const additions = orderedHskWords
-    .filter((hanzi) => !existing.has(hanzi))
+    .filter((hanzi) => !existing.has(hanzi) && dictionary.has(hanzi))
     .slice(0, needed)
     .map((hanzi, index): Word => ({
       ...dictionary.get(hanzi)!,

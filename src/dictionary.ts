@@ -4,9 +4,6 @@ import type { ImportedWord } from "./ocr";
 export type Dictionary = Map<string, ImportedWord>;
 const ASSETS: Record<AppLanguage, string> = {
   en: "/dictionaries/hsk-en.json", ru: "/dictionaries/hsk-ru.json",
-  de: "/dictionaries/hsk-de.json", fr: "/dictionaries/hsk-fr.json",
-  sr: "/dictionaries/hsk-sr.json", th: "/dictionaries/hsk-th.json",
-  fil: "/dictionaries/hsk-fil.json",
 };
 const MAX_BYTES = 2_000_000;
 const METADATA_GLOSS = /^(?:CL:|(?:also |Taiwan )?pr\.|(?:old )?variant of |see |abbr\. for )/i;
