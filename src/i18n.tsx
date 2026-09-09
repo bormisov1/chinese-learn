@@ -7,11 +7,6 @@ import translations from "./data/ui-translations.json";
 export const LANGUAGES: { code: AppLanguage; label: string; nativeLabel: string }[] = [
   { code: "en", label: "English", nativeLabel: "English" },
   { code: "ru", label: "Russian", nativeLabel: "Русский" },
-  { code: "de", label: "German", nativeLabel: "Deutsch" },
-  { code: "fr", label: "French", nativeLabel: "Français" },
-  { code: "sr", label: "Serbian", nativeLabel: "Српски" },
-  { code: "th", label: "Thai", nativeLabel: "ไทย" },
-  { code: "fil", label: "Filipino", nativeLabel: "Filipino" },
 ];
 export const isAppLanguage = (value: unknown): value is AppLanguage => LANGUAGES.some(item => item.code === value);
 
@@ -24,7 +19,6 @@ export function suggestedLanguage(): AppLanguage {
   const supported = new Set(LANGUAGES.map(({ code }) => code));
   for (const locale of navigator.languages ?? [navigator.language]) {
     const normalized = locale.toLowerCase().split("-")[0];
-    if (normalized === "tl") return "fil";
     if (supported.has(normalized as AppLanguage)) return normalized as AppLanguage;
   }
   return "en";

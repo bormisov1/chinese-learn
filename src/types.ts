@@ -60,7 +60,7 @@ export type Settings = {
   ttsRate: number;
   automaticWordAddition: boolean;
 };
-export type AppLanguage = "en" | "ru" | "de" | "fr" | "sr" | "th" | "fil";
+export type AppLanguage = "en" | "ru";
 export type PracticeDirection = "zh-ru" | "ru-zh";
 export type StoreData = {
   words: Word[];

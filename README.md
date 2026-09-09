@@ -42,4 +42,5 @@ On first launch the app suggests a supported language from the browser locale an
 
 HSK dictionaries are lazy-loaded from the fixed, same-origin `/dictionaries/hsk-<language>.json` allowlist. The loader rejects oversized and malformed files; a stored language value can never become a download URL. Only the selected dictionary is requested. Screenshot OCR uses a translation-free Hanzi/pinyin index, and reimports merge by Hanzi while preserving study counters.
 
-Dictionary source and license details are documented in [`THIRD_PARTY_DICTIONARIES.md`](THIRD_PARTY_DICTIONARIES.md).
+English meanings come from CC-CEDICT. Russian meanings use the original bundled
+HSK dictionary retained from before multilingual support.

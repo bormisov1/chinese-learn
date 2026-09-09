@@ -27,7 +27,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setData(current => ({ ...current, words: current.words.map(word => {
         const localized = value.get(word.hanzi);
         if (localized) return { ...word, ...localized };
-        return language === 'th' ? { ...word, russian: 'ยังไม่มีคำแปล' } : word;
+        return word;
       }) }));
     }).catch(reason => { if (active) setError(reason instanceof Error ? reason.message : 'Dictionary download failed.'); })
       .finally(() => { if (active) setDictionaryLoading(false); });
