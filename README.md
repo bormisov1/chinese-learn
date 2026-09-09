@@ -41,3 +41,5 @@ Add a DeepSeek API key under Settings. Screenshot OCR runs locally on web via Te
 On first launch the app suggests a supported language from the browser locale and asks the learner to confirm it. The language can be changed later in Settings. Changing it refreshes saved word meanings and clears generated sentences because their translations belong to the previous language.
 
 HSK dictionaries are lazy-loaded from the fixed, same-origin `/dictionaries/hsk-<language>.json` allowlist. The loader rejects oversized and malformed files; a stored language value can never become a download URL. Only the selected dictionary is requested. Screenshot OCR uses a translation-free Hanzi/pinyin index, and reimports merge by Hanzi while preserving study counters.
+
+Dictionary source and license details are documented in [`THIRD_PARTY_DICTIONARIES.md`](THIRD_PARTY_DICTIONARIES.md).
