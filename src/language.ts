@@ -1,5 +1,21 @@
 import type { Dictionary } from "./dictionary";
-import type { AppLanguage, StoreData, Word } from "./types";
+import type { AppLanguage, LanguageSentenceData, StoreData, Word } from "./types";
+
+const emptySentenceData = (): LanguageSentenceData => ({
+  sentences: [],
+  wordSentenceIndex: {},
+  attempts: [],
+  mixQueue: [],
+  mixPosition: 0,
+});
+
+const activeSentenceData = (data: StoreData): LanguageSentenceData => ({
+  sentences: data.sentences,
+  wordSentenceIndex: data.wordSentenceIndex,
+  attempts: data.attempts,
+  mixQueue: data.mixQueue,
+  mixPosition: data.mixPosition,
+});
 
 function localizeWord(word: Word, currentLanguage: AppLanguage, targetLanguage: AppLanguage, dictionary: Dictionary): Word {
   const translationByLanguage = { ...word.translationByLanguage };
@@ -26,15 +42,25 @@ export function switchStoreLanguage(
   dictionary: Dictionary,
 ): StoreData {
   const changed = data.settings.language !== language;
+  const sentenceDataByLanguage = changed
+    ? { ...data.sentenceDataByLanguage, [data.settings.language]: activeSentenceData(data) }
+    : data.sentenceDataByLanguage;
+  const sentenceData = changed
+    ? sentenceDataByLanguage[language] ?? emptySentenceData()
+    : activeSentenceData(data);
+  const exampleCountByWord = new Map<string, number>();
+  for (const sentence of sentenceData.sentences) {
+    for (const wordId of sentence.wordIds) exampleCountByWord.set(wordId, (exampleCountByWord.get(wordId) ?? 0) + 1);
+  }
   return {
     ...data,
     languageSelected: true,
     settings: { ...data.settings, language },
-    words: data.words.map((word) => localizeWord(word, data.settings.language, language, dictionary)),
-    sentences: changed ? [] : data.sentences,
-    wordSentenceIndex: changed ? {} : data.wordSentenceIndex,
-    attempts: changed ? [] : data.attempts,
-    mixQueue: changed ? [] : data.mixQueue,
-    mixPosition: changed ? 0 : data.mixPosition,
+    words: data.words.map((word) => ({
+      ...localizeWord(word, data.settings.language, language, dictionary),
+      exampleCount: exampleCountByWord.get(word.id) ?? 0,
+    })),
+    ...sentenceData,
+    sentenceDataByLanguage,
   };
 }
