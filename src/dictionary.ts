@@ -30,7 +30,9 @@ async function downloadDictionary(language: AppLanguage): Promise<Dictionary> {
     if (!Array.isArray(row) || row.length !== 3 || row.some(value => typeof value !== "string" || value.length > 2_000)) throw new Error("Invalid dictionary entry.");
     const [hanzi, pinyin, rawMeaning] = row;
     const meaning = cleanDictionaryMeaning(rawMeaning);
-    if (!hanzi || !pinyin || !meaning || !/^\p{Script=Han}/u.test(hanzi)) throw new Error("Invalid dictionary entry.");
+    // Ignore isolated unusable source rows; the completeness check below still
+    // rejects missing or broadly corrupted dictionaries.
+    if (!hanzi || !pinyin || !meaning || !/^\p{Script=Han}/u.test(hanzi)) continue;
     dictionary.set(hanzi, { hanzi, pinyin, russian: meaning });
   }
   if (dictionary.size < 100) throw new Error("Dictionary is incomplete.");
