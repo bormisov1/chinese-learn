@@ -1,4 +1,4 @@
-import { LANGUAGES, Text, TextInput, useTranslation } from "@/i18n";
+import { displayTranslation, LANGUAGES, Text, TextInput, useTranslation } from "@/i18n";
 import { useEffect,
   useMemo,
   useState } from "react";
@@ -83,7 +83,7 @@ export default function Mix() {
   const listening = item.mode === "listening";
   const chinese = item.mode === "word" ? item.word.hanzi : item.mode === "sentence" ? item.sentence.chinese.replaceAll(" ", "") : isSentence(item.source) ? item.source.chinese.replaceAll(" ", "") : item.source.hanzi;
   const pinyin = item.mode === "word" ? item.word.pinyin : item.mode === "sentence" ? item.sentence.pinyin : item.source.pinyin;
-  const russian = item.mode === "word" ? item.word.russian : item.mode === "sentence" ? item.sentence.russian : item.source.russian;
+  const russian = item.mode === "word" ? displayTranslation(item.word.russian, data.settings.language) : item.mode === "sentence" ? item.sentence.russian : isSentence(item.source) ? item.source.russian : displayTranslation(item.source.russian, data.settings.language);
   const chineseFirst = listening || direction === "zh-ru";
   const answered = Boolean(evaluation || explanation);
   const reset = () => { setRevealed(false); setAnswer(""); setSubmittedAnswer(""); setEvaluation(undefined); setExplanation(undefined); setError(""); };

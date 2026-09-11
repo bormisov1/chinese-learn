@@ -1,4 +1,4 @@
-import { LANGUAGES, Text } from "@/i18n";
+import { displayTranslation, LANGUAGES, Text } from "@/i18n";
 import { useEffect,
   useMemo,
   useRef,
@@ -220,7 +220,7 @@ export default function Cards() {
                   <SpeakerButton text={w!.hanzi} settings={data.settings} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.mistakePinyin}>{w!.pinyin}</Text>
-                    <Text style={styles.mistakeRussian}>{w!.russian}</Text>
+                    <Text style={styles.mistakeRussian}>{displayTranslation(w!.russian, data.settings.language)}</Text>
                     <WordGuessStats word={w!} />
                   </View>
                 </View>
@@ -274,7 +274,7 @@ export default function Cards() {
         {!flipped ? (
           <>
             <Text style={styles.side}>{translationLanguage}</Text>
-            <Text style={styles.question}>{word.russian}</Text>
+            <Text style={styles.question}>{displayTranslation(word.russian, data.settings.language)}</Text>
             <WordGuessStats word={word} />
             <Text style={styles.hint}>Tap to reveal</Text>
           </>
@@ -364,7 +364,7 @@ function GraduationCelebration({
         />
       </View>
       <Text style={styles.learnedPinyin}>{graduation.learned.pinyin}</Text>
-      <Text style={styles.learnedRussian}>{graduation.learned.russian}</Text>
+      <Text style={styles.learnedRussian}>{displayTranslation(graduation.learned.russian, settings.language)}</Text>
       <WordGuessStats word={graduation.learned} />
       {graduation.replacement ? (
         <View
@@ -388,7 +388,7 @@ function GraduationCelebration({
           </View>
           <Text style={styles.learnedPinyin}>{graduation.replacement.pinyin}</Text>
           <Text style={styles.learnedRussian}>
-            {graduation.replacement.russian}
+            {displayTranslation(graduation.replacement.russian, settings.language)}
           </Text>
           <WordGuessStats word={graduation.replacement} />
         </View>

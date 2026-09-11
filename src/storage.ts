@@ -39,12 +39,17 @@ export async function loadStore(): Promise<StoreData> {
   if (!raw) return emptyStore;
   try {
     const parsed = JSON.parse(raw) as StoreData;
+    const language = isAppLanguage(parsed.settings?.language) ? parsed.settings.language : "en";
     return {
       ...emptyStore,
       ...parsed,
       words: migrateCardPool(
         (parsed.words ?? []).map((w) => ({
           ...w,
+          translationByLanguage: {
+            ...w.translationByLanguage,
+            ...(w.russian?.trim() ? { [language]: w.russian } : {}),
+          },
           srsLevel: w.srsLevel ?? 0,
           srsCorrect: w.srsCorrect ?? 0,
           srsIncorrect: w.srsIncorrect ?? 0,
@@ -67,7 +72,7 @@ export async function loadStore(): Promise<StoreData> {
       settings: {
         ...emptyStore.settings,
         ...parsed.settings,
-        language: isAppLanguage(parsed.settings?.language) ? parsed.settings.language : "en",
+        language,
       },
     };
   } catch {

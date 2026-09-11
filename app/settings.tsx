@@ -1,13 +1,16 @@
-import { LANGUAGES, Text, TextInput } from "@/i18n";
+import { displayTranslation, LANGUAGES, Text, TextInput } from "@/i18n";
 import { useEffect,
   useRef,
   useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Animated,
   LayoutChangeEvent,
   Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -33,7 +36,7 @@ import {
 } from "@/tts";
 
 export default function Settings() {
-  const { data, dictionary, importWords, patch, selectLanguage, setAutomaticWordAddition } = useStore();
+  const { data, dictionary, dictionaryLoading, dictionaryError, switchingLanguage, importWords, patch, retryDictionary, selectLanguage, setAutomaticWordAddition } = useStore();
   const scrollRef = useRef<ScrollView>(null);
   const sectionOffsets = useRef<Record<SettingsSection, number>>({
     general: 0,
@@ -67,6 +70,25 @@ export default function Settings() {
         showSentencesTab: false,
       },
     }));
+  };
+  const requestLanguage = (language: SettingsData["language"]) => {
+    if (language === data.settings.language || !data.sentences.length) {
+      void selectLanguage(language);
+      return;
+    }
+    const message = `${data.sentences.length} generated sentence${data.sentences.length === 1 ? "" : "s"} and their attempts will be removed after the new dictionary downloads. Vocabulary and SRS progress stay intact.`;
+    if (Platform.OS === "web") {
+      if (globalThis.confirm?.(`Change language?\n\n${message}`)) void selectLanguage(language);
+      return;
+    }
+    Alert.alert(
+      "Change language?",
+      message,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Change language", style: "destructive", onPress: () => { void selectLanguage(language); } },
+      ],
+    );
   };
   useEffect(() => {
     const apiKey = data.settings.apiKey.trim();
@@ -229,8 +251,25 @@ export default function Settings() {
         >
         <Text style={styles.label}>LANGUAGE</Text>
         <View style={styles.chips}>
-          {LANGUAGES.map(item => <Choice key={item.code} label={item.nativeLabel} selected={data.settings.language === item.code} onPress={() => selectLanguage(item.code)} />)}
+          {LANGUAGES.map(item => <Choice key={item.code} label={item.nativeLabel} selected={data.settings.language === item.code} disabled={switchingLanguage !== null} onPress={() => requestLanguage(item.code)} />)}
         </View>
+        {switchingLanguage ? (
+          <View style={styles.dictionaryStatus}>
+            <ActivityIndicator color={colors.green} />
+            <Text style={styles.help}>Downloading {LANGUAGES.find(item => item.code === switchingLanguage)?.label} dictionary… Existing study data stays unchanged.</Text>
+          </View>
+        ) : dictionaryLoading ? (
+          <View style={styles.dictionaryStatus}>
+            <ActivityIndicator color={colors.green} />
+            <Text style={styles.help}>Loading dictionary…</Text>
+          </View>
+        ) : null}
+        {dictionaryError ? (
+          <View style={styles.dictionaryError}>
+            <Text style={styles.error}>{dictionaryError} {dictionary ? "Language unchanged. Select it again to retry." : "Saved cards remain available."}</Text>
+            {!dictionary ? <Button secondary label="Retry dictionary" onPress={retryDictionary} /> : null}
+          </View>
+        ) : null}
         <Field
           label="DEEPSEEK API KEY"
           value={data.settings.apiKey}
@@ -419,7 +458,7 @@ export default function Settings() {
               <View style={styles.wordCell}>
                 <Text style={styles.queuePinyin}>{word.pinyin}</Text>
                 <Text numberOfLines={1} style={styles.wordMeta}>
-                  {word.russian}
+                  {displayTranslation(word.russian, data.settings.language)}
                 </Text>
               </View>
               <Text style={styles.queueScore}>
@@ -467,7 +506,7 @@ export default function Settings() {
               <View style={styles.wordCell}>
                 <Text style={styles.hanzi}>{word.hanzi}</Text>
                 <Text numberOfLines={1} style={styles.wordMeta}>
-                  {word.pinyin} · {word.russian}
+                  {word.pinyin} · {displayTranslation(word.russian, data.settings.language)}
                 </Text>
               </View>
               {stat(
@@ -553,7 +592,7 @@ function WordDetailsModal({
               </View>
               <Text style={styles.detailsPinyin}>{displayedWord.pinyin}</Text>
               <View style={styles.detailsRule} />
-              <Text style={styles.detailsTranslation}>{displayedWord.russian}</Text>
+              <Text style={styles.detailsTranslation}>{displayTranslation(displayedWord.russian, settings.language)}</Text>
             </>
           ) : null}
         </Pressable>
@@ -705,16 +744,20 @@ function TtsSettings({
 function Choice({
   label,
   selected,
+  disabled,
   onPress,
 }: {
   label: string;
   selected: boolean;
+  disabled?: boolean;
   onPress: () => void;
 }) {
   return (
     <Pressable
+      accessibilityState={{ selected, disabled }}
+      disabled={disabled}
       onPress={onPress}
-      style={[styles.choice, selected && styles.choiceSelected]}
+      style={[styles.choice, selected && styles.choiceSelected, disabled && styles.choiceDisabled]}
     >
       <Text style={[styles.choiceText, selected && styles.choiceTextSelected]}>
         {label}
@@ -885,10 +928,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.paper,
   },
   choiceSelected: { borderColor: colors.green, backgroundColor: colors.pale },
+  choiceDisabled: { opacity: 0.55 },
   choiceText: { color: colors.muted, fontSize: 13 },
   choiceTextSelected: { color: colors.green, fontWeight: "800" },
   testButton: { marginTop: 16, alignSelf: "flex-start" },
   error: { color: colors.red, marginTop: 12 },
+  dictionaryStatus: { flexDirection: "row", alignItems: "center", gap: 9, marginTop: 12 },
+  dictionaryError: { alignItems: "flex-start", gap: 10, marginBottom: 14 },
   field: { marginBottom: 18 },
   label: {
     fontSize: 11,
