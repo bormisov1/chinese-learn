@@ -21,13 +21,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const language = data.settings.language;
     let active = true;
     setDictionary(null); setDictionaryLoading(true); setError('');
+    setData(current => ({ ...current, words: current.words.map(word => ({ ...word, russian: '' })) }));
     downloadDictionary(language).then(value => {
       if (!active) return;
       setDictionary(value);
       setData(current => ({ ...current, words: current.words.map(word => {
         const localized = value.get(word.hanzi);
-        if (localized) return { ...word, ...localized };
-        return word;
+        return { ...word, russian: localized?.russian ?? '' };
       }) }));
     }).catch(reason => { if (active) setError(reason instanceof Error ? reason.message : 'Dictionary download failed.'); })
       .finally(() => { if (active) setDictionaryLoading(false); });
@@ -43,6 +43,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const selectLanguage = (language: AppLanguage) => setData(current => ({
     ...current, languageSelected: true,
     settings: { ...current.settings, language },
+    words: current.settings.language === language
+      ? current.words
+      : current.words.map(word => ({ ...word, russian: '' })),
     sentences: current.settings.language === language ? current.sentences : [],
     wordSentenceIndex: current.settings.language === language ? current.wordSentenceIndex : {},
     attempts: current.settings.language === language ? current.attempts : [],

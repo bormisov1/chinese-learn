@@ -1,4 +1,4 @@
-import { Text } from "@/i18n";
+import { LANGUAGES, Text } from "@/i18n";
 import { useEffect,
   useMemo,
   useRef,
@@ -38,6 +38,7 @@ export default function Cards() {
     [graduations, setGraduations] = useState<Graduation[]>([]),
     [roundEndsAfterCelebration, setRoundEndsAfterCelebration] = useState(false);
   const total = data.words.length;
+  const translationLanguage = LANGUAGES.find(item => item.code === data.settings.language)?.label.toUpperCase() ?? "ENGLISH";
   const upcoming = useMemo(
     () => selectRound(data.words, data.cardRound + 1),
     [data.words, data.cardRound],
@@ -272,7 +273,7 @@ export default function Cards() {
       >
         {!flipped ? (
           <>
-            <Text style={styles.side}>RUSSIAN</Text>
+            <Text style={styles.side}>{translationLanguage}</Text>
             <Text style={styles.question}>{word.russian}</Text>
             <WordGuessStats word={word} />
             <Text style={styles.hint}>Tap to reveal</Text>
