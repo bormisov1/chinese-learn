@@ -10,6 +10,7 @@ export const emptyStore: StoreData = {
   sentences: [],
   wordSentenceIndex: {},
   attempts: [],
+  sentenceDataByLanguage: {},
   cardRound: 0,
   mixQueue: [],
   mixPosition: 0,
@@ -66,6 +67,7 @@ export async function loadStore(): Promise<StoreData> {
       cardRound: parsed.cardRound ?? 0,
       mixQueue: parsed.mixQueue ?? [],
       mixPosition: parsed.mixPosition ?? 0,
+      sentenceDataByLanguage: parsed.sentenceDataByLanguage ?? {},
       onboardingComplete:
         parsed.onboardingComplete ?? (parsed.words?.length ?? 0) > 0,
       languageSelected: parsed.languageSelected ?? false,

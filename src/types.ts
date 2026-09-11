@@ -63,17 +63,26 @@ export type Settings = {
 };
 export type AppLanguage = "en" | "ru";
 export type PracticeDirection = "zh-ru" | "ru-zh";
+export type SentenceAttempt = {
+  sentenceId: string;
+  answer: string;
+  evaluation?: Evaluation;
+  direction?: PracticeDirection;
+  at: number;
+};
+export type LanguageSentenceData = {
+  sentences: Sentence[];
+  wordSentenceIndex: Record<string, string[]>;
+  attempts: SentenceAttempt[];
+  mixQueue: string[];
+  mixPosition: number;
+};
 export type StoreData = {
   words: Word[];
   sentences: Sentence[];
   wordSentenceIndex: Record<string, string[]>;
-  attempts: {
-    sentenceId: string;
-    answer: string;
-    evaluation?: Evaluation;
-    direction?: PracticeDirection;
-    at: number;
-  }[];
+  attempts: SentenceAttempt[];
+  sentenceDataByLanguage: Partial<Record<AppLanguage, LanguageSentenceData>>;
   cardRound: number;
   mixQueue: string[];
   mixPosition: number;

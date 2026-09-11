@@ -4,13 +4,11 @@ import { useEffect,
   useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   LayoutChangeEvent,
   Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -72,23 +70,7 @@ export default function Settings() {
     }));
   };
   const requestLanguage = (language: SettingsData["language"]) => {
-    if (language === data.settings.language || !data.sentences.length) {
-      void selectLanguage(language);
-      return;
-    }
-    const message = `${data.sentences.length} generated sentence${data.sentences.length === 1 ? "" : "s"} and their attempts will be removed after the new dictionary downloads. Vocabulary and SRS progress stay intact.`;
-    if (Platform.OS === "web") {
-      if (globalThis.confirm?.(`Change language?\n\n${message}`)) void selectLanguage(language);
-      return;
-    }
-    Alert.alert(
-      "Change language?",
-      message,
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Change language", style: "destructive", onPress: () => { void selectLanguage(language); } },
-      ],
-    );
+    void selectLanguage(language);
   };
   useEffect(() => {
     const apiKey = data.settings.apiKey.trim();
