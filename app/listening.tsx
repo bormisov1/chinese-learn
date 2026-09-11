@@ -1,4 +1,4 @@
-import { Text, TextInput } from "@/i18n";
+import { displayTranslation, Text, TextInput } from "@/i18n";
 import { useMemo,
   useState } from "react";
 import { ActivityIndicator,
@@ -21,7 +21,7 @@ type ListeningItem =
 export default function Listening() {
   const { data, patch } = useStore();
   const items = useMemo<ListeningItem[]>(() => {
-    const words: ListeningItem[] = data.words.map((word) => ({ kind: "word", id: `word:${word.id}`, chinese: word.hanzi, pinyin: word.pinyin, russian: word.russian, word }));
+    const words: ListeningItem[] = data.words.map((word) => ({ kind: "word", id: `word:${word.id}`, chinese: word.hanzi, pinyin: word.pinyin, russian: displayTranslation(word.russian, data.settings.language), word }));
     const sentences: ListeningItem[] = data.settings.apiKeyValidated
       ? data.sentences.map((sentence) => ({ kind: "sentence", id: `sentence:${sentence.id}`, chinese: sentence.chinese.replaceAll(" ", ""), pinyin: sentence.pinyin, russian: sentence.russian, sentence }))
       : [];

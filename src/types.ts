@@ -3,6 +3,7 @@ export type Word = {
   hanzi: string;
   pinyin: string;
   russian: string;
+  translationByLanguage?: Partial<Record<AppLanguage, string>>;
   exampleCount: number;
   wordShownCount: number;
   createdAt: number;

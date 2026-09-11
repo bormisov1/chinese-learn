@@ -30,6 +30,10 @@ export function translate(language: AppLanguage, value: string): string {
   return table?.[value] || value;
 }
 
+export function displayTranslation(value: string, language: AppLanguage): string {
+  return value.trim() || translate(language, "Translation unavailable");
+}
+
 export function useTranslation() {
   const language = useLanguage();
   return (value: string) => translate(language, value);

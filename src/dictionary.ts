@@ -7,13 +7,14 @@ const ASSETS: Record<AppLanguage, string> = {
 };
 const MAX_BYTES = 2_000_000;
 const METADATA_GLOSS = /^(?:CL:|(?:also |Taiwan )?pr\.|(?:old )?variant of |see |abbr\. for )/i;
+const cache = new Map<AppLanguage, Promise<Dictionary>>();
 
 export function cleanDictionaryMeaning(value: string): string {
   const meanings = value.split(";").map(part => part.trim()).filter(part => part && !METADATA_GLOSS.test(part));
   return meanings.join("; ") || value.trim();
 }
 
-export async function downloadDictionary(language: AppLanguage): Promise<Dictionary> {
+async function downloadDictionary(language: AppLanguage): Promise<Dictionary> {
   const asset = ASSETS[language];
   if (!asset) throw new Error("Unsupported dictionary language.");
   const response = await fetch(asset, { credentials: "same-origin", cache: "force-cache" });
@@ -34,4 +35,16 @@ export async function downloadDictionary(language: AppLanguage): Promise<Diction
   }
   if (dictionary.size < 100) throw new Error("Dictionary is incomplete.");
   return dictionary;
+}
+
+/** Reuse parsed dictionaries and in-flight downloads. Failed requests remain retryable. */
+export function loadDictionary(language: AppLanguage): Promise<Dictionary> {
+  const cached = cache.get(language);
+  if (cached) return cached;
+  const request = downloadDictionary(language).catch((error) => {
+    if (cache.get(language) === request) cache.delete(language);
+    throw error;
+  });
+  cache.set(language, request);
+  return request;
 }

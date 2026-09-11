@@ -1,4 +1,4 @@
-import { Text } from "@/i18n";
+import { displayTranslation, Text } from "@/i18n";
 import { router } from "expo-router";
 import { ScrollView,
   StyleSheet,
@@ -38,7 +38,7 @@ export default function Home() {
             <Text style={styles.hanzi}>{word.hanzi}</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.pinyin}>{word.pinyin}</Text>
-              <Text style={styles.russian}>{word.russian}</Text>
+              <Text style={styles.russian}>{displayTranslation(word.russian, data.settings.language)}</Text>
               <Text style={styles.guessStats}>✓ {word.cardSrsCorrect} · ✗ {word.cardSrsIncorrect}</Text>
             </View>
             <Text style={styles.count}>{word.exampleCount} examples</Text>

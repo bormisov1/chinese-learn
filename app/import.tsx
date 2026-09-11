@@ -40,7 +40,7 @@ async function readQr(uri: string, onStage: (message: string) => void) {
 }
 
 export default function Import() {
-  const { data, dictionary, importWords, importWordBackup } = useStore();
+  const { data, dictionary, dictionaryLoading, dictionaryError, retryDictionary, importWords, importWordBackup } = useStore();
   const [images, setImages] = useState<string[]>([]), [detected, setDetected] = useState<ImportedWord[]>([]), [progress, setProgress] = useState(0), [currentImage, setCurrentImage] = useState(0), [busy, setBusy] = useState(false), [message, setMessage] = useState(''), [qrBusy, setQrBusy] = useState(false), [qrMessage, setQrMessage] = useState('');
   const [text, setText] = useState(''), [textMessage, setTextMessage] = useState('');
   const parsedText = parseTextVocabulary(text, dictionary);
@@ -53,7 +53,7 @@ export default function Import() {
   const pickQr = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1, allowsMultipleSelection: false }); if (result.canceled) return;
     setQrBusy(true); setQrMessage('Reading QR locally…');
-    try { const words = await decodeQrBackup(await readQr(result.assets[0].uri, setQrMessage)); setQrMessage('Restoring vocabulary and SRS…'); importWordBackup(words); setQrMessage(`Restored vocabulary and SRS for ${words.length} words. Sentences were not included.`); }
+    try { const backup = await decodeQrBackup(await readQr(result.assets[0].uri, setQrMessage)); setQrMessage('Restoring vocabulary and SRS…'); importWordBackup(backup.words, backup.language); setQrMessage(`Restored vocabulary and SRS for ${backup.words.length} words. Sentences were not included.`); }
     catch (e) { setQrMessage(e instanceof Error ? e.message : 'QR import failed.'); } finally { setQrBusy(false); }
   };
   const commit = () => { const count = importWords(detected); setMessage(count ? `Imported ${count} new word${count === 1 ? '' : 's'}. Duplicates skipped.` : 'No new valid words found.'); };
@@ -64,6 +64,8 @@ export default function Import() {
 
   return <ScrollView style={shell.page} contentContainerStyle={shell.content} keyboardShouldPersistTaps="handled">
     <Header eyebrow="Build your deck" title="Import vocabulary" subtitle="Enter Chinese text, import screenshots, or restore vocabulary and SRS from a QR image."/>
+    {dictionaryLoading ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}><ActivityIndicator color={colors.green}/><Text style={styles.note}>Loading dictionary…</Text></View> : null}
+    {dictionaryError && !dictionary ? <View style={{ alignItems: 'flex-start', marginBottom: 14 }}><Text style={styles.warning}>{dictionaryError} Saved cards are unaffected.</Text><Button secondary label="Retry dictionary" onPress={retryDictionary}/></View> : null}
     <View style={styles.qrPanel}><View style={{ flex: 1 }}><Text style={styles.qrTitle}>Vocabulary + SRS QR</Text><Text style={styles.scanText}>Restores words and both SRS histories. Generated sentences excluded.</Text></View><Button secondary label={qrBusy ? 'Reading…' : 'Choose QR image'} icon="qr-code-outline" disabled={qrBusy || busy} onPress={pickQr}/></View>
     {qrMessage ? <Text style={styles.note}>{qrMessage}</Text> : null}
     <HskAdder dictionary={dictionary} existing={new Set(data.words.map(w => w.hanzi))} onAdd={importWords}/>

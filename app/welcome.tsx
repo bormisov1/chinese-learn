@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, SafeAreaView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Pressable, SafeAreaView, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useStore } from "@/context";
 import { colors } from "@/theme";
@@ -7,7 +7,7 @@ import { LANGUAGES, Text, suggestedLanguage } from "@/i18n";
 import type { AppLanguage } from "@/types";
 
 export default function Welcome() {
-  const { data, selectLanguage, setAutomaticWordAddition } = useStore();
+  const { data, dictionaryError, switchingLanguage, selectLanguage, setAutomaticWordAddition } = useStore();
   const suggestion = suggestedLanguage();
   const [language, setLanguage] = useState<AppLanguage>(data.languageSelected ? data.settings.language : suggestion);
   if (!data.languageSelected) return (
@@ -16,12 +16,16 @@ export default function Welcome() {
         <Text style={styles.title}>Choose your language</Text>
         <Text style={styles.subtitle}>You can change it later in Settings.</Text>
         <View style={styles.languages} accessibilityRole="radiogroup">
-          {LANGUAGES.map(item => <Pressable key={item.code} accessibilityRole="radio" accessibilityState={{ checked: language === item.code }} onPress={() => setLanguage(item.code)} style={[styles.language, language === item.code && styles.languageSelected]}>
+          {LANGUAGES.map(item => <Pressable key={item.code} accessibilityRole="radio" accessibilityState={{ checked: language === item.code, disabled: switchingLanguage !== null }} disabled={switchingLanguage !== null} onPress={() => setLanguage(item.code)} style={[styles.language, language === item.code && styles.languageSelected, switchingLanguage !== null && styles.disabled]}>
             <Text style={styles.optionTitle}>{item.nativeLabel}</Text>
             {item.code === suggestion ? <Text style={styles.suggestion}>Suggested</Text> : null}
           </Pressable>)}
         </View>
-        <Pressable accessibilityRole="button" onPress={() => selectLanguage(language)} style={styles.continue}><Text style={styles.continueText}>Continue</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityState={{ disabled: switchingLanguage !== null }} disabled={switchingLanguage !== null} onPress={() => { void selectLanguage(language); }} style={[styles.continue, switchingLanguage !== null && styles.disabled]}>
+          {switchingLanguage ? <ActivityIndicator color={colors.white} /> : <Text style={styles.continueText}>Continue</Text>}
+        </Pressable>
+        {switchingLanguage ? <Text style={styles.status}>Downloading dictionary…</Text> : null}
+        {dictionaryError ? <Text style={styles.error}>{dictionaryError} Your language was not changed. Try again.</Text> : null}
       </View>
     </SafeAreaView>
   );
@@ -88,4 +92,7 @@ const styles = StyleSheet.create({
   suggestion: { color: colors.green, fontSize: 11, fontWeight: "800" },
   continue: { minHeight: 52, borderRadius: 14, backgroundColor: colors.green, alignItems: "center", justifyContent: "center", marginTop: 18 },
   continueText: { color: colors.white, fontSize: 16, fontWeight: "800" },
+  disabled: { opacity: 0.55 },
+  status: { color: colors.muted, marginTop: 12, textAlign: "center" },
+  error: { color: colors.red, marginTop: 12, textAlign: "center", lineHeight: 20 },
 });
