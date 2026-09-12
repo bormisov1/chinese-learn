@@ -34,7 +34,7 @@ import {
 } from "@/tts";
 
 export default function Settings() {
-  const { data, dictionary, dictionaryLoading, dictionaryError, switchingLanguage, importWords, patch, retryDictionary, selectLanguage, setAutomaticWordAddition } = useStore();
+  const { data, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, importWords, patch, retryDictionary, selectLanguage, setAutomaticWordAddition } = useStore();
   const scrollRef = useRef<ScrollView>(null);
   const sectionOffsets = useRef<Record<SettingsSection, number>>({
     general: 0,
@@ -231,27 +231,29 @@ export default function Settings() {
             data.settings.apiKeyValidated && styles.deepSeekValidated,
           ]}
         >
-        <Text style={styles.label}>LANGUAGE</Text>
-        <View style={styles.chips}>
-          {LANGUAGES.map(item => <Choice key={item.code} label={item.nativeLabel} selected={data.settings.language === item.code} disabled={switchingLanguage !== null} onPress={() => requestLanguage(item.code)} />)}
+        <View style={styles.languageSection}>
+          <Text style={styles.label}>LANGUAGE</Text>
+          <View style={styles.chips}>
+            {LANGUAGES.map(item => <Choice key={item.code} label={item.nativeLabel} selected={data.settings.language === item.code} disabled={switchingLanguage !== null} onPress={() => requestLanguage(item.code)} />)}
+          </View>
+          {switchingLanguage ? (
+            <View style={styles.dictionaryStatus}>
+              {dictionaryProgress === null ? <ActivityIndicator color={colors.green} /> : <CircularDownloadProgress value={dictionaryProgress} />}
+              <Text style={[styles.help, styles.dictionaryStatusText]}>Downloading {LANGUAGES.find(item => item.code === switchingLanguage)?.label} dictionary{dictionaryProgress === null ? "…" : `… ${Math.round(dictionaryProgress * 100)}%`} Existing study data stays unchanged.</Text>
+            </View>
+          ) : dictionaryLoading ? (
+            <View style={styles.dictionaryStatus}>
+              <ActivityIndicator color={colors.green} />
+              <Text style={[styles.help, styles.dictionaryStatusText]}>Loading dictionary…</Text>
+            </View>
+          ) : null}
+          {dictionaryError ? (
+            <View style={styles.dictionaryError}>
+              <Text style={styles.error}>{dictionaryError} {dictionary ? "Language unchanged. Select it again to retry." : "Saved cards remain available."}</Text>
+              {!dictionary ? <Button secondary label="Retry dictionary" onPress={retryDictionary} /> : null}
+            </View>
+          ) : null}
         </View>
-        {switchingLanguage ? (
-          <View style={styles.dictionaryStatus}>
-            <ActivityIndicator color={colors.green} />
-            <Text style={styles.help}>Downloading {LANGUAGES.find(item => item.code === switchingLanguage)?.label} dictionary… Existing study data stays unchanged.</Text>
-          </View>
-        ) : dictionaryLoading ? (
-          <View style={styles.dictionaryStatus}>
-            <ActivityIndicator color={colors.green} />
-            <Text style={styles.help}>Loading dictionary…</Text>
-          </View>
-        ) : null}
-        {dictionaryError ? (
-          <View style={styles.dictionaryError}>
-            <Text style={styles.error}>{dictionaryError} {dictionary ? "Language unchanged. Select it again to retry." : "Saved cards remain available."}</Text>
-            {!dictionary ? <Button secondary label="Retry dictionary" onPress={retryDictionary} /> : null}
-          </View>
-        ) : null}
         <Field
           label="DEEPSEEK API KEY"
           value={data.settings.apiKey}
@@ -748,6 +750,24 @@ function Choice({
   );
 }
 
+function CircularDownloadProgress({ value }: { value: number }) {
+  const activeSegments = Math.ceil(value * 12);
+  return (
+    <View
+      accessibilityRole="progressbar"
+      accessibilityValue={{ min: 0, max: 100, now: Math.round(value * 100) }}
+      style={styles.downloadProgress}
+    >
+      {Array.from({ length: 12 }, (_, index) => (
+        <View key={index} style={[styles.progressSegmentSlot, { transform: [{ rotate: `${index * 30}deg` }] }]}>
+          <View style={[styles.progressSegment, index < activeSegments && styles.progressSegmentActive]} />
+        </View>
+      ))}
+      <View style={styles.progressStop} />
+    </View>
+  );
+}
+
 function Field(props: {
   label: string;
   value: string;
@@ -873,7 +893,7 @@ const styles = StyleSheet.create({
     gap: 14,
     borderTopWidth: 1,
     borderTopColor: "#C8E4CE",
-    paddingTop: 16,
+    paddingVertical: 16,
   },
   settingsAction: {
     flexDirection: "row",
@@ -916,6 +936,13 @@ const styles = StyleSheet.create({
   testButton: { marginTop: 16, alignSelf: "flex-start" },
   error: { color: colors.red, marginTop: 12 },
   dictionaryStatus: { flexDirection: "row", alignItems: "center", gap: 9, marginTop: 12 },
+  languageSection: { marginBottom: 22 },
+  dictionaryStatusText: { flex: 1 },
+  downloadProgress: { width: 28, height: 28, position: "relative", flexShrink: 0 },
+  progressSegmentSlot: { position: "absolute", width: 28, height: 28, alignItems: "center" },
+  progressSegment: { width: 2.5, height: 6, borderRadius: 2, backgroundColor: colors.line },
+  progressSegmentActive: { backgroundColor: colors.green },
+  progressStop: { position: "absolute", width: 6, height: 6, borderRadius: 1.5, backgroundColor: colors.green, left: 11, top: 11 },
   dictionaryError: { alignItems: "flex-start", gap: 10, marginBottom: 14 },
   field: { marginBottom: 18 },
   label: {
