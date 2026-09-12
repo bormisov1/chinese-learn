@@ -19,13 +19,17 @@ const activeSentenceData = (data: StoreData): LanguageSentenceData => ({
 
 function localizeWord(word: Word, currentLanguage: AppLanguage, targetLanguage: AppLanguage, dictionary: Dictionary): Word {
   const translationByLanguage = { ...word.translationByLanguage };
-  if (word.russian.trim()) translationByLanguage[currentLanguage] = word.russian;
+  const currentMeaning = word.russian.trim();
+  if (currentMeaning) translationByLanguage[currentLanguage] = currentMeaning;
   const localized = dictionary.get(word.hanzi);
-  if (localized) translationByLanguage[targetLanguage] = localized.russian;
+  if (localized && (currentLanguage !== targetLanguage || !currentMeaning)) translationByLanguage[targetLanguage] = localized.russian;
+  const targetMeaning = currentLanguage === targetLanguage
+    ? currentMeaning || translationByLanguage[targetLanguage] || localized?.russian || ""
+    : localized?.russian ?? translationByLanguage[targetLanguage] ?? "";
   return {
     ...word,
     pinyin: localized?.pinyin ?? word.pinyin,
-    russian: localized?.russian ?? translationByLanguage[targetLanguage] ?? "",
+    russian: targetMeaning,
     translationByLanguage,
   };
 }

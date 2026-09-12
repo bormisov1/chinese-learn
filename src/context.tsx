@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { generate } from './deepseek';
+import { generate, translateWords } from './deepseek';
 import { emptyStore, loadStore, saveStore } from './storage';
 import { AppLanguage, StoreData, Word } from './types';
 import { ImportedWord } from './ocr';
@@ -50,8 +50,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
     setSwitchingLanguage(language); setDictionaryError('');
     try {
-      const value = await loadDictionary(language);
+      let value = await loadDictionary(language);
       if (switchRequest.current !== request) return false;
+      const unresolved = data.words.filter(word => !value.has(word.hanzi) && !word.translationByLanguage?.[language]?.trim());
+      if (unresolved.length && data.settings.apiKey.trim()) {
+        try {
+          const translated = await translateWords(data.settings, unresolved.map(word => word.hanzi), language);
+          if (switchRequest.current !== request) return false;
+          if (translated.length) value = new Map([...value, ...translated.map(word => [word.hanzi, word] as const)]);
+        } catch { /* Dictionary switching remains available when the optional AI fallback fails. */ }
+      }
       dictionaryRef.current = { language, value };
       setLoadedDictionary({ language, value });
       setDictionaryLoading(false);

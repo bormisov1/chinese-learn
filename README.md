@@ -46,3 +46,10 @@ HSK dictionaries are lazy-loaded from the fixed, same-origin `/dictionaries/hsk-
 
 English meanings come from CC-CEDICT. Russian meanings use the original bundled
 HSK dictionary retained from before multilingual support.
+
+The English dictionary combines complete HSK 2.0/3.0 vocabulary with the full
+CC-CEDICT release. Dictionary meanings are resolved offline first. When a saved
+word is still missing during a language change, a configured DeepSeek key
+provides a best-effort translation that is cached on-device. Rebuild the English
+asset with `npm run build:dictionary`; attribution is in
+`third-party/CC-CEDICT-NOTICE`.
