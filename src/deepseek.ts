@@ -1,5 +1,7 @@
 import { Evaluation, Explanation, Sentence, Settings, Word } from './types';
-import { evaluateChinesePrompt, evaluatePrompt, explainPrompt, generatePrompt } from './prompts';
+import type { AppLanguage } from './types';
+import type { ImportedWord } from './ocr';
+import { evaluateChinesePrompt, evaluatePrompt, explainPrompt, generatePrompt, translateWordsPrompt } from './prompts';
 
 const DEEPSEEK_PRO_MODEL = 'deepseek-v4-pro';
 const DEEPSEEK_FLASH_MODEL = 'deepseek-v4-flash';
@@ -39,3 +41,22 @@ export async function generate(settings: Settings, words: Word[], targets: Word[
 export const evaluate = (settings: Settings, sentence: Sentence, answer: string) => call<Evaluation>(settings, DEEPSEEK_FLASH_MODEL, 'Evaluate a Mandarin translation exercise. JSON only.', evaluatePrompt(settings.language, sentence.chinese, sentence.pinyin, sentence.russian, answer));
 export const evaluateChinese = (settings: Settings, sentence: Sentence, answer: string) => call<Evaluation>(settings, DEEPSEEK_FLASH_MODEL, 'Evaluate a translation into Mandarin. JSON only.', evaluateChinesePrompt(settings.language, sentence.chinese, sentence.pinyin, sentence.russian, answer));
 export const explain = (settings: Settings, sentence: Sentence, words: Word[]) => call<Explanation>(settings, DEEPSEEK_PRO_MODEL, 'Explain Mandarin to the learner in their selected language. JSON only.', explainPrompt(settings.language, sentence.chinese, words.filter(w => sentence.wordIds.includes(w.id))));
+export async function translateWords(settings: Settings, words: string[], language: AppLanguage): Promise<ImportedWord[]> {
+  const translated: ImportedWord[] = [];
+  for (let start = 0; start < words.length; start += 50) {
+    const requested = words.slice(start, start + 50);
+    const allowed = new Set(requested);
+    const response = await call<{ words?: { hanzi?: unknown; pinyin?: unknown; translation?: unknown }[] }>(
+      settings,
+      DEEPSEEK_FLASH_MODEL,
+      'Translate Mandarin vocabulary accurately and concisely. JSON only.',
+      translateWordsPrompt(language, requested),
+    );
+    for (const item of response.words ?? []) {
+      if (typeof item.hanzi !== 'string' || !allowed.has(item.hanzi) || typeof item.pinyin !== 'string' || typeof item.translation !== 'string') continue;
+      if (!item.pinyin.trim() || !item.translation.trim() || translated.some(word => word.hanzi === item.hanzi)) continue;
+      translated.push({ hanzi: item.hanzi, pinyin: item.pinyin.trim(), russian: item.translation.trim() });
+    }
+  }
+  return translated;
+}

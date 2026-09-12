@@ -5,7 +5,14 @@ export type Dictionary = Map<string, ImportedWord>;
 const ASSETS: Record<AppLanguage, string> = {
   en: "/dictionaries/hsk-en.json", ru: "/dictionaries/hsk-ru.json",
 };
-const MAX_BYTES = 2_000_000;
+const MAX_BYTES: Record<AppLanguage, number> = {
+  en: 30_000_000,
+  ru: 2_000_000,
+};
+const MAX_ENTRIES: Record<AppLanguage, number> = {
+  en: 150_000,
+  ru: 10_000,
+};
 const METADATA_GLOSS = /^(?:CL:|(?:also |Taiwan )?pr\.|(?:old )?variant of |see |abbr\. for )/i;
 const cache = new Map<AppLanguage, Promise<Dictionary>>();
 
@@ -20,11 +27,11 @@ async function downloadDictionary(language: AppLanguage): Promise<Dictionary> {
   const response = await fetch(asset, { credentials: "same-origin", cache: "force-cache" });
   if (!response.ok) throw new Error(`Dictionary download failed (${response.status}).`);
   const length = Number(response.headers.get("content-length") || 0);
-  if (length > MAX_BYTES) throw new Error("Dictionary file is unexpectedly large.");
+  if (length > MAX_BYTES[language]) throw new Error("Dictionary file is unexpectedly large.");
   const text = await response.text();
-  if (text.length > MAX_BYTES) throw new Error("Dictionary file is unexpectedly large.");
+  if (text.length > MAX_BYTES[language]) throw new Error("Dictionary file is unexpectedly large.");
   const rows: unknown = JSON.parse(text);
-  if (!Array.isArray(rows) || rows.length > 10_000) throw new Error("Invalid dictionary file.");
+  if (!Array.isArray(rows) || rows.length > MAX_ENTRIES[language]) throw new Error("Invalid dictionary file.");
   const dictionary: Dictionary = new Map();
   for (const row of rows) {
     if (!Array.isArray(row) || row.length !== 3 || row.some(value => typeof value !== "string" || value.length > 2_000)) throw new Error("Invalid dictionary entry.");
