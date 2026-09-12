@@ -8,14 +8,14 @@ import { replenishAutomaticWords } from './hsk-vocabulary';
 import { Dictionary, loadDictionary } from './dictionary';
 import { refreshWords, switchStoreLanguage } from './language';
 
-type Context = { data: StoreData; ready: boolean; generating: boolean; error: string; dictionary: Dictionary | null; dictionaryLoading: boolean; dictionaryError: string; switchingLanguage: AppLanguage | null; selectLanguage: (language: AppLanguage) => Promise<boolean>; retryDictionary: () => void; importWords: (items: ImportedWord[]) => number; importWordBackup: (items: Omit<Word, 'id'>[], sourceLanguage: AppLanguage) => number; patch: (fn: (data: StoreData) => StoreData) => void; setAutomaticWordAddition: (enabled: boolean, completeOnboarding?: boolean) => void; generateBatch: (mandatory?: Word) => Promise<void> };
+type Context = { data: StoreData; ready: boolean; generating: boolean; error: string; dictionary: Dictionary | null; dictionaryLoading: boolean; dictionaryError: string; dictionaryProgress: number | null; switchingLanguage: AppLanguage | null; selectLanguage: (language: AppLanguage) => Promise<boolean>; retryDictionary: () => void; importWords: (items: ImportedWord[]) => number; importWordBackup: (items: Omit<Word, 'id'>[], sourceLanguage: AppLanguage) => number; patch: (fn: (data: StoreData) => StoreData) => void; setAutomaticWordAddition: (enabled: boolean, completeOnboarding?: boolean) => void; generateBatch: (mandatory?: Word) => Promise<void> };
 const StoreContext = createContext<Context>(null as never);
 const id = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [data, setData] = useState<StoreData>(emptyStore), [ready, setReady] = useState(false), [generating, setGenerating] = useState(false), [error, setError] = useState('');
   const [loadedDictionary, setLoadedDictionary] = useState<{ language: AppLanguage; value: Dictionary } | null>(null);
-  const [dictionaryLoading, setDictionaryLoading] = useState(false), [dictionaryError, setDictionaryError] = useState(''), [switchingLanguage, setSwitchingLanguage] = useState<AppLanguage | null>(null), [dictionaryReload, setDictionaryReload] = useState(0);
+  const [dictionaryLoading, setDictionaryLoading] = useState(false), [dictionaryError, setDictionaryError] = useState(''), [dictionaryProgress, setDictionaryProgress] = useState<number | null>(null), [switchingLanguage, setSwitchingLanguage] = useState<AppLanguage | null>(null), [dictionaryReload, setDictionaryReload] = useState(0);
   const dictionaryRef = useRef<{ language: AppLanguage; value: Dictionary } | null>(null), switchRequest = useRef(0), languageRef = useRef<AppLanguage>(data.settings.language);
   languageRef.current = data.settings.language;
   const dictionary = loadedDictionary?.language === data.settings.language ? loadedDictionary.value : null;
@@ -48,9 +48,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setDictionaryError(''); setSwitchingLanguage(null);
       return true;
     }
-    setSwitchingLanguage(language); setDictionaryError('');
+    setSwitchingLanguage(language); setDictionaryError(''); setDictionaryProgress(0);
     try {
-      let value = await loadDictionary(language);
+      let value = await loadDictionary(language, progress => {
+        if (switchRequest.current === request) setDictionaryProgress(progress);
+      });
       if (switchRequest.current !== request) return false;
       const unresolved = data.words.filter(word => !value.has(word.hanzi) && !word.translationByLanguage?.[language]?.trim());
       if (unresolved.length && data.settings.apiKey.trim()) {
@@ -70,7 +72,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (switchRequest.current === request) setDictionaryError(reason instanceof Error ? reason.message : 'Dictionary download failed.');
       return false;
     } finally {
-      if (switchRequest.current === request) setSwitchingLanguage(null);
+      if (switchRequest.current === request) { setSwitchingLanguage(null); setDictionaryProgress(null); }
     }
   };
   const retryDictionary = () => { setDictionaryError(''); setDictionaryReload(value => value + 1); };
@@ -126,7 +128,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       });
     } catch (e) { if (languageRef.current === language) setError(e instanceof Error ? e.message : 'Generation failed'); } finally { setGenerating(false); }
   };
-  const value = useMemo(() => ({ data, ready, generating, error, dictionary, dictionaryLoading, dictionaryError, switchingLanguage, selectLanguage, retryDictionary, importWords, importWordBackup, patch, setAutomaticWordAddition, generateBatch }), [data, ready, generating, error, dictionary, dictionaryLoading, dictionaryError, switchingLanguage]);
+  const value = useMemo(() => ({ data, ready, generating, error, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, selectLanguage, retryDictionary, importWords, importWordBackup, patch, setAutomaticWordAddition, generateBatch }), [data, ready, generating, error, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage]);
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
 export const useStore = () => useContext(StoreContext);

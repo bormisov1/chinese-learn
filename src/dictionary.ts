@@ -5,6 +5,10 @@ export type Dictionary = Map<string, ImportedWord>;
 const ASSETS: Record<AppLanguage, string> = {
   en: "/dictionaries/hsk-en.json", ru: "/dictionaries/hsk-ru.json",
 };
+const ASSET_BYTES: Record<AppLanguage, number> = {
+  en: 8_854_286,
+  ru: 386_236,
+};
 const MAX_BYTES: Record<AppLanguage, number> = {
   en: 30_000_000,
   ru: 2_000_000,
@@ -21,14 +25,34 @@ export function cleanDictionaryMeaning(value: string): string {
   return meanings.join("; ") || value.trim();
 }
 
-async function downloadDictionary(language: AppLanguage): Promise<Dictionary> {
+async function downloadDictionary(language: AppLanguage, onProgress?: (value: number | null) => void): Promise<Dictionary> {
   const asset = ASSETS[language];
   if (!asset) throw new Error("Unsupported dictionary language.");
   const response = await fetch(asset, { credentials: "same-origin", cache: "force-cache" });
   if (!response.ok) throw new Error(`Dictionary download failed (${response.status}).`);
   const length = Number(response.headers.get("content-length") || 0);
   if (length > MAX_BYTES[language]) throw new Error("Dictionary file is unexpectedly large.");
-  const text = await response.text();
+  let text: string;
+  if (response.body) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let received = 0;
+    text = "";
+    onProgress?.(0);
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      received += value.byteLength;
+      if (received > MAX_BYTES[language]) throw new Error("Dictionary file is unexpectedly large.");
+      text += decoder.decode(value, { stream: true });
+      onProgress?.(Math.min(received / ASSET_BYTES[language], 0.99));
+    }
+    text += decoder.decode();
+    onProgress?.(1);
+  } else {
+    onProgress?.(null);
+    text = await response.text();
+  }
   if (text.length > MAX_BYTES[language]) throw new Error("Dictionary file is unexpectedly large.");
   const rows: unknown = JSON.parse(text);
   if (!Array.isArray(rows) || rows.length > MAX_ENTRIES[language]) throw new Error("Invalid dictionary file.");
@@ -47,10 +71,10 @@ async function downloadDictionary(language: AppLanguage): Promise<Dictionary> {
 }
 
 /** Reuse parsed dictionaries and in-flight downloads. Failed requests remain retryable. */
-export function loadDictionary(language: AppLanguage): Promise<Dictionary> {
+export function loadDictionary(language: AppLanguage, onProgress?: (value: number | null) => void): Promise<Dictionary> {
   const cached = cache.get(language);
   if (cached) return cached;
-  const request = downloadDictionary(language).catch((error) => {
+  const request = downloadDictionary(language, onProgress).catch((error) => {
     if (cache.get(language) === request) cache.delete(language);
     throw error;
   });
