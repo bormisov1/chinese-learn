@@ -75,6 +75,7 @@ export type LanguageSentenceData = {
   mixPosition: number;
 };
 export type StoreData = {
+  storageVersion: number;
   words: Word[];
   sentences: Sentence[];
   wordSentenceIndex: Record<string, string[]>;

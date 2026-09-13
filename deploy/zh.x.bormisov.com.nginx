@@ -1,6 +1,6 @@
 server {
     listen 80;
-    server_name zh.x.bormisov.com;
+    server_name zh.x.bormisov.com *.zh.x.bormisov.com;
 
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
