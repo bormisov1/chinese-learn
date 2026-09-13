@@ -1,16 +1,31 @@
 import { displayTranslation, Text } from "@/i18n";
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useState } from "react";
 import { ScrollView,
+  Pressable,
   StyleSheet,
   View,
 } from "react-native";
 import { useStore } from "@/context";
 import { Button, Header, shell } from "@/ui";
 import { colors } from "@/theme";
+import { CARD_GRADUATION_LEVEL } from "@/card-srs";
 
 export default function Home() {
-  const { data, generating, error, generateBatch } = useStore();
-  const unseen = data.sentences.filter((sentence) => !sentence.sentenceShownCount).length;
+  const { data, error } = useStore();
+  const [showApiTip, setShowApiTip] = useState(false);
+  const passedWords = data.words.filter(
+    (word) => word.cardSrsLevel >= CARD_GRADUATION_LEVEL,
+  ).length;
+  const passedProgress = `${passedWords} ${passedWords === 1 ? "word" : "words"} passed · ${data.cardRound} ${data.cardRound === 1 ? "round" : "rounds"} passed`;
+  const aiEnabled = data.settings.apiKeyValidated;
+  const modes = [
+    { label: "Cards", icon: "albums-outline", href: "/cards", enabled: true },
+    { label: "Sentences", icon: "create-outline", href: "/practice", enabled: aiEnabled },
+    { label: "Listening", icon: "headset-outline", href: "/listening", enabled: aiEnabled },
+    { label: "Mix", icon: "shuffle-outline", href: "/mix", enabled: aiEnabled },
+  ] as const;
   return (
     <ScrollView style={shell.page} contentContainerStyle={shell.content}>
       <Header eyebrow="Your Mandarin study" title={"Learn what matters.\nRemember what you learn."} subtitle="A private vocabulary deck shaped around the words you choose." />
@@ -18,19 +33,57 @@ export default function Home() {
         <Text style={styles.heroMark}>好</Text>
         <View style={{ flex: 1 }}>
           <Text style={styles.heroTitle}>{data.words.length ? `${data.words.length} words in your deck` : "Start with your own words"}</Text>
-          <Text style={styles.heroText}>{data.words.length ? `${data.sentences.length} examples · ${unseen} unseen exercises` : "Import a screenshot or paste a vocabulary list. Nothing is hardcoded."}</Text>
+          <Text style={styles.heroText}>{data.words.length ? passedProgress : "Import a screenshot or paste a vocabulary list. Nothing is hardcoded."}</Text>
         </View>
       </View>
-      <View style={styles.stats}>
-        <Stat value={String(data.words.length)} label="WORDS" />
-        <Stat value={String(data.sentences.length)} label="EXAMPLES" />
-        <Stat value={String(data.cardRound)} label="CARD ROUNDS" />
-      </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      <View style={styles.actions}>
-        <Button label={data.words.length ? "Study flashcards" : "Import vocabulary"} icon={data.words.length ? "albums-outline" : "scan-outline"} onPress={() => router.push(data.words.length ? "/cards" : "/import")} />
-        {data.words.length > 0 && <Button secondary label={generating ? "Generating…" : "Generate 20 examples"} icon="sparkles-outline" disabled={generating} onPress={() => generateBatch()} />}
+      {!data.words.length ? (
+        <View style={styles.importAction}>
+          <Button label="Import vocabulary" icon="scan-outline" onPress={() => router.push("/import")} />
+        </View>
+      ) : null}
+      <View style={styles.modeGrid}>
+        {modes.map((mode) => (
+          <Pressable
+            key={mode.label}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !mode.enabled }}
+            accessibilityHint={mode.enabled ? `Open ${mode.label}` : "Requires a validated DeepSeek API key"}
+            onPress={() => {
+              if (mode.enabled) router.push(mode.href);
+              else setShowApiTip(true);
+            }}
+            style={({ pressed }) => [
+              styles.mode,
+              !mode.enabled && styles.modeDisabled,
+              pressed && styles.modePressed,
+            ]}
+          >
+            <Ionicons
+              name={mode.icon}
+              size={25}
+              color={mode.enabled ? colors.green : colors.muted}
+            />
+            <Text style={[styles.modeLabel, !mode.enabled && styles.modeLabelDisabled]}>
+              {mode.label}
+            </Text>
+          </Pressable>
+        ))}
       </View>
+      {showApiTip && !aiEnabled ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Open Settings to add a DeepSeek API key"
+          onPress={() => router.push("/settings")}
+          style={styles.apiTip}
+        >
+          <Ionicons name="key-outline" size={20} color={colors.coral} />
+          <Text style={styles.apiTipText}>
+            Add and validate your DeepSeek API key in Settings to unlock Sentences, Listening, and Mix.
+          </Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.coral} />
+        </Pressable>
+      ) : null}
       <Text style={styles.section}>RECENT VOCABULARY</Text>
       <View style={shell.panel}>
         {data.words.length ? data.words.slice(-5).reverse().map((word, index) => (
@@ -49,20 +102,43 @@ export default function Home() {
   );
 }
 
-function Stat({ value, label }: { value: string; label: string }) {
-  return <View style={styles.stat}><Text style={styles.statValue}>{value}</Text><Text style={styles.statLabel}>{label}</Text></View>;
-}
-
 const styles = StyleSheet.create({
   hero: { backgroundColor: colors.green, borderRadius: 22, padding: 22, flexDirection: "row", alignItems: "center", gap: 18 },
   heroMark: { width: 70, height: 70, textAlign: "center", textAlignVertical: "center", fontSize: 43, color: colors.white, backgroundColor: "#496C5D", borderRadius: 18 },
   heroTitle: { color: colors.white, fontWeight: "800", fontSize: 19 },
   heroText: { color: "#DCE9E2", marginTop: 6, lineHeight: 20 },
-  stats: { flexDirection: "row", marginVertical: 22, gap: 10 },
-  stat: { flex: 1, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, padding: 15, borderRadius: 14 },
-  statValue: { fontSize: 24, fontWeight: "800", color: colors.ink },
-  statLabel: { fontSize: 10, color: colors.muted, letterSpacing: 1, marginTop: 3 },
-  actions: { gap: 10 },
+  importAction: { marginTop: 18 },
+  modeGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 22 },
+  mode: {
+    minWidth: "45%",
+    flexBasis: "45%",
+    flexGrow: 1,
+    minHeight: 94,
+    padding: 18,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#CCDCD1",
+    backgroundColor: colors.pale,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 9,
+  },
+  modeDisabled: { backgroundColor: "#ECEAE4", borderColor: colors.line },
+  modePressed: { opacity: 0.65 },
+  modeLabel: { color: colors.green, fontSize: 15, fontWeight: "800" },
+  modeLabelDisabled: { color: colors.muted },
+  apiTip: {
+    marginTop: 12,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E8C9BD",
+    backgroundColor: "#FFF1EC",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  apiTipText: { flex: 1, color: colors.ink, fontSize: 13, lineHeight: 19 },
   section: { fontSize: 11, letterSpacing: 1.5, fontWeight: "800", color: colors.muted, marginTop: 28, marginBottom: 10 },
   word: { flexDirection: "row", alignItems: "center", paddingVertical: 12, gap: 14 },
   border: { borderTopWidth: 1, borderTopColor: colors.line },

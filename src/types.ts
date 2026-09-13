@@ -51,9 +51,6 @@ export type Settings = {
   language: AppLanguage;
   apiKey: string;
   apiKeyValidated: boolean;
-  showSentencesTab: boolean;
-  showListeningTab: boolean;
-  showMixTab: boolean;
   apiUrl: string;
   model: string;
   ttsProvider: string;

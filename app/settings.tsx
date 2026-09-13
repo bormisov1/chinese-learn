@@ -13,6 +13,7 @@ import {
   ScrollView,
   StyleSheet,
   Switch,
+  Linking,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -65,7 +66,6 @@ export default function Settings() {
         ...d.settings,
         apiKey,
         apiKeyValidated: false,
-        showSentencesTab: false,
       },
     }));
   };
@@ -261,6 +261,14 @@ export default function Settings() {
           secureTextEntry
           placeholder="sk-…"
         />
+        <Pressable
+          accessibilityRole="link"
+          onPress={() => void Linking.openURL("https://api-docs.deepseek.com/api/deepseek-api/")}
+          style={({ pressed }) => [styles.apiKeyGuide, pressed && styles.pressed]}
+        >
+          <Text style={styles.apiKeyGuideText}>How to get a DeepSeek API key</Text>
+          <Ionicons name="open-outline" size={15} color={colors.green} />
+        </Pressable>
         <Field
           label="API ENDPOINT"
           value={data.settings.apiUrl}
@@ -289,46 +297,6 @@ export default function Settings() {
                     : "Waiting to validate…"}
           </Text>
         ) : null}
-        {data.settings.apiKeyValidated ? (
-          <View style={styles.sentencesToggle}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.privacyTitle}>Sentences menu</Text>
-              <Text style={styles.help}>Show Sentences in the bottom menu.</Text>
-            </View>
-            <Switch
-              value={data.settings.showSentencesTab}
-              onValueChange={(value) => update("showSentencesTab", value)}
-              trackColor={{ false: colors.line, true: colors.green }}
-            />
-          </View>
-        ) : null}
-        <View style={styles.sentencesToggle}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.privacyTitle}>Listening menu</Text>
-            <Text style={styles.help}>
-              Show Listening in the bottom menu. Words work without DeepSeek;
-              sentences are included when the API key is validated.
-            </Text>
-          </View>
-          <Switch
-            value={data.settings.showListeningTab}
-            onValueChange={(value) => update("showListeningTab", value)}
-            trackColor={{ false: colors.line, true: colors.green }}
-          />
-        </View>
-        <View style={styles.sentencesToggle}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.privacyTitle}>Mix menu</Text>
-            <Text style={styles.help}>
-              Show Mix in the bottom menu for words, sentences, and listening together.
-            </Text>
-          </View>
-          <Switch
-            value={data.settings.showMixTab}
-            onValueChange={(value) => update("showMixTab", value)}
-            trackColor={{ false: colors.line, true: colors.green }}
-          />
-        </View>
       </View>
       <View onLayout={recordSection("audio")}>
         <TtsSettings settings={data.settings} update={update} />
@@ -887,14 +855,15 @@ const styles = StyleSheet.create({
   validationStatus: { color: colors.muted, marginTop: -4, marginBottom: 14 },
   modelRouting: { color: colors.muted, lineHeight: 20, marginBottom: 18 },
   validationSuccess: { color: colors.green, fontWeight: "700" },
-  sentencesToggle: {
+  apiKeyGuide: {
+    alignSelf: "flex-start",
+    marginTop: -8,
+    marginBottom: 18,
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
-    borderTopWidth: 1,
-    borderTopColor: "#C8E4CE",
-    paddingVertical: 16,
+    gap: 6,
   },
+  apiKeyGuideText: { color: colors.green, fontWeight: "700" },
   settingsAction: {
     flexDirection: "row",
     alignItems: "center",
