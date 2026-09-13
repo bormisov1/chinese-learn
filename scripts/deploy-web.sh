@@ -6,14 +6,35 @@ readonly NODE_BIN="$NODE_HOME/bin"
 readonly LOCK_FILE=/tmp/chinese-learn-web-deploy.lock
 readonly CACHE_LOCK_FILE=/tmp/chinese-learn-web-dependency-cache.lock
 readonly DEPENDENCY_CACHE_ROOT=/home/claude/.cache/chinese-learn-web-dependencies
+readonly BRANCH_DEPLOYMENT_ROOT=/home/claude/chinese-learn-web-deployments
+readonly ACME_WEBROOT=/var/www/certbot
+readonly NGINX_SITES_AVAILABLE=/etc/nginx/sites-available
+readonly NGINX_SITES_ENABLED=/etc/nginx/sites-enabled
 
 REPO_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+CURRENT_BRANCH=$(git -C "$REPO_ROOT" symbolic-ref --quiet --short HEAD) || {
+  printf '[deploy-web] Deployments require a named branch, not detached HEAD.\n' >&2
+  exit 1
+}
+DEPLOY_SLUG=$(printf '%s' "$CURRENT_BRANCH" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//')
+if [[ -z "$DEPLOY_SLUG" || ${#DEPLOY_SLUG} -gt 63 ]]; then
+  printf '[deploy-web] Branch name does not produce a valid DNS label: %s\n' "$CURRENT_BRANCH" >&2
+  exit 1
+fi
+if [[ "$CURRENT_BRANCH" == master ]]; then
+  DEPLOY_HOST=zh.x.bormisov.com
+  DEPLOY_TARGET="$REPO_ROOT/dist"
+else
+  DEPLOY_HOST="$DEPLOY_SLUG.zh.x.bormisov.com"
+  DEPLOY_TARGET="$BRANCH_DEPLOYMENT_ROOT/$DEPLOY_SLUG"
+fi
 WORKTREE_DIR=""
 WORKTREE_PARENT=""
 OUTPUT_PARENT=""
 BUILD_OUTPUT=""
 DISPLACED_OUTPUT=""
 CACHE_STAGING=""
+DEPLOYMENT_SWAPPED=0
 
 log() {
   printf '[deploy-web] %s\n' "$*"
@@ -21,6 +42,15 @@ log() {
 
 cleanup() {
   local exit_code=$?
+
+  if (( exit_code != 0 && DEPLOYMENT_SWAPPED == 1 )); then
+    if [[ -e "$DEPLOY_TARGET" ]]; then
+      mv -- "$DEPLOY_TARGET" "$OUTPUT_PARENT/failed-dist" 2>/dev/null || true
+    fi
+    if [[ -n "$DISPLACED_OUTPUT" && -e "$DISPLACED_OUTPUT" ]]; then
+      mv -- "$DISPLACED_OUTPUT" "$DEPLOY_TARGET" 2>/dev/null || true
+    fi
+  fi
 
   if [[ -n "$WORKTREE_DIR" && -d "$WORKTREE_DIR" ]]; then
     git -C "$REPO_ROOT" worktree remove --force "$WORKTREE_DIR" >/dev/null 2>&1 || \
@@ -64,16 +94,22 @@ if [[ "$(node --version)" != v22.13.0 ]]; then
 fi
 
 cd "$REPO_ROOT"
-log "Fetching origin/master."
-git fetch --prune origin master
+DEPLOY_COMMIT=$(git rev-parse HEAD)
+log "Deploying $CURRENT_BRANCH at $DEPLOY_COMMIT to https://$DEPLOY_HOST."
 
 WORKTREE_PARENT=$(mktemp -d /tmp/chinese-learn-worktree.XXXXXX)
 WORKTREE_DIR="$WORKTREE_PARENT/checkout"
-OUTPUT_PARENT=$(mktemp -d "$REPO_ROOT/.deploy-output.XXXXXX")
+if [[ "$CURRENT_BRANCH" == master ]]; then
+  OUTPUT_ROOT="$REPO_ROOT"
+else
+  mkdir -p -- "$BRANCH_DEPLOYMENT_ROOT"
+  OUTPUT_ROOT="$BRANCH_DEPLOYMENT_ROOT"
+fi
+OUTPUT_PARENT=$(mktemp -d "$OUTPUT_ROOT/.deploy-output.$DEPLOY_SLUG.XXXXXX")
 BUILD_OUTPUT="$OUTPUT_PARENT/dist"
 
-log "Creating a temporary worktree from origin/master."
-git worktree add --detach "$WORKTREE_DIR" origin/master
+log "Creating a temporary worktree from committed HEAD."
+git worktree add --detach "$WORKTREE_DIR" "$DEPLOY_COMMIT"
 
 exec 8>"$CACHE_LOCK_FILE"
 flock 8
@@ -154,18 +190,63 @@ for (const reference of references) {
 console.log(`Validated index.html and ${references.length} local asset reference(s).`);
 NODE
 
-log "Swapping the validated output into dist."
-if [[ -e "$REPO_ROOT/dist" ]]; then
+log "Swapping the validated output into $DEPLOY_TARGET."
+if [[ -e "$DEPLOY_TARGET" ]]; then
   DISPLACED_OUTPUT="$OUTPUT_PARENT/displaced-dist"
-  mv -- "$REPO_ROOT/dist" "$DISPLACED_OUTPUT"
+  mv -- "$DEPLOY_TARGET" "$DISPLACED_OUTPUT"
 fi
 
-if ! mv -- "$BUILD_OUTPUT" "$REPO_ROOT/dist"; then
+if ! mv -- "$BUILD_OUTPUT" "$DEPLOY_TARGET"; then
   if [[ -n "$DISPLACED_OUTPUT" && -e "$DISPLACED_OUTPUT" ]]; then
-    mv -- "$DISPLACED_OUTPUT" "$REPO_ROOT/dist"
+    mv -- "$DISPLACED_OUTPUT" "$DEPLOY_TARGET"
   fi
   exit 1
 fi
+DEPLOYMENT_SWAPPED=1
+
+provision_branch_host() {
+  local config_path="$NGINX_SITES_AVAILABLE/chinese-learn-$DEPLOY_SLUG"
+  local config_staging
+  config_staging=$(mktemp)
+
+  if ! sudo test -s "/etc/letsencrypt/live/$DEPLOY_HOST/fullchain.pem"; then
+    log "Obtaining the initial Let's Encrypt certificate for $DEPLOY_HOST."
+    sudo certbot certonly --webroot --webroot-path "$ACME_WEBROOT" \
+      --cert-name "$DEPLOY_HOST" --domains "$DEPLOY_HOST" \
+      --non-interactive --agree-tos --no-eff-email
+  fi
+
+  cat >"$config_staging" <<NGINX
+server {
+    listen 8443 ssl http2 proxy_protocol;
+    server_name $DEPLOY_HOST;
+
+    set_real_ip_from 127.0.0.1;
+    real_ip_header proxy_protocol;
+
+    ssl_certificate /etc/letsencrypt/live/$DEPLOY_HOST/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$DEPLOY_HOST/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    root $DEPLOY_TARGET;
+    index index.html;
+
+    location / {
+        try_files \$uri \$uri/ /index.html;
+    }
+}
+NGINX
+  sudo install -m 0644 "$config_staging" "$config_path"
+  rm -f -- "$config_staging"
+  sudo ln -sfn "$config_path" "$NGINX_SITES_ENABLED/chinese-learn-$DEPLOY_SLUG"
+  sudo nginx -t
+  sudo systemctl reload nginx
+}
+
+if [[ "$CURRENT_BRANCH" != master ]]; then
+  provision_branch_host
+fi
+
 check_url() {
   local url=$1
   log "Checking $url"
@@ -174,18 +255,20 @@ check_url() {
     --max-time 20 --output /dev/null "$url"
 }
 
-if ! check_url http://127.0.0.1:8081 || ! check_url https://zh.x.bormisov.com; then
+if [[ "$CURRENT_BRANCH" == master ]]; then
+  LOCAL_URL=http://127.0.0.1:8081
+else
+  LOCAL_URL="https://$DEPLOY_HOST"
+fi
+
+if ! check_url "$LOCAL_URL" || ! check_url "https://$DEPLOY_HOST"; then
   log "Health check failed; restoring the previous output."
-  FAILED_OUTPUT="$OUTPUT_PARENT/failed-dist"
-  mv -- "$REPO_ROOT/dist" "$FAILED_OUTPUT"
-  if [[ -n "$DISPLACED_OUTPUT" && -e "$DISPLACED_OUTPUT" ]]; then
-    mv -- "$DISPLACED_OUTPUT" "$REPO_ROOT/dist"
-  fi
   exit 1
 fi
 
 if [[ -n "$DISPLACED_OUTPUT" && -e "$DISPLACED_OUTPUT" ]]; then
   rm -rf -- "$DISPLACED_OUTPUT"
 fi
+DEPLOYMENT_SWAPPED=0
 
-log "Deployment completed successfully; the serving process keeps running."
+log "Deployment completed successfully: https://$DEPLOY_HOST"

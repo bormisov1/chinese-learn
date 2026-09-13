@@ -3,9 +3,18 @@ import { Platform } from "react-native";
 import { StoreData } from "./types";
 import { migrateCardPool } from "./card-srs";
 import { isAppLanguage } from "./i18n";
+import russianSupplement from "./data/hsk-russian-supplement.json";
 
 const KEY = "hanzi-deck:v1";
+const STORAGE_VERSION = 2;
+const russianRepairs = new Map(
+  (russianSupplement as [string, string, string][]).map(([hanzi, pinyin, translation]) => [
+    hanzi,
+    { pinyin, translation },
+  ]),
+);
 export const emptyStore: StoreData = {
+  storageVersion: STORAGE_VERSION,
   words: [],
   sentences: [],
   wordSentenceIndex: {},
@@ -38,27 +47,37 @@ export async function loadStore(): Promise<StoreData> {
   try {
     const parsed = JSON.parse(raw) as StoreData;
     const language = isAppLanguage(parsed.settings?.language) ? parsed.settings.language : "en";
+    const needsRussianRepair = (parsed.storageVersion ?? 0) < STORAGE_VERSION;
     return {
       ...emptyStore,
       ...parsed,
+      storageVersion: STORAGE_VERSION,
       words: migrateCardPool(
-        (parsed.words ?? []).map((w) => ({
-          ...w,
-          translationByLanguage: {
+        (parsed.words ?? []).map((w) => {
+          const repair = needsRussianRepair ? russianRepairs.get(w.hanzi) : undefined;
+          const rememberedTranslation = w.translationByLanguage?.[language]?.trim();
+          const translationByLanguage = {
             ...w.translationByLanguage,
-            ...(w.russian?.trim() ? { [language]: w.russian } : {}),
-          },
-          srsLevel: w.srsLevel ?? 0,
-          srsCorrect: w.srsCorrect ?? 0,
-          srsIncorrect: w.srsIncorrect ?? 0,
-          srsDueAt: w.srsDueAt ?? 0,
-          cardSrsLevel: w.cardSrsLevel ?? 0,
-          cardSrsCorrect: w.cardSrsCorrect ?? 0,
-          cardSrsIncorrect: w.cardSrsIncorrect ?? 0,
-          cardSrsDueAt: w.cardSrsDueAt ?? 0,
-          cardLastIncorrectAt: w.cardLastIncorrectAt,
-          cardLapses: w.cardLapses ?? w.cardSrsIncorrect ?? 0,
-        })),
+            ...(!rememberedTranslation && w.russian?.trim() ? { [language]: w.russian } : {}),
+            ...(repair ? { ru: repair.translation } : {}),
+          };
+          return {
+            ...w,
+            ...(rememberedTranslation ? { russian: rememberedTranslation } : {}),
+            ...(repair && language === "ru" ? { pinyin: repair.pinyin, russian: repair.translation } : {}),
+            translationByLanguage,
+            srsLevel: w.srsLevel ?? 0,
+            srsCorrect: w.srsCorrect ?? 0,
+            srsIncorrect: w.srsIncorrect ?? 0,
+            srsDueAt: w.srsDueAt ?? 0,
+            cardSrsLevel: w.cardSrsLevel ?? 0,
+            cardSrsCorrect: w.cardSrsCorrect ?? 0,
+            cardSrsIncorrect: w.cardSrsIncorrect ?? 0,
+            cardSrsDueAt: w.cardSrsDueAt ?? 0,
+            cardLastIncorrectAt: w.cardLastIncorrectAt,
+            cardLapses: w.cardLapses ?? w.cardSrsIncorrect ?? 0,
+          };
+        }),
         parsed.cardRound ?? 0,
       ),
       cardRound: parsed.cardRound ?? 0,

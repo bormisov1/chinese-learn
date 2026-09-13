@@ -7,19 +7,23 @@ npm install
 npm run web
 ```
 
-## Production deployment
+## Web deployment
 
-Deploy the production web app with this single authoritative command:
+Deploy the committed `HEAD` of the current branch:
 
 ```bash
 ./scripts/deploy-web.sh
 ```
 
-Production always deploys `origin/master`. Never run `npm run build:web`
-directly in the live checkout. Node 22 is mandatory.
+`master` publishes to `https://zh.x.bormisov.com`. Other branches publish to
+`https://<branch>.zh.x.bormisov.com`; non-DNS characters such as `/` become
+`-`. The wildcard DNS record is preconfigured. The script provisions Nginx and
+a Let's Encrypt certificate on the first deployment of each branch. Never run
+`npm run build:web` directly in the live checkout. Node 22 is mandatory.
 
-The `dist` directory is actively served on port 8081. The serving process does
-not need restarting after an output swap.
+The production `dist` directory is served on port 8081. Branch builds are served
+directly by Nginx from `/home/claude/chinese-learn-web-deployments`. Neither
+requires restarting a Node process after an atomic output swap.
 
 Deployments cache `node_modules` under
 `/home/claude/.cache/chinese-learn-web-dependencies`, keyed by the
@@ -44,8 +48,10 @@ Word meanings are remembered per language, so custom or dictionary-missing meani
 
 HSK dictionaries are lazy-loaded from the fixed, same-origin `/dictionaries/hsk-<language>.json` allowlist. The loader rejects oversized and malformed files; a stored language value can never become a download URL. Only the active or explicitly requested target dictionary is loaded. Screenshot OCR uses a translation-free Hanzi/pinyin index, and reimports merge by Hanzi while preserving study counters.
 
-English meanings come from CC-CEDICT. Russian meanings use the original bundled
-HSK dictionary retained from before multilingual support.
+English meanings come from CC-CEDICT. Russian meanings use the original HSK
+dictionary, normalized aliases for legacy spaced keys, and curated corrections from
+`src/data/hsk-russian-supplement.json`. Rebuild it with
+`npm run build:dictionary:ru`.
 
 The English dictionary combines complete HSK 2.0/3.0 vocabulary with the full
 CC-CEDICT release. Dictionary meanings are resolved offline first. When a saved

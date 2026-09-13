@@ -7,7 +7,7 @@ const ASSETS: Record<AppLanguage, string> = {
 };
 const ASSET_BYTES: Record<AppLanguage, number> = {
   en: 8_854_286,
-  ru: 386_236,
+  ru: 410_405,
 };
 const MAX_BYTES: Record<AppLanguage, number> = {
   en: 30_000_000,
