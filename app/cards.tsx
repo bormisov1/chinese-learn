@@ -274,7 +274,14 @@ export default function Cards() {
         {!flipped ? (
           <>
             <Text style={styles.side}>{translationLanguage}</Text>
-            <Text style={styles.question}>{displayTranslation(word.russian, data.settings.language)}</Text>
+            <Text
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}
+              numberOfLines={4}
+              style={styles.question}
+            >
+              {displayTranslation(word.russian, data.settings.language)}
+            </Text>
             <WordGuessStats word={word} />
             <Text style={styles.hint}>Tap to reveal</Text>
           </>
