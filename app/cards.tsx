@@ -1,4 +1,4 @@
-import { displayTranslation, LANGUAGES, Text } from "@/i18n";
+import { displayTranslation, LANGUAGES, maskTranslatedHanzi, Text } from "@/i18n";
 import { useEffect,
   useMemo,
   useRef,
@@ -280,7 +280,10 @@ export default function Cards() {
               numberOfLines={4}
               style={styles.question}
             >
-              {displayTranslation(word.russian, data.settings.language)}
+              {maskTranslatedHanzi(
+                displayTranslation(word.russian, data.settings.language),
+                word.hanzi,
+              )}
             </Text>
             <WordGuessStats word={word} />
             <Text style={styles.hint}>Tap to reveal</Text>
