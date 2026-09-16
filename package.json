@@ -6,6 +6,7 @@
   "scripts": {
     "start": "expo start",
     "web": "expo start --web",
+    "prebuild:web": "node scripts/check-node-version.mjs",
     "build:web": "expo export --platform web",
     "build:dictionary": "node scripts/build-english-dictionary.mjs",
     "build:dictionary:ru": "node scripts/build-russian-dictionary.mjs",
@@ -13,6 +14,9 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": "22.13.0"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
