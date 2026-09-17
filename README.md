@@ -53,6 +53,16 @@ dictionary, normalized aliases for legacy spaced keys, and curated corrections f
 `src/data/hsk-russian-supplement.json`. Rebuild it with
 `npm run build:dictionary:ru`.
 
+The HSK 2.0 level sets and English dictionary are generated from the pinned
+complete-hsk-vocabulary release. The level sets contain all 4,991 distinct written
+forms behind the 5,000 syllabus entries; repeated forms with different parts of
+speech are intentionally represented once because decks are keyed by Hanzi. Russian
+aliases are matched from the downloaded legacy vocabulary by Hanzi and pinyin, and
+validation requires every selectable HSK form in every bundled learner dictionary.
+Rebuild and validate all generated vocabulary assets with `npm run build:hsk-data`.
+The individual level, English, and Russian build scripts remain available for adding
+or updating learner-language assets independently.
+
 The English dictionary combines complete HSK 2.0/3.0 vocabulary with the full
 CC-CEDICT release. Dictionary meanings are resolved offline first. When a saved
 word is still missing during a language change, a configured DeepSeek key
