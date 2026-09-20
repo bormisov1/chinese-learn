@@ -15,6 +15,11 @@ import { colors } from "@/theme";
 import { Evaluation, Explanation, PracticeDirection, Sentence, Word } from "@/types";
 import { Button, Header, HskBadge, shell, SpeakerButton } from "@/ui";
 import { copyText } from "@/clipboard";
+import {
+  resolveExplainedPronunciation,
+  resolveSentencePronunciation,
+  resolveWordPronunciation,
+} from "@/pronunciation";
 
 type MixItem =
   | { id: string; mode: "word"; word: Word }
@@ -81,9 +86,14 @@ export default function Mix() {
   const sentence = item.mode === "sentence" ? item.sentence : item.mode === "listening" && item.sourceKind === "sentence" ? item.source as Sentence : undefined;
   const word = item.mode === "word" ? item.word : undefined;
   const listening = item.mode === "listening";
-  const chinese = item.mode === "word" ? item.word.hanzi : item.mode === "sentence" ? item.sentence.chinese.replaceAll(" ", "") : isSentence(item.source) ? item.source.chinese.replaceAll(" ", "") : item.source.hanzi;
-  const pinyin = item.mode === "word" ? item.word.pinyin : item.mode === "sentence" ? item.sentence.pinyin : item.source.pinyin;
-  const russian = item.mode === "word" ? displayTranslation(item.word.russian, data.settings.language) : item.mode === "sentence" ? item.sentence.russian : isSentence(item.source) ? item.source.russian : displayTranslation(item.source.russian, data.settings.language);
+  const pronunciation = item.mode === "word"
+    ? resolveWordPronunciation(item.word, displayTranslation(item.word.russian, data.settings.language))
+    : item.mode === "sentence"
+      ? resolveSentencePronunciation(item.sentence)
+      : isSentence(item.source)
+        ? resolveSentencePronunciation(item.source)
+        : resolveWordPronunciation(item.source, displayTranslation(item.source.russian, data.settings.language));
+  const { hanzi: chinese, pinyin, meaning: russian } = pronunciation;
   const chineseFirst = listening || direction === "zh-ru";
   const answered = Boolean(evaluation || explanation);
   const reset = () => { setRevealed(false); setAnswer(""); setSubmittedAnswer(""); setEvaluation(undefined); setExplanation(undefined); setError(""); };
@@ -124,17 +134,17 @@ export default function Mix() {
       </View>}
       <Pressable accessibilityRole={word || (listening && !sentence) ? "button" : undefined} accessibilityLabel={word || (listening && !sentence) ? revealed ? "Hide answer" : "Reveal answer" : undefined} disabled={Boolean(sentence)} onPress={() => setRevealed((value) => !value)} style={[styles.card, sentence && !listening && styles.sentenceCard]}>
         <Text style={styles.side}>{item.mode.toUpperCase()}</Text>
-        {listening ? <SpeakerButton text={chinese} settings={data.settings} size={42} accessibilityLabel="Play listening prompt" /> : <View style={styles.centered}>
+        {listening ? <SpeakerButton pronunciation={pronunciation} settings={data.settings} size={42} accessibilityLabel="Play listening prompt" /> : <View style={styles.centered}>
           <Pressable onPress={() => copyText(sentence && chineseFirst ? chinese : russian)}><Text style={sentence && chineseFirst ? styles.sentenceChinese : styles.prompt}>{sentence && chineseFirst ? chinese : russian}</Text></Pressable>
-          {sentence && chineseFirst && <SpeakerButton text={chinese} settings={data.settings} size={22} />}
+          {sentence && chineseFirst && <SpeakerButton pronunciation={pronunciation} settings={data.settings} size={22} />}
         </View>}
         {revealed && !sentence && <View style={styles.answer}><View style={styles.wordHeading}><Text style={styles.chinese}>{chinese}</Text><HskBadge hanzi={chinese} /></View><Text style={styles.pinyin}>{pinyin}</Text><Text style={styles.translation}>{russian}</Text></View>}
       </Pressable>
       {sentence && !answered && <><Text style={styles.label}>{chineseFirst ? "YOUR TRANSLATION" : "YOUR CHINESE TRANSLATION"}</Text><TextInput value={answer} onChangeText={setAnswer} multiline placeholder={chineseFirst ? "Enter your translation…" : "输入中文翻译…"} placeholderTextColor="#9A9D95" style={styles.input} /><View style={styles.actions}><Button secondary label="I don't know" disabled={busy} onPress={showHelp} /><Button label="Check answer" icon="checkmark" disabled={!answer.trim() || busy} onPress={checkAnswer} /></View></>}
       {busy && <ActivityIndicator style={styles.busy} color={colors.green} />}
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      {sentence && evaluation && <View style={[styles.feedback, evaluation.correct ? styles.correct : styles.incorrect]}><Text style={styles.feedbackTitle}>{evaluation.correct ? "✓ Correct" : "Not quite yet"}</Text>{!evaluation.correct && <View style={styles.translationResult}><Text style={styles.resultLabel}>YOUR TRANSLATION</Text><Text style={styles.submittedAnswer}>{submittedAnswer}</Text></View>}{listening && <Text style={styles.chinese}>{chinese}</Text>}<Text style={styles.pinyin}>{evaluation.pinyin}</Text>{evaluation.correction ? <Text style={styles.correction}>{evaluation.correction}</Text> : null}<Text style={styles.muted}>{evaluation.feedback}</Text></View>}
-      {sentence && explanation && <View style={styles.feedback}><View style={styles.audioRow}><Text style={styles.feedbackTitle}>Sentence guide</Text><SpeakerButton text={chinese} settings={data.settings} /></View><Text style={styles.chinese}>{chinese}</Text><Text style={styles.pinyin}>{explanation.pinyin}</Text><Text style={styles.correction}>{explanation.russian}</Text>{explanation.words.map((entry, index) => <View key={`${entry.word}-${index}`} style={styles.audioRow}><Text style={styles.word}><Text style={styles.wordHanzi}>{entry.word}</Text> · {entry.meaning}</Text><SpeakerButton text={entry.word} settings={data.settings} /></View>)}<Text style={styles.muted}>{explanation.grammar}</Text></View>}
+      {sentence && evaluation && <View style={[styles.feedback, evaluation.correct ? styles.correct : styles.incorrect]}><Text style={styles.feedbackTitle}>{evaluation.correct ? "✓ Correct" : "Not quite yet"}</Text>{!evaluation.correct && <View style={styles.translationResult}><Text style={styles.resultLabel}>YOUR TRANSLATION</Text><Text style={styles.submittedAnswer}>{submittedAnswer}</Text></View>}{listening && <Text style={styles.chinese}>{chinese}</Text>}<Text style={styles.pinyin}>{pinyin}</Text>{evaluation.correction ? <Text style={styles.correction}>{evaluation.correction}</Text> : null}<Text style={styles.muted}>{evaluation.feedback}</Text></View>}
+      {sentence && explanation && <View style={styles.feedback}><View style={styles.audioRow}><Text style={styles.feedbackTitle}>Sentence guide</Text><SpeakerButton pronunciation={pronunciation} settings={data.settings} /></View><Text style={styles.chinese}>{chinese}</Text><Text style={styles.pinyin}>{pinyin}</Text><Text style={styles.correction}>{russian}</Text>{explanation.words.map((entry, index) => { const wordPronunciation = resolveExplainedPronunciation(entry, data.words); return <View key={`${entry.word}-${index}`} style={styles.audioRow}><Text style={styles.word}><Text style={styles.wordHanzi}>{wordPronunciation.hanzi}</Text> · {wordPronunciation.meaning}</Text><SpeakerButton pronunciation={wordPronunciation} settings={data.settings} /></View>; })}<Text style={styles.muted}>{explanation.grammar}</Text></View>}
       {sentence && answered && <View style={styles.actions}>{evaluation && !explanation ? <Button secondary label="Explain more" disabled={busy} onPress={showHelp} /> : null}<Button label="Next" icon="arrow-forward" onPress={() => advance({ kind: "sentence", sentenceId: sentence.id, correct: evaluation?.correct === true })} /></View>}
       {word && (revealed ? <View style={styles.actions}><Button secondary label="I don't know" onPress={() => advance({ kind: "card", wordId: word.id, correct: false, round: data.cardRound })} /><Button label="I know" icon="checkmark" onPress={() => advance({ kind: "card", wordId: word.id, correct: true, round: data.cardRound })} /></View> : <Button label="Reveal answer" icon="eye-outline" onPress={() => setRevealed(true)} />)}
       {listening && !sentence && (revealed ? <Button label="Next" icon="arrow-forward" onPress={() => advance({ kind: "word", wordId: (item.source as Word).id })} /> : <Button label="Reveal answer" icon="eye-outline" onPress={() => setRevealed(true)} />)}
