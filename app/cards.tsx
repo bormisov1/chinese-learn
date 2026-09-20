@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { useStore } from "@/context";
 import { colors } from "@/theme";
-import { Button, Header, HskBadge, shell, SpeakerButton } from "@/ui";
+import { Button, FittedTranslation, Header, HskBadge, shell, SpeakerButton } from "@/ui";
 import { Sentence, Settings, Word } from "@/types";
 import { copyText } from "@/clipboard";
 import {
@@ -282,17 +282,12 @@ export default function Cards() {
         {!flipped ? (
           <>
             <Text style={styles.side}>{translationLanguage}</Text>
-            <Text
-              adjustsFontSizeToFit
-              minimumFontScale={0.75}
-              numberOfLines={4}
-              style={styles.question}
-            >
-              {maskTranslatedHanzi(
+            <FittedTranslation
+              text={maskTranslatedHanzi(
                 wordPronunciation!.meaning,
                 wordPronunciation!.hanzi,
               )}
-            </Text>
+            />
             <WordGuessStats word={word} />
             <Text style={styles.hint}>Tap to reveal</Text>
           </>
@@ -666,13 +661,6 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontWeight: "800",
     letterSpacing: 1.8,
-  },
-  question: {
-    fontSize: 31,
-    fontWeight: "700",
-    color: colors.ink,
-    textAlign: "center",
-    marginTop: 20,
   },
   hint: { position: "absolute", bottom: 24, color: colors.muted, fontSize: 13 },
   hanzi: { fontSize: 66, fontWeight: "700", color: colors.ink },
