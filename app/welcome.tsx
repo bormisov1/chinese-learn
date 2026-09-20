@@ -73,10 +73,18 @@ function Mode({ icon, title, badge, description, onPress }: { icon: keyof typeof
 
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.paper },
-  content: { flex: 1, paddingHorizontal: 24, paddingTop: 28, paddingBottom: 24 },
+  content: {
+    flex: 1,
+    width: "100%",
+    maxWidth: 760,
+    alignSelf: "center",
+    paddingHorizontal: 22,
+    paddingTop: 28,
+    paddingBottom: 24,
+  },
   title: { color: colors.ink, fontSize: 36, fontWeight: "900" },
   subtitle: { color: colors.muted, fontSize: 17, lineHeight: 24, marginTop: 8, maxWidth: 480 },
-  options: { gap: 14, marginTop: 36, maxWidth: 620 },
+  options: { gap: 14, marginTop: 36 },
   option: { flexDirection: "row", alignItems: "center", gap: 14, padding: 18, borderWidth: 1, borderColor: colors.line, borderRadius: 18, backgroundColor: colors.card },
   pressed: { opacity: 0.65 },
   icon: { width: 46, height: 46, alignItems: "center", justifyContent: "center", borderRadius: 14, backgroundColor: colors.pale },
