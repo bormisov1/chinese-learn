@@ -5,6 +5,7 @@ import { useEffect,
   useState } from "react";
 import {
   Animated,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -34,11 +35,11 @@ export default function Cards() {
     [position, setPosition] = useState(0),
     [phase, setPhase] = useState<Phase>("ready"),
     [flipped, setFlipped] = useState(false),
-    [revealed, setRevealed] = useState(false),
     [examplesExpanded, setExamplesExpanded] = useState(false),
     [mistakeIds, setMistakeIds] = useState<string[]>([]),
     [graduations, setGraduations] = useState<Graduation[]>([]),
     [roundEndsAfterCelebration, setRoundEndsAfterCelebration] = useState(false);
+  const swipe = useRef(new Animated.ValueXY()).current;
   const total = data.words.length;
   const translationLanguage = LANGUAGES.find(item => item.code === data.settings.language)?.label.toUpperCase() ?? "ENGLISH";
   const upcoming = useMemo(
@@ -94,8 +95,8 @@ export default function Cards() {
     setGraduations([]);
     setRoundEndsAfterCelebration(false);
     setFlipped(false);
-    setRevealed(false);
     setExamplesExpanded(false);
+    swipe.setValue({ x: 0, y: 0 });
     setPhase("studying");
   };
   const startRound = () => begin(upcoming, data.cardRound + 1);
@@ -136,8 +137,8 @@ export default function Cards() {
     } else if (roundComplete) setPhase("complete");
     else setPosition((p) => p + 1);
     setFlipped(false);
-    setRevealed(false);
     setExamplesExpanded(false);
+    swipe.setValue({ x: 0, y: 0 });
   };
   const continueAfterCelebration = () => {
     if (roundEndsAfterCelebration) setPhase("complete");
@@ -147,6 +148,39 @@ export default function Cards() {
     }
     setRoundEndsAfterCelebration(false);
   };
+  const finishSwipe = (correct: boolean) => {
+    Animated.timing(swipe, {
+      toValue: { x: correct ? 520 : -520, y: 0 },
+      duration: 180,
+      useNativeDriver: true,
+    }).start(() => grade(correct));
+  };
+  const panResponder = PanResponder.create({
+    onMoveShouldSetPanResponder: (_, gesture) =>
+      flipped &&
+      Math.abs(gesture.dx) > 8 &&
+      Math.abs(gesture.dx) > Math.abs(gesture.dy),
+    onPanResponderMove: (_, gesture) => {
+      swipe.setValue({ x: gesture.dx, y: 0 });
+    },
+    onPanResponderRelease: (_, gesture) => {
+      if (gesture.dx > 100 || gesture.vx > 0.75) finishSwipe(true);
+      else if (gesture.dx < -100 || gesture.vx < -0.75) finishSwipe(false);
+      else
+        Animated.spring(swipe, {
+          toValue: { x: 0, y: 0 },
+          useNativeDriver: true,
+          speed: 22,
+          bounciness: 7,
+        }).start();
+    },
+    onPanResponderTerminate: () => {
+      Animated.spring(swipe, {
+        toValue: { x: 0, y: 0 },
+        useNativeDriver: true,
+      }).start();
+    },
+  });
 
   if (phase === "ready")
     return (
@@ -267,94 +301,130 @@ export default function Cards() {
           ]}
         />
       </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={flipped ? "Hide answer" : "Reveal answer"}
-        style={[styles.card, flipped && styles.back]}
-        onPress={() => {
-          setFlipped((value) => {
-            const next = !value;
-            setRevealed(next);
-            return next;
-          });
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={{
+          transform: [
+            { translateX: swipe.x },
+            {
+              rotate: swipe.x.interpolate({
+                inputRange: [-240, 0, 240],
+                outputRange: ["-8deg", "0deg", "8deg"],
+                extrapolate: "clamp",
+              }),
+            },
+          ],
         }}
       >
-        {!flipped ? (
-          <>
-            <Text style={styles.side}>{translationLanguage}</Text>
-            <FittedTranslation
-              text={maskTranslatedHanzi(
-                wordPronunciation!.meaning,
-                wordPronunciation!.hanzi,
-              )}
-            />
-            <WordGuessStats word={word} />
-            <Text style={styles.hint}>Tap to reveal</Text>
-          </>
-        ) : (
-          <>
-            <View style={styles.hanziRow}>
-              <Pressable onPress={() => copyText(wordPronunciation!.hanzi)}>
-                <Text style={styles.hanzi}>{wordPronunciation!.hanzi}</Text>
-              </Pressable>
-              <HskBadge hanzi={wordPronunciation!.hanzi} />
-              <SpeakerButton
-                pronunciation={wordPronunciation!}
-                settings={data.settings}
-                size={22}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={flipped ? "Answer revealed" : "Reveal answer"}
+          accessibilityActions={flipped ? [
+            { name: "decrement", label: "Mark wrong" },
+            { name: "increment", label: "Mark correct" },
+          ] : undefined}
+          onAccessibilityAction={(event) => {
+            if (event.nativeEvent.actionName === "decrement") finishSwipe(false);
+            if (event.nativeEvent.actionName === "increment") finishSwipe(true);
+          }}
+          style={[styles.card, flipped && styles.back]}
+          onPress={() => {
+            if (!flipped) setFlipped(true);
+          }}
+        >
+          {!flipped ? (
+            <>
+              <Text style={styles.side}>{translationLanguage}</Text>
+              <FittedTranslation
+                text={maskTranslatedHanzi(
+                  wordPronunciation!.meaning,
+                  wordPronunciation!.hanzi,
+                )}
               />
-            </View>
-            <Text style={styles.pinyin}>{wordPronunciation!.pinyin}</Text>
-            <View style={styles.rule} />
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ expanded: examplesExpanded }}
-              onPress={(event) => {
-                event.stopPropagation();
-                setExamplesExpanded((value) => !value);
-              }}
-              style={styles.examplesToggle}
-            >
-              <Text style={styles.side}>EXAMPLES</Text>
-              <Text style={styles.examplesToggleIcon}>
-                {examplesExpanded ? "−" : "+"}
-              </Text>
-            </Pressable>
-            {examplesExpanded && examples.length ? (
-              <View style={styles.examples}>
-                {examples.map((s) => (
-                  <ExampleRow
-                    key={s!.id}
-                    sentence={s!}
-                    settings={data.settings}
-                  />
-                ))}
+              <WordGuessStats word={word} />
+              <Text style={styles.hint}>Tap to reveal</Text>
+            </>
+          ) : (
+            <>
+              <Animated.Text
+                pointerEvents="none"
+                style={[
+                  styles.swipeBadge,
+                  styles.wrongBadge,
+                  {
+                    opacity: swipe.x.interpolate({
+                      inputRange: [-100, -35],
+                      outputRange: [1, 0],
+                      extrapolate: "clamp",
+                    }),
+                  },
+                ]}
+              >
+                WRONG
+              </Animated.Text>
+              <Animated.Text
+                pointerEvents="none"
+                style={[
+                  styles.swipeBadge,
+                  styles.rightBadge,
+                  {
+                    opacity: swipe.x.interpolate({
+                      inputRange: [35, 100],
+                      outputRange: [0, 1],
+                      extrapolate: "clamp",
+                    }),
+                  },
+                ]}
+              >
+                RIGHT
+              </Animated.Text>
+              <View style={styles.hanziRow}>
+                <Pressable onPress={() => copyText(wordPronunciation!.hanzi)}>
+                  <Text style={styles.hanzi}>{wordPronunciation!.hanzi}</Text>
+                </Pressable>
+                <HskBadge hanzi={wordPronunciation!.hanzi} />
+                <SpeakerButton
+                  pronunciation={wordPronunciation!}
+                  settings={data.settings}
+                  size={22}
+                />
               </View>
-            ) : examplesExpanded ? (
-              <Text style={styles.waiting}>
-                {generating ? "Generating examples…" : "No examples yet"}
-              </Text>
-            ) : null}
-          </>
-        )}
-      </Pressable>
-      <View style={styles.controls}>
-        {revealed ? (
-          <>
-            <Button
-              secondary
-              label="I don't know"
-              icon="close"
-              onPress={() => grade(false)}
-            />
-            <Button
-              label="I know"
-              icon="checkmark"
-              onPress={() => grade(true)}
-            />
-          </>
-        ) : null}
-      </View>
+              <Text style={styles.pinyin}>{wordPronunciation!.pinyin}</Text>
+              <View style={styles.rule} />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: examplesExpanded }}
+                onPress={(event) => {
+                  event.stopPropagation();
+                  setExamplesExpanded((value) => !value);
+                }}
+                style={styles.examplesToggle}
+              >
+                <Text style={styles.side}>EXAMPLES</Text>
+                <Text style={styles.examplesToggleIcon}>
+                  {examplesExpanded ? "−" : "+"}
+                </Text>
+              </Pressable>
+              {examplesExpanded && examples.length ? (
+                <View style={styles.examples}>
+                  {examples.map((s) => (
+                    <ExampleRow
+                      key={s!.id}
+                      sentence={s!}
+                      settings={data.settings}
+                    />
+                  ))}
+                </View>
+              ) : examplesExpanded ? (
+                <Text style={styles.waiting}>
+                  {generating ? "Generating examples…" : "No examples yet"}
+                </Text>
+              ) : null}
+              <Text style={styles.swipeHint}>← Wrong · Right →</Text>
+            </>
+          )}
+        </Pressable>
+      </Animated.View>
     </ScrollView>
   );
 }
@@ -646,7 +716,7 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
   },
-  back: { justifyContent: "flex-start", paddingTop: 50 },
+  back: { justifyContent: "flex-start", paddingTop: 50, paddingBottom: 58 },
   side: {
     fontSize: 11,
     color: colors.muted,
@@ -654,6 +724,26 @@ const styles = StyleSheet.create({
     letterSpacing: 1.8,
   },
   hint: { position: "absolute", bottom: 24, color: colors.muted, fontSize: 13 },
+  swipeHint: {
+    position: "absolute",
+    bottom: 18,
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  swipeBadge: {
+    position: "absolute",
+    top: 22,
+    borderWidth: 2,
+    borderRadius: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    fontSize: 12,
+    fontWeight: "900",
+    letterSpacing: 1.1,
+  },
+  wrongBadge: { left: 20, color: colors.red, borderColor: colors.red },
+  rightBadge: { right: 20, color: colors.green, borderColor: colors.green },
   hanzi: { fontSize: 66, fontWeight: "700", color: colors.ink },
   pinyin: { fontSize: 20, color: colors.green, marginTop: 6 },
   rule: {
@@ -706,5 +796,4 @@ const styles = StyleSheet.create({
   exampleRussianLine: { marginTop: 3 },
   exampleRussian: { color: colors.muted, fontSize: 13 },
   waiting: { color: colors.muted, marginTop: 20 },
-  controls: { flexDirection: "row", gap: 10, marginTop: 16 },
 });
