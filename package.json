@@ -7,8 +7,12 @@
     "start": "expo start",
     "web": "expo start --web",
     "build:web": "expo export --platform web",
+    "build:hsk-data": "node scripts/build-hsk-levels.mjs && node scripts/build-russian-dictionary.mjs && node scripts/build-english-dictionary.mjs && node scripts/validate-hsk-data.mjs",
+    "build:hsk-levels": "node scripts/build-hsk-levels.mjs",
     "build:dictionary": "node scripts/build-english-dictionary.mjs",
     "build:dictionary:ru": "node scripts/build-russian-dictionary.mjs",
+    "validate:hsk-data": "node scripts/validate-hsk-data.mjs",
+    "test": "tsx --test src/*.test.ts",
     "serve:web": "serve -s dist -l tcp://0.0.0.0:8081",
     "android": "expo start --android",
     "ios": "expo start --ios",
@@ -38,6 +42,7 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "~19.1.10",
     "serve": "^14.2.5",
+    "tsx": "^4.23.13",
     "typescript": "~5.9.2"
   }
 }
