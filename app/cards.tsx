@@ -30,7 +30,7 @@ type Phase = "ready" | "studying" | "celebrating" | "complete";
 type Graduation = { learned: Word; replacement?: Word };
 
 export default function Cards() {
-  const { data, patch, generating, generateBatch } = useStore();
+  const { data, patch, generateBatch } = useStore();
   const [studyRound, setStudyRound] = useState(data.cardRound + 1),
     [roundIds, setRoundIds] = useState<string[]>([]),
     [position, setPosition] = useState(0),
@@ -395,34 +395,34 @@ export default function Cards() {
               </View>
               <Text style={styles.pinyin}>{wordPronunciation!.pinyin}</Text>
               <View style={styles.rule} />
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ expanded: examplesExpanded }}
-                onPress={(event) => {
-                  event.stopPropagation();
-                  setExamplesExpanded((value) => !value);
-                }}
-                style={styles.examplesToggle}
-              >
-                <Text style={styles.side}>EXAMPLES</Text>
-                <Text style={styles.examplesToggleIcon}>
-                  {examplesExpanded ? "−" : "+"}
-                </Text>
-              </Pressable>
-              {examplesExpanded && examples.length ? (
-                <View style={styles.examples}>
-                  {examples.map((s) => (
-                    <ExampleRow
-                      key={s!.id}
-                      sentence={s!}
-                      settings={data.settings}
-                    />
-                  ))}
-                </View>
-              ) : examplesExpanded ? (
-                <Text style={styles.waiting}>
-                  {generating ? "Generating examples…" : "No examples yet"}
-                </Text>
+              {examples.length ? (
+                <>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: examplesExpanded }}
+                    onPress={(event) => {
+                      event.stopPropagation();
+                      setExamplesExpanded((value) => !value);
+                    }}
+                    style={styles.examplesToggle}
+                  >
+                    <Text style={styles.side}>EXAMPLES</Text>
+                    <Text style={styles.examplesToggleIcon}>
+                      {examplesExpanded ? "−" : "+"}
+                    </Text>
+                  </Pressable>
+                  {examplesExpanded ? (
+                    <View style={styles.examples}>
+                      {examples.map((s) => (
+                        <ExampleRow
+                          key={s!.id}
+                          sentence={s!}
+                          settings={data.settings}
+                        />
+                      ))}
+                    </View>
+                  ) : null}
+                </>
               ) : null}
               <Text style={styles.swipeHint}>← Wrong · Right →</Text>
             </>
@@ -799,5 +799,4 @@ const styles = StyleSheet.create({
   examplePinyin: { color: colors.green, fontSize: 14, fontWeight: "700" },
   exampleRussianLine: { marginTop: 3 },
   exampleRussian: { color: colors.muted, fontSize: 13 },
-  waiting: { color: colors.muted, marginTop: 20 },
 });
