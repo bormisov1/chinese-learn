@@ -353,16 +353,7 @@ export default function Cards() {
               onPress={() => grade(true)}
             />
           </>
-        ) : (
-          <Button
-            label="Reveal answer"
-            icon="eye-outline"
-            onPress={() => {
-              setRevealed(true);
-              setFlipped(true);
-            }}
-          />
-        )}
+        ) : null}
       </View>
     </ScrollView>
   );
