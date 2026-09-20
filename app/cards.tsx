@@ -1,4 +1,4 @@
-import { displayTranslation, LANGUAGES, Text } from "@/i18n";
+import { displayTranslation, LANGUAGES, maskTranslatedHanzi, Text } from "@/i18n";
 import { useEffect,
   useMemo,
   useRef,
@@ -22,6 +22,7 @@ import {
   selectRound,
 } from "@/card-srs";
 import { finishExercise } from "@/exercise-progress";
+import { resolveSentencePronunciation, resolveWordPronunciation } from "@/pronunciation";
 
 type Phase = "ready" | "studying" | "celebrating" | "complete";
 type Graduation = { learned: Word; replacement?: Word };
@@ -48,6 +49,9 @@ export default function Cards() {
     .map((id) => data.words.find((w) => w.id === id))
     .filter(Boolean) as typeof data.words;
   const word = roundWords[position];
+  const wordPronunciation = word
+    ? resolveWordPronunciation(word, displayTranslation(word.russian, data.settings.language))
+    : undefined;
   const examples = useMemo(
     () =>
       word
@@ -212,19 +216,20 @@ export default function Cards() {
           {mistaken.length ? (
             <>
               <Text style={styles.resultsTitle}>MISTAKEN WORDS</Text>
-              {mistaken.map((w) => (
-                <View key={w!.id} style={styles.mistake}>
-                  <Pressable onPress={() => copyText(w!.hanzi)}>
-                    <Text style={styles.mistakeHanzi}>{w!.hanzi}</Text>
+              {mistaken.map((w) => {
+                const pronunciation = resolveWordPronunciation(w!, displayTranslation(w!.russian, data.settings.language));
+                return <View key={w!.id} style={styles.mistake}>
+                  <Pressable onPress={() => copyText(pronunciation.hanzi)}>
+                    <Text style={styles.mistakeHanzi}>{pronunciation.hanzi}</Text>
                   </Pressable>
-                  <SpeakerButton text={w!.hanzi} settings={data.settings} />
+                  <SpeakerButton pronunciation={pronunciation} settings={data.settings} />
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.mistakePinyin}>{w!.pinyin}</Text>
-                    <Text style={styles.mistakeRussian}>{displayTranslation(w!.russian, data.settings.language)}</Text>
+                    <Text style={styles.mistakePinyin}>{pronunciation.pinyin}</Text>
+                    <Text style={styles.mistakeRussian}>{pronunciation.meaning}</Text>
                     <WordGuessStats word={w!} />
                   </View>
-                </View>
-              ))}
+                </View>;
+              })}
             </>
           ) : (
             <>
@@ -280,7 +285,10 @@ export default function Cards() {
               numberOfLines={4}
               style={styles.question}
             >
-              {displayTranslation(word.russian, data.settings.language)}
+              {maskTranslatedHanzi(
+                wordPronunciation!.meaning,
+                wordPronunciation!.hanzi,
+              )}
             </Text>
             <WordGuessStats word={word} />
             <Text style={styles.hint}>Tap to reveal</Text>
@@ -288,17 +296,17 @@ export default function Cards() {
         ) : (
           <>
             <View style={styles.hanziRow}>
-              <Pressable onPress={() => copyText(word.hanzi)}>
-                <Text style={styles.hanzi}>{word.hanzi}</Text>
+              <Pressable onPress={() => copyText(wordPronunciation!.hanzi)}>
+                <Text style={styles.hanzi}>{wordPronunciation!.hanzi}</Text>
               </Pressable>
-              <HskBadge hanzi={word.hanzi} />
+              <HskBadge hanzi={wordPronunciation!.hanzi} />
               <SpeakerButton
-                text={word.hanzi}
+                pronunciation={wordPronunciation!}
                 settings={data.settings}
                 size={22}
               />
             </View>
-            <Text style={styles.pinyin}>{word.pinyin}</Text>
+            <Text style={styles.pinyin}>{wordPronunciation!.pinyin}</Text>
             <View style={styles.rule} />
             <Text style={styles.side}>EXAMPLES</Text>
             {examples.length ? (
@@ -358,22 +366,32 @@ function GraduationCelebration({
   settings: Settings;
   compact?: boolean;
 }) {
+  const learned = resolveWordPronunciation(
+    graduation.learned,
+    displayTranslation(graduation.learned.russian, settings.language),
+  );
+  const replacement = graduation.replacement
+    ? resolveWordPronunciation(
+        graduation.replacement,
+        displayTranslation(graduation.replacement.russian, settings.language),
+      )
+    : undefined;
   return (
     <View style={[styles.celebration, compact && styles.celebrationCompact]}>
       <Text style={styles.confetti}>🎉</Text>
       <Text style={styles.celebrationTitle}>LEARNED</Text>
       <View style={styles.graduationWordRow}>
-        <Text style={styles.learnedHanzi}>{graduation.learned.hanzi}</Text>
+        <Text style={styles.learnedHanzi}>{learned.hanzi}</Text>
         <SpeakerButton
-          text={graduation.learned.hanzi}
+          pronunciation={learned}
           settings={settings}
           size={24}
         />
       </View>
-      <Text style={styles.learnedPinyin}>{graduation.learned.pinyin}</Text>
-      <Text style={styles.learnedRussian}>{displayTranslation(graduation.learned.russian, settings.language)}</Text>
+      <Text style={styles.learnedPinyin}>{learned.pinyin}</Text>
+      <Text style={styles.learnedRussian}>{learned.meaning}</Text>
       <WordGuessStats word={graduation.learned} />
-      {graduation.replacement ? (
+      {graduation.replacement && replacement ? (
         <View
           style={[
             styles.replacement,
@@ -385,17 +403,17 @@ function GraduationCelebration({
           <Text style={styles.learnTitle}>LEARN</Text>
           <View style={styles.graduationWordRow}>
             <Text style={styles.learnedHanzi}>
-              {graduation.replacement.hanzi}
+              {replacement.hanzi}
             </Text>
             <SpeakerButton
-              text={graduation.replacement.hanzi}
+              pronunciation={replacement}
               settings={settings}
               size={24}
             />
           </View>
-          <Text style={styles.learnedPinyin}>{graduation.replacement.pinyin}</Text>
+          <Text style={styles.learnedPinyin}>{replacement.pinyin}</Text>
           <Text style={styles.learnedRussian}>
-            {displayTranslation(graduation.replacement.russian, settings.language)}
+            {replacement.meaning}
           </Text>
           <WordGuessStats word={graduation.replacement} />
         </View>
@@ -421,6 +439,7 @@ function ExampleRow({
   sentence: Sentence;
   settings: Settings;
 }) {
+  const pronunciation = resolveSentencePronunciation(sentence);
   const translationCoverOpacity = useRef(new Animated.Value(1)).current;
   const revealed = useRef(false);
   const setTranslationVisible = (visible: boolean) => {
@@ -430,24 +449,24 @@ function ExampleRow({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${sentence.chinese.replaceAll(" ", "")}. Copy sentence`}
+      accessibilityLabel={`${pronunciation.hanzi}. Copy sentence`}
       onHoverIn={() => setTranslationVisible(true)}
       onHoverOut={() => setTranslationVisible(false)}
       onPress={() => {
         setTranslationVisible(!revealed.current);
-        copyText(sentence.chinese.replaceAll(" ", ""));
+        copyText(pronunciation.hanzi);
       }}
       style={styles.exampleRow}
     >
       <View style={styles.exampleChinese}>
         <Text style={styles.example}>
-          {sentence.chinese.replaceAll(" ", "")}
+          {pronunciation.hanzi}
         </Text>
-        <SpeakerButton text={sentence.chinese} settings={settings} />
+        <SpeakerButton pronunciation={pronunciation} settings={settings} />
       </View>
       <View style={styles.exampleHelp}>
         <View style={styles.exampleCoveredLine}>
-          <Text style={styles.examplePinyin}>{sentence.pinyin}</Text>
+          <Text style={styles.examplePinyin}>{pronunciation.pinyin}</Text>
           <Animated.View
             pointerEvents="none"
             style={[
@@ -457,7 +476,7 @@ function ExampleRow({
           />
         </View>
         <View style={[styles.exampleCoveredLine, styles.exampleRussianLine]}>
-          <Text style={styles.exampleRussian}>{sentence.russian}</Text>
+          <Text style={styles.exampleRussian}>{pronunciation.meaning}</Text>
           <Animated.View
             pointerEvents="none"
             style={[

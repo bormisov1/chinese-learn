@@ -42,6 +42,7 @@ export type Explanation = {
   russian: string;
   words: {
     word: string;
+    pinyin?: string;
     meaning: string;
     characters?: { character: string; meaning: string }[];
   }[];

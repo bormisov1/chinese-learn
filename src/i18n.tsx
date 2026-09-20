@@ -34,6 +34,15 @@ export function displayTranslation(value: string, language: AppLanguage): string
   return value.trim() || translate(language, "Translation unavailable");
 }
 
+export function maskTranslatedHanzi(translation: string, hanzi: string): string {
+  const translatedCharacters = new Set(
+    [...hanzi].filter((character) => /\p{Script=Han}/u.test(character)),
+  );
+  return [...translation]
+    .map((character) => translatedCharacters.has(character) ? "□" : character)
+    .join("");
+}
+
 export function useTranslation() {
   const language = useLanguage();
   return (value: string) => translate(language, value);

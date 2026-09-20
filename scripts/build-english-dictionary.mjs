@@ -2,27 +2,23 @@
 
 import { readFile, writeFile } from "node:fs/promises";
 import { gunzipSync } from "node:zlib";
+import {
+  download,
+  downloadHsk,
+  normalizeHanzi,
+  normalizePinyin,
+} from "./hsk-source.mjs";
 
-const HSK_URL = "https://raw.githubusercontent.com/drkameleon/complete-hsk-vocabulary/v1.4/complete.min.json";
 const CEDICT_URL = "https://cc-cedict.org/editor/editor_export_cedict.php?c=gz";
 const OUTPUT = new URL("../public/dictionaries/hsk-en.json", import.meta.url);
 const RUSSIAN = new URL("../public/dictionaries/hsk-ru.json", import.meta.url);
 const METADATA_GLOSS = /^(?:CL:|(?:also |Taiwan )?pr\.|(?:old )?variant of |see |abbr\. for )/i;
 
-const normalizeHanzi = (value) => value.replace(/\s+/g, "");
 const cleanMeanings = (values) => {
   const present = values.map(value => value.trim()).filter(Boolean);
   const cleaned = [...new Set(present.filter(value => !METADATA_GLOSS.test(value)))];
   return cleaned.length ? cleaned : present;
 };
-const normalizePinyin = (value) => value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f\s0-9'’:\-_]/g, "").replaceAll("ü", "v").replaceAll("u:", "v").replace(/[^a-zv]/g, "");
-
-async function download(url) {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`${url} returned ${response.status}`);
-  return Buffer.from(await response.arrayBuffer());
-}
-
 function markedSyllable(value) {
   const match = value.match(/^(.*?)([0-5])$/);
   if (!match) return value.replaceAll("u:", "ü").replaceAll("v", "ü");
@@ -53,7 +49,7 @@ function markedSyllable(value) {
 
 const markPinyin = (value) => value.split(/\s+/).map(markedSyllable).join(" ");
 
-const hsk = JSON.parse((await download(HSK_URL)).toString("utf8"));
+const hsk = await downloadHsk();
 const cedict = gunzipSync(await download(CEDICT_URL)).toString("utf8");
 const russian = JSON.parse(await readFile(RUSSIAN, "utf8"));
 const entries = new Map();
