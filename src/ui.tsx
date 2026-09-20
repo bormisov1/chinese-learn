@@ -2,6 +2,7 @@ import { Text } from "./i18n";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { Pressable,
+  ScrollView,
   StyleSheet,
   View,
 } from "react-native";
@@ -107,6 +108,73 @@ export function HskBadge({ hanzi }: { hanzi: string }) {
     </View>
   );
 }
+
+const TRANSLATION_FONT_SIZE = 31;
+const TRANSLATION_LINE_HEIGHT = 39;
+const MINIMUM_TRANSLATION_SCALE = 0.75;
+
+export function FittedTranslation({ text }: { text: string }) {
+  const [availableWidth, setAvailableWidth] = React.useState(0);
+  const [measuredWidth, setMeasuredWidth] = React.useState(0);
+  const requiredScale = measuredWidth && availableWidth
+    ? (availableWidth * 4) / measuredWidth
+    : 1;
+  const scale = Math.max(
+    MINIMUM_TRANSLATION_SCALE,
+    Math.min(1, requiredScale),
+  );
+  const contentWidth = Math.max(
+    availableWidth,
+    measuredWidth ? (measuredWidth * scale) / 4 : availableWidth,
+  );
+  const canScroll = contentWidth > availableWidth + 1;
+
+  React.useEffect(() => setMeasuredWidth(0), [text]);
+
+  return (
+    <View
+      onLayout={(event) => setAvailableWidth(event.nativeEvent.layout.width)}
+      style={s.translationViewport}
+    >
+      <Text
+        aria-hidden
+        onTextLayout={(event) => {
+          const width = event.nativeEvent.lines.reduce(
+            (total, line) => total + line.width,
+            0,
+          );
+          if (Math.abs(width - measuredWidth) > 1) setMeasuredWidth(width);
+        }}
+        style={s.translationMeasure}
+      >
+        {text}
+      </Text>
+      <ScrollView
+        horizontal
+        bounces={false}
+        overScrollMode="never"
+        scrollEnabled={canScroll}
+        showsHorizontalScrollIndicator={canScroll}
+        contentContainerStyle={s.translationScrollContent}
+      >
+        <Text
+          numberOfLines={4}
+          style={[
+            s.translationText,
+            {
+              width: contentWidth || "100%",
+              fontSize: TRANSLATION_FONT_SIZE * scale,
+              lineHeight: TRANSLATION_LINE_HEIGHT * scale,
+            },
+          ]}
+        >
+          {text}
+        </Text>
+      </ScrollView>
+    </View>
+  );
+}
+
 export const shell = StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.paper },
   content: {
@@ -177,5 +245,25 @@ const s = StyleSheet.create({
     lineHeight: 12,
     fontWeight: "800",
     letterSpacing: 0.3,
+  },
+  translationViewport: {
+    width: "100%",
+    maxHeight: TRANSLATION_LINE_HEIGHT * 4,
+    marginTop: 20,
+    overflow: "hidden",
+  },
+  translationMeasure: {
+    position: "absolute",
+    width: "100%",
+    opacity: 0,
+    fontSize: TRANSLATION_FONT_SIZE,
+    lineHeight: TRANSLATION_LINE_HEIGHT,
+    fontWeight: "700",
+  },
+  translationScrollContent: { minWidth: "100%", alignItems: "center" },
+  translationText: {
+    color: colors.ink,
+    fontWeight: "700",
+    textAlign: "center",
   },
 });
