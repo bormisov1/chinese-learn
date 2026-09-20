@@ -4,9 +4,10 @@ import { StoreData } from "./types";
 import { migrateCardPool } from "./card-srs";
 import { isAppLanguage } from "./i18n";
 import russianSupplement from "./data/hsk-russian-supplement.json";
+import { migrateRoundCompletions } from "./round-history";
 
 const KEY = "hanzi-deck:v1";
-const STORAGE_VERSION = 2;
+const STORAGE_VERSION = 3;
 const russianRepairs = new Map(
   (russianSupplement as [string, string, string][]).map(([hanzi, pinyin, translation]) => [
     hanzi,
@@ -21,6 +22,7 @@ export const emptyStore: StoreData = {
   attempts: [],
   sentenceDataByLanguage: {},
   cardRound: 0,
+  roundCompletions: [],
   mixQueue: [],
   mixPosition: 0,
   onboardingComplete: false,
@@ -81,6 +83,7 @@ export async function loadStore(): Promise<StoreData> {
         parsed.cardRound ?? 0,
       ),
       cardRound: parsed.cardRound ?? 0,
+      roundCompletions: migrateRoundCompletions(parsed.roundCompletions),
       mixQueue: parsed.mixQueue ?? [],
       mixPosition: parsed.mixPosition ?? 0,
       sentenceDataByLanguage: parsed.sentenceDataByLanguage ?? {},

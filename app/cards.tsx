@@ -24,6 +24,7 @@ import {
 } from "@/card-srs";
 import { finishExercise } from "@/exercise-progress";
 import { resolveSentencePronunciation, resolveWordPronunciation } from "@/pronunciation";
+import { recordRoundCompletion } from "@/round-history";
 
 type Phase = "ready" | "studying" | "celebrating" | "complete";
 type Graduation = { learned: Word; replacement?: Word };
@@ -107,18 +108,22 @@ export default function Cards() {
   const grade = (correct: boolean) => {
     if (!word) return;
     const reviewedAt = Date.now();
+    const roundComplete = position + 1 === roundWords.length;
     const updatedWords = finishExercise(
       data,
       { kind: "card", wordId: word.id, correct, round: studyRound },
       reviewedAt,
     ).words;
-    patch((d) =>
-      finishExercise(
+    patch((d) => {
+      const progressed = finishExercise(
         d,
         { kind: "card", wordId: word.id, correct, round: studyRound },
         reviewedAt,
-      ),
-    );
+      );
+      return roundComplete
+        ? recordRoundCompletion(progressed, studyRound, reviewedAt)
+        : progressed;
+    });
     if (!correct) setMistakeIds((ids) => [...ids, word.id]);
     const learned = updatedWords.find(
       (item) => item.id === word.id && word.cardActive && !item.cardActive,
@@ -129,7 +134,6 @@ export default function Cards() {
         item.cardActive &&
         !data.words.find((before) => before.id === item.id)?.cardActive,
     );
-    const roundComplete = position + 1 === roundWords.length;
     if (learned) {
       setGraduations((items) => [...items, { learned, replacement }]);
       setRoundEndsAfterCelebration(roundComplete);
