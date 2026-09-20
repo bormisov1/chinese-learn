@@ -11,6 +11,7 @@ import { useStore } from "@/context";
 import { Button, Header, shell } from "@/ui";
 import { colors } from "@/theme";
 import { CARD_GRADUATION_LEVEL } from "@/card-srs";
+import { roundsByDay } from "@/round-history";
 
 export default function Home() {
   const { data, error } = useStore();
@@ -20,6 +21,9 @@ export default function Home() {
   ).length;
   const passedProgress = `${passedWords} ${passedWords === 1 ? "word" : "words"} passed · ${data.cardRound} ${data.cardRound === 1 ? "round" : "rounds"} passed`;
   const aiEnabled = data.settings.apiKeyValidated;
+  const roundDays = roundsByDay(data.roundCompletions);
+  const sevenDayRounds = roundDays.reduce((sum, item) => sum + item.count, 0);
+  const maxDailyRounds = Math.max(1, ...roundDays.map((item) => item.count));
   const modes = [
     { label: "Cards", icon: "albums-outline", href: "/cards", enabled: true },
     { label: "Sentences", icon: "create-outline", href: "/practice", enabled: aiEnabled },
@@ -34,6 +38,46 @@ export default function Home() {
         <View style={{ flex: 1 }}>
           <Text style={styles.heroTitle}>{data.words.length ? `${data.words.length} words in your deck` : "Start with your own words"}</Text>
           <Text style={styles.heroText}>{data.words.length ? passedProgress : "Import a screenshot or paste a vocabulary list. Nothing is hardcoded."}</Text>
+        </View>
+      </View>
+      <View style={styles.roundChart}>
+        <View style={styles.chartHeading}>
+          <View>
+            <Text style={styles.chartEyebrow}>ROUNDS</Text>
+            <Text style={styles.chartTitle}>Last 7 days</Text>
+          </View>
+          <View style={styles.chartTotal}>
+            <Text style={styles.chartTotalNumber}>{sevenDayRounds}</Text>
+            <Text style={styles.chartTotalLabel}>completed</Text>
+          </View>
+        </View>
+        <View style={styles.chartBars}>
+          {roundDays.map((item) => {
+            const height = item.count
+              ? Math.max(8, (item.count / maxDailyRounds) * 70)
+              : 3;
+            return (
+              <View key={item.date} style={styles.chartDay}>
+                <Text style={styles.chartCount}>
+                  {item.count || ""}
+                </Text>
+                <View style={styles.chartTrack}>
+                  <View
+                    style={[
+                      styles.chartBar,
+                      item.today && styles.chartBarToday,
+                      { height },
+                    ]}
+                  />
+                </View>
+                <Text style={[styles.chartLabel, item.today && styles.chartLabelToday]}>
+                  {new Date(item.date).toLocaleDateString(undefined, {
+                    weekday: "narrow",
+                  })}
+                </Text>
+              </View>
+            );
+          })}
         </View>
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -107,6 +151,51 @@ const styles = StyleSheet.create({
   heroMark: { width: 70, height: 70, textAlign: "center", textAlignVertical: "center", fontSize: 43, color: colors.white, backgroundColor: "#496C5D", borderRadius: 18 },
   heroTitle: { color: colors.white, fontWeight: "800", fontSize: 19 },
   heroText: { color: "#DCE9E2", marginTop: 6, lineHeight: 20 },
+  roundChart: {
+    marginTop: 14,
+    padding: 18,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.card,
+  },
+  chartHeading: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+  },
+  chartEyebrow: {
+    color: colors.coral,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1.4,
+  },
+  chartTitle: { color: colors.ink, fontSize: 20, fontWeight: "800", marginTop: 3 },
+  chartTotal: { alignItems: "flex-end" },
+  chartTotalNumber: { color: colors.green, fontSize: 28, lineHeight: 30, fontWeight: "800" },
+  chartTotalLabel: { color: colors.muted, fontSize: 10, fontWeight: "700" },
+  chartBars: {
+    height: 112,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 8,
+    marginTop: 14,
+  },
+  chartDay: { flex: 1, height: "100%", alignItems: "center", justifyContent: "flex-end" },
+  chartCount: { height: 17, color: colors.muted, fontSize: 10, fontWeight: "700" },
+  chartTrack: {
+    width: "100%",
+    maxWidth: 34,
+    height: 72,
+    borderRadius: 10,
+    backgroundColor: colors.pale,
+    justifyContent: "flex-end",
+    overflow: "hidden",
+  },
+  chartBar: { width: "100%", borderRadius: 10, backgroundColor: colors.green },
+  chartBarToday: { backgroundColor: colors.coral },
+  chartLabel: { color: colors.muted, fontSize: 11, fontWeight: "700", marginTop: 6 },
+  chartLabelToday: { color: colors.coral, fontWeight: "900" },
   importAction: { marginTop: 18 },
   modeGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 22 },
   mode: {

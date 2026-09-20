@@ -75,6 +75,10 @@ export type LanguageSentenceData = {
   mixQueue: string[];
   mixPosition: number;
 };
+export type RoundCompletion = {
+  round: number;
+  completedAt: number;
+};
 export type StoreData = {
   storageVersion: number;
   words: Word[];
@@ -83,6 +87,7 @@ export type StoreData = {
   attempts: SentenceAttempt[];
   sentenceDataByLanguage: Partial<Record<AppLanguage, LanguageSentenceData>>;
   cardRound: number;
+  roundCompletions: RoundCompletion[];
   mixQueue: string[];
   mixPosition: number;
   onboardingComplete: boolean;
