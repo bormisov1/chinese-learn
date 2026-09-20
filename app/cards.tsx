@@ -35,6 +35,7 @@ export default function Cards() {
     [phase, setPhase] = useState<Phase>("ready"),
     [flipped, setFlipped] = useState(false),
     [revealed, setRevealed] = useState(false),
+    [examplesExpanded, setExamplesExpanded] = useState(false),
     [mistakeIds, setMistakeIds] = useState<string[]>([]),
     [graduations, setGraduations] = useState<Graduation[]>([]),
     [roundEndsAfterCelebration, setRoundEndsAfterCelebration] = useState(false);
@@ -94,6 +95,7 @@ export default function Cards() {
     setRoundEndsAfterCelebration(false);
     setFlipped(false);
     setRevealed(false);
+    setExamplesExpanded(false);
     setPhase("studying");
   };
   const startRound = () => begin(upcoming, data.cardRound + 1);
@@ -135,6 +137,7 @@ export default function Cards() {
     else setPosition((p) => p + 1);
     setFlipped(false);
     setRevealed(false);
+    setExamplesExpanded(false);
   };
   const continueAfterCelebration = () => {
     if (roundEndsAfterCelebration) setPhase("complete");
@@ -308,8 +311,21 @@ export default function Cards() {
             </View>
             <Text style={styles.pinyin}>{wordPronunciation!.pinyin}</Text>
             <View style={styles.rule} />
-            <Text style={styles.side}>EXAMPLES</Text>
-            {examples.length ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: examplesExpanded }}
+              onPress={(event) => {
+                event.stopPropagation();
+                setExamplesExpanded((value) => !value);
+              }}
+              style={styles.examplesToggle}
+            >
+              <Text style={styles.side}>EXAMPLES</Text>
+              <Text style={styles.examplesToggleIcon}>
+                {examplesExpanded ? "−" : "+"}
+              </Text>
+            </Pressable>
+            {examplesExpanded && examples.length ? (
               <View style={styles.examples}>
                 {examples.map((s) => (
                   <ExampleRow
@@ -319,11 +335,11 @@ export default function Cards() {
                   />
                 ))}
               </View>
-            ) : (
+            ) : examplesExpanded ? (
               <Text style={styles.waiting}>
                 {generating ? "Generating examples…" : "No examples yet"}
               </Text>
-            )}
+            ) : null}
           </>
         )}
       </Pressable>
@@ -666,6 +682,20 @@ const styles = StyleSheet.create({
     width: "100%",
     backgroundColor: colors.line,
     marginVertical: 27,
+  },
+  examplesToggle: {
+    width: "100%",
+    minHeight: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  examplesToggleIcon: {
+    color: colors.green,
+    fontSize: 19,
+    fontWeight: "700",
+    lineHeight: 20,
   },
   examples: { width: "100%", marginTop: 8 },
   exampleRow: {
