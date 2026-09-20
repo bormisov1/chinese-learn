@@ -33,6 +33,7 @@ import {
   subscribeToVoices,
   TtsVoice,
 } from "@/tts";
+import { resolvePronunciation, resolveWordPronunciation } from "@/pronunciation";
 
 export default function Settings() {
   const { data, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, importWords, patch, retryDictionary, selectLanguage, setAutomaticWordAddition } = useStore();
@@ -503,6 +504,9 @@ function WordDetailsModal({
   const lastWord = useRef<Word | null>(word);
   if (word) lastWord.current = word;
   const displayedWord = lastWord.current;
+  const pronunciation = displayedWord
+    ? resolveWordPronunciation(displayedWord, displayTranslation(displayedWord.russian, settings.language))
+    : null;
 
   return (
     <Modal
@@ -531,20 +535,20 @@ function WordDetailsModal({
           >
             <Ionicons name="close" size={24} color={colors.muted} />
           </Pressable>
-          {displayedWord ? (
+          {displayedWord && pronunciation ? (
             <>
               <Text style={styles.detailsLabel}>WORD DETAILS</Text>
               <View style={styles.detailsHanziRow}>
-                <Text style={styles.detailsHanzi}>{displayedWord.hanzi}</Text>
+                <Text style={styles.detailsHanzi}>{pronunciation.hanzi}</Text>
                 <SpeakerButton
-                  text={displayedWord.hanzi}
+                  pronunciation={pronunciation}
                   settings={settings}
                   size={23}
                 />
               </View>
-              <Text style={styles.detailsPinyin}>{displayedWord.pinyin}</Text>
+              <Text style={styles.detailsPinyin}>{pronunciation.pinyin}</Text>
               <View style={styles.detailsRule} />
-              <Text style={styles.detailsTranslation}>{displayTranslation(displayedWord.russian, settings.language)}</Text>
+              <Text style={styles.detailsTranslation}>{pronunciation.meaning}</Text>
             </>
           ) : null}
         </Pressable>
@@ -684,7 +688,11 @@ function TtsSettings({
               secondary
               icon="volume-high-outline"
               label="Test voice"
-              onPress={() => speakMandarin("你好，我正在学习中文。", settings)}
+              onPress={() => speakMandarin(resolvePronunciation({
+                hanzi: "你好，我正在学习中文。",
+                pinyin: "nǐ hǎo, wǒ zhèngzài xuéxí zhōngwén.",
+                meaning: "Hello, I am learning Chinese.",
+              }), settings)}
             />
           </View>
         </>

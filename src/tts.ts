@@ -1,5 +1,7 @@
 import { Platform } from "react-native";
 import { Settings } from "./types";
+import type { ResolvedPronunciation } from "./pronunciation";
+import { prepareTtsInput } from "./tts-input";
 
 export type TtsVoice = {
   id: string;
@@ -9,9 +11,10 @@ export type TtsVoice = {
 };
 export type TtsProvider = {
   id: string;
+  supportsSsml: boolean;
   supported: () => boolean;
   voices: () => TtsVoice[];
-  speak: (text: string, settings: Settings) => void;
+  speak: (input: string, settings: Settings) => void;
   stop: () => void;
 };
 
@@ -34,14 +37,15 @@ const browserVoices = (): TtsVoice[] =>
 
 const browserProvider: TtsProvider = {
   id: "browser",
+  supportsSsml: false,
   supported,
   voices: browserVoices,
-  speak(text, settings) {
+  speak(input, settings) {
     if (!supported()) return;
     speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(
-      text.replaceAll(" ", "").trim(),
-    );
+    // Web Speech does not accept SSML. Speaking the resolved pinyin still
+    // preserves the chosen reading instead of making the engine infer hanzi.
+    const utterance = new SpeechSynthesisUtterance(input);
     const voices = speechSynthesis.getVoices();
     const voice =
       voices.find((v) => v.voiceURI === settings.ttsVoiceURI) ??
@@ -63,8 +67,15 @@ export const ttsProviders: Record<string, TtsProvider> = {
 };
 export const getTtsProvider = (settings: Settings) =>
   ttsProviders[settings.ttsProvider] ?? browserProvider;
-export const speakMandarin = (text: string, settings: Settings) =>
-  getTtsProvider(settings).speak(text, settings);
+export const speakMandarin = (pronunciation: ResolvedPronunciation, settings: Settings) => {
+  const provider = getTtsProvider(settings);
+  const voices = provider.voices();
+  const voice = voices.find(({ id }) => id === settings.ttsVoiceURI)
+    ?? voices.find(({ language }) => /^zh-CN$/i.test(language))
+    ?? voices[0];
+  const input = prepareTtsInput(pronunciation, voice?.id ?? settings.ttsVoiceURI ?? "");
+  provider.speak(provider.supportsSsml ? input.ssml : input.text, settings);
+};
 export const subscribeToVoices = (listener: () => void) => {
   if (!supported()) return () => {};
   speechSynthesis.addEventListener?.("voiceschanged", listener);

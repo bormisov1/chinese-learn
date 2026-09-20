@@ -13,17 +13,23 @@ import { Evaluation, Explanation, Sentence, Word } from "@/types";
 import { Button, Header, HskBadge, shell, SpeakerButton } from "@/ui";
 import { colors } from "@/theme";
 import { finishExercise } from "@/exercise-progress";
+import {
+  ResolvedPronunciation,
+  resolveExplainedPronunciation,
+  resolveSentencePronunciation,
+  resolveWordPronunciation,
+} from "@/pronunciation";
 
 type ListeningItem =
-  | { kind: "word"; id: string; chinese: string; pinyin: string; russian: string; word: Word }
-  | { kind: "sentence"; id: string; chinese: string; pinyin: string; russian: string; sentence: Sentence };
+  | { kind: "word"; id: string; pronunciation: ResolvedPronunciation; word: Word }
+  | { kind: "sentence"; id: string; pronunciation: ResolvedPronunciation; sentence: Sentence };
 
 export default function Listening() {
   const { data, patch } = useStore();
   const items = useMemo<ListeningItem[]>(() => {
-    const words: ListeningItem[] = data.words.map((word) => ({ kind: "word", id: `word:${word.id}`, chinese: word.hanzi, pinyin: word.pinyin, russian: displayTranslation(word.russian, data.settings.language), word }));
+    const words: ListeningItem[] = data.words.map((word) => ({ kind: "word", id: `word:${word.id}`, pronunciation: resolveWordPronunciation(word, displayTranslation(word.russian, data.settings.language)), word }));
     const sentences: ListeningItem[] = data.settings.apiKeyValidated
-      ? data.sentences.map((sentence) => ({ kind: "sentence", id: `sentence:${sentence.id}`, chinese: sentence.chinese.replaceAll(" ", ""), pinyin: sentence.pinyin, russian: sentence.russian, sentence }))
+      ? data.sentences.map((sentence) => ({ kind: "sentence", id: `sentence:${sentence.id}`, pronunciation: resolveSentencePronunciation(sentence), sentence }))
       : [];
     return [...words, ...sentences].sort((a, b) => {
       const aSeen = a.kind === "word" ? a.word.wordShownCount : a.sentence.sentenceShownCount;
@@ -99,17 +105,17 @@ export default function Listening() {
         onPress={() => setRevealed((value) => !value)}
         style={styles.card}
       >
-        <SpeakerButton text={item.chinese} settings={data.settings} size={42} accessibilityLabel="Play listening prompt" />
+        <SpeakerButton pronunciation={item.pronunciation} settings={data.settings} size={42} accessibilityLabel="Play listening prompt" />
       </Pressable>
 
       {item.kind === "word" && revealed && (
         <View style={styles.answer}>
           <View style={styles.wordHeading}>
-            <Text style={styles.chinese}>{item.chinese}</Text>
-            <HskBadge hanzi={item.chinese} />
+            <Text style={styles.chinese}>{item.pronunciation.hanzi}</Text>
+            <HskBadge hanzi={item.pronunciation.hanzi} />
           </View>
-          <Text style={styles.pinyin}>{item.pinyin}</Text>
-          <Text style={styles.russian}>{item.russian}</Text>
+          <Text style={styles.pinyin}>{item.pronunciation.pinyin}</Text>
+          <Text style={styles.russian}>{item.pronunciation.meaning}</Text>
         </View>
       )}
 
@@ -136,8 +142,8 @@ export default function Listening() {
               <Text style={styles.submittedAnswer}>{submittedAnswer}</Text>
             </View>
           )}
-          <Text style={styles.chinese}>{item.chinese}</Text>
-          <Text style={styles.pinyin}>{evaluation.pinyin}</Text>
+          <Text style={styles.chinese}>{item.pronunciation.hanzi}</Text>
+          <Text style={styles.pinyin}>{item.pronunciation.pinyin}</Text>
           {evaluation.correction ? <Text style={styles.russian}>{evaluation.correction}</Text> : null}
           <Text style={styles.muted}>{evaluation.feedback}</Text>
         </View>
@@ -146,15 +152,16 @@ export default function Listening() {
       {item.kind === "sentence" && explanation && (
         <View style={styles.feedback}>
           <Text style={styles.feedbackTitle}>Sentence guide</Text>
-          <Text style={styles.chinese}>{item.chinese}</Text>
-          <Text style={styles.pinyin}>{explanation.pinyin}</Text>
-          <Text style={styles.russian}>{explanation.russian}</Text>
-          {explanation.words.map((word, index) => (
-            <View key={`${word.word}-${index}`} style={styles.wordRow}>
-              <Text style={styles.word}><Text style={styles.wordHanzi}>{word.word}</Text> · {word.meaning}</Text>
-              <SpeakerButton text={word.word} settings={data.settings} />
-            </View>
-          ))}
+          <Text style={styles.chinese}>{item.pronunciation.hanzi}</Text>
+          <Text style={styles.pinyin}>{item.pronunciation.pinyin}</Text>
+          <Text style={styles.russian}>{item.pronunciation.meaning}</Text>
+          {explanation.words.map((word, index) => {
+            const pronunciation = resolveExplainedPronunciation(word, data.words);
+            return <View key={`${word.word}-${index}`} style={styles.wordRow}>
+              <Text style={styles.word}><Text style={styles.wordHanzi}>{pronunciation.hanzi}</Text> · {pronunciation.meaning}</Text>
+              <SpeakerButton pronunciation={pronunciation} settings={data.settings} />
+            </View>;
+          })}
           <Text style={styles.muted}>{explanation.grammar}</Text>
         </View>
       )}

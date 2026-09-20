@@ -9,6 +9,7 @@ import { colors } from "./theme";
 import { Settings } from "./types";
 import { getTtsProvider, speakMandarin } from "./tts";
 import { getHskLevel } from "./hsk-vocabulary";
+import type { ResolvedPronunciation } from "./pronunciation";
 
 export function Header({
   eyebrow,
@@ -64,27 +65,27 @@ export function Button({
   );
 }
 export function SpeakerButton({
-  text,
+  pronunciation,
   settings,
   size = 18,
   accessibilityLabel,
 }: {
-  text: string;
+  pronunciation: ResolvedPronunciation;
   settings: Settings;
   size?: number;
   accessibilityLabel?: string;
 }) {
-  const disabled = !text || !getTtsProvider(settings).supported();
+  const disabled = !pronunciation.hanzi || !pronunciation.pinyin || !getTtsProvider(settings).supported();
   const buttonSize = Math.max(34, size + 16);
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel ?? `Play ${text}`}
+      accessibilityLabel={accessibilityLabel ?? `Play ${pronunciation.hanzi}`}
       disabled={disabled}
       hitSlop={8}
       onPress={(event) => {
         event.stopPropagation();
-        speakMandarin(text, settings);
+        speakMandarin(pronunciation, settings);
       }}
       style={({ pressed }) => [
         s.speaker,

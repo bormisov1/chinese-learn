@@ -12,6 +12,7 @@
     "build:dictionary": "node scripts/build-english-dictionary.mjs",
     "build:dictionary:ru": "node scripts/build-russian-dictionary.mjs",
     "validate:hsk-data": "node scripts/validate-hsk-data.mjs",
+    "test": "tsx --test src/*.test.ts",
     "serve:web": "serve -s dist -l tcp://0.0.0.0:8081",
     "android": "expo start --android",
     "ios": "expo start --ios",
@@ -41,6 +42,7 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "~19.1.10",
     "serve": "^14.2.5",
+    "tsx": "^4.23.13",
     "typescript": "~5.9.2"
   }
 }

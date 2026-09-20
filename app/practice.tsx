@@ -15,6 +15,11 @@ import { colors } from "@/theme";
 import { Button, Header, shell, SpeakerButton } from "@/ui";
 import { copyText } from "@/clipboard";
 import { finishExercise } from "@/exercise-progress";
+import {
+  resolveExplainedPronunciation,
+  resolvePronunciation,
+  resolveSentencePronunciation,
+} from "@/pronunciation";
 
 export default function Practice() {
   const {
@@ -172,6 +177,14 @@ export default function Practice() {
     );
 
   const chineseFirst = direction === "zh-ru";
+  const pronunciation = resolveSentencePronunciation(sentence);
+  const correctionPronunciation = evaluation?.correction && !chineseFirst
+    ? resolvePronunciation({
+        hanzi: evaluation.correction,
+        pinyin: evaluation.pinyin,
+        meaning: sentence.russian,
+      })
+    : undefined;
   return (
     <ScrollView
       style={shell.page}
@@ -201,8 +214,8 @@ export default function Practice() {
         onPress={() =>
           copyText(
             chineseFirst
-              ? sentence.chinese.replaceAll(" ", "")
-              : sentence.russian,
+              ? pronunciation.hanzi
+              : pronunciation.meaning,
           )
         }
         style={styles.sentence}
@@ -210,12 +223,12 @@ export default function Practice() {
         <View style={styles.sentenceContent}>
           <Text style={chineseFirst ? styles.chinese : styles.russian}>
             {chineseFirst
-              ? sentence.chinese.replaceAll(" ", "")
-              : sentence.russian}
+              ? pronunciation.hanzi
+              : pronunciation.meaning}
           </Text>
           {chineseFirst && (
             <SpeakerButton
-              text={sentence.chinese}
+              pronunciation={pronunciation}
               settings={data.settings}
               size={22}
             />
@@ -270,15 +283,15 @@ export default function Practice() {
               <Text style={styles.submittedAnswer}>{submittedAnswer}</Text>
             </View>
           )}
-          <Text style={styles.pinyin}>{evaluation.pinyin}</Text>
+          <Text style={styles.pinyin}>{pronunciation.pinyin}</Text>
           {evaluation.correction && (
             <View style={styles.audioRow}>
               <Pressable onPress={() => copyText(evaluation.correction!)}>
                 <Text style={styles.correction}>{evaluation.correction}</Text>
               </Pressable>
-              {!chineseFirst && (
+              {correctionPronunciation && (
                 <SpeakerButton
-                  text={evaluation.correction}
+                  pronunciation={correctionPronunciation}
                   settings={data.settings}
                 />
               )}
@@ -291,21 +304,22 @@ export default function Practice() {
         <View style={styles.feedback}>
           <View style={styles.audioRow}>
             <Text style={styles.feedbackTitle}>Sentence guide</Text>
-            <SpeakerButton text={sentence.chinese} settings={data.settings} />
+            <SpeakerButton pronunciation={pronunciation} settings={data.settings} />
           </View>
-          <Text style={styles.pinyin}>{explanation.pinyin}</Text>
-          <Pressable onPress={() => copyText(explanation.russian)}>
-            <Text style={styles.correction}>{explanation.russian}</Text>
+          <Text style={styles.pinyin}>{pronunciation.pinyin}</Text>
+          <Pressable onPress={() => copyText(pronunciation.meaning)}>
+            <Text style={styles.correction}>{pronunciation.meaning}</Text>
           </Pressable>
-          {explanation.words.map((w, i) => (
-            <View key={`${w.word}-${i}`} style={styles.audioRow}>
+          {explanation.words.map((w, i) => {
+            const wordPronunciation = resolveExplainedPronunciation(w, data.words);
+            return <View key={`${w.word}-${i}`} style={styles.audioRow}>
               <Text style={[styles.word, { flex: 1 }]}>
-                <Text style={{ fontWeight: "800" }}>{w.word}</Text> ·{" "}
-                {w.meaning}
+                <Text style={{ fontWeight: "800" }}>{wordPronunciation.hanzi}</Text> ·{" "}
+                {wordPronunciation.meaning}
               </Text>
-              <SpeakerButton text={w.word} settings={data.settings} />
-            </View>
-          ))}
+              <SpeakerButton pronunciation={wordPronunciation} settings={data.settings} />
+            </View>;
+          })}
           <Text style={[styles.muted, { marginTop: 12 }]}>
             {explanation.grammar}
           </Text>
