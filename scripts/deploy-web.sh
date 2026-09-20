@@ -156,6 +156,9 @@ install -D -m 0644 \
   "$BUILD_OUTPUT/docs/backend-architecture.html"
 install -D -m 0644 \
   "$WORKTREE_DIR/docs/backend-architecture.html" \
+  "$BUILD_OUTPUT/docs/backend-architecture.htm"
+install -D -m 0644 \
+  "$WORKTREE_DIR/docs/backend-architecture.html" \
   "$BUILD_OUTPUT/docs/backend-architecture/index.html"
 
 log "Verifying index.html and its referenced assets."
