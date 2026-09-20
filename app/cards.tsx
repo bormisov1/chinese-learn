@@ -336,6 +336,19 @@ export default function Cards() {
             if (!flipped) setFlipped(true);
           }}
         >
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.correctSwipeTint,
+              {
+                opacity: swipe.x.interpolate({
+                  inputRange: [0, 60, 110, 170, 240],
+                  outputRange: [0, 0.04, 0.16, 0.48, 1],
+                  extrapolate: "clamp",
+                }),
+              },
+            ]}
+          />
           {!flipped ? (
             <>
               <Text style={styles.side}>{translationLanguage}</Text>
@@ -721,6 +734,11 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
   },
   back: { justifyContent: "flex-start", paddingTop: 50, paddingBottom: 58 },
+  correctSwipeTint: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.green,
+    borderRadius: 24,
+  },
   side: {
     fontSize: 11,
     color: colors.muted,
