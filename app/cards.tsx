@@ -6,6 +6,7 @@ import { useEffect,
 import {
   Animated,
   PanResponder,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -28,6 +29,9 @@ import { recordRoundCompletion } from "@/round-history";
 
 type Phase = "ready" | "studying" | "celebrating" | "complete";
 type Graduation = { learned: Word; replacement?: Word };
+const webDragSurface = Platform.OS === "web"
+  ? ({ touchAction: "none" } as any)
+  : undefined;
 
 export default function Cards() {
   const { data, patch, generateBatch } = useStore();
@@ -162,14 +166,17 @@ export default function Cards() {
   const panResponder = PanResponder.create({
     onMoveShouldSetPanResponder: (_, gesture) =>
       flipped &&
-      Math.abs(gesture.dx) > 8 &&
-      Math.abs(gesture.dx) > Math.abs(gesture.dy),
+      Math.hypot(gesture.dx, gesture.dy) > 8,
+    onMoveShouldSetPanResponderCapture: (_, gesture) =>
+      flipped &&
+      Math.hypot(gesture.dx, gesture.dy) > 8,
+    onPanResponderGrant: () => swipe.stopAnimation(),
     onPanResponderMove: (_, gesture) => {
-      swipe.setValue({ x: gesture.dx, y: 0 });
+      swipe.setValue({ x: gesture.dx, y: gesture.dy });
     },
     onPanResponderRelease: (_, gesture) => {
-      if (gesture.dx > 100 || gesture.vx > 0.75) finishSwipe(true);
-      else if (gesture.dx < -100 || gesture.vx < -0.75) finishSwipe(false);
+      if (gesture.dx > 100) finishSwipe(true);
+      else if (gesture.dx < -100) finishSwipe(false);
       else
         Animated.spring(swipe, {
           toValue: { x: 0, y: 0 },
@@ -178,6 +185,7 @@ export default function Cards() {
           bounciness: 7,
         }).start();
     },
+    onPanResponderTerminationRequest: () => false,
     onPanResponderTerminate: () => {
       Animated.spring(swipe, {
         toValue: { x: 0, y: 0 },
@@ -303,18 +311,22 @@ export default function Cards() {
       </View>
       <Animated.View
         {...panResponder.panHandlers}
-        style={{
-          transform: [
-            { translateX: swipe.x },
-            {
-              rotate: swipe.x.interpolate({
-                inputRange: [-240, 0, 240],
-                outputRange: ["-8deg", "0deg", "8deg"],
-                extrapolate: "clamp",
-              }),
-            },
-          ],
-        }}
+        style={[
+          webDragSurface,
+          {
+            transform: [
+              { translateX: swipe.x },
+              { translateY: swipe.y },
+              {
+                rotate: swipe.x.interpolate({
+                  inputRange: [-240, 0, 240],
+                  outputRange: ["-8deg", "0deg", "8deg"],
+                  extrapolate: "clamp",
+                }),
+              },
+            ],
+          },
+        ]}
       >
         <Pressable
           accessibilityRole="button"
@@ -467,14 +479,16 @@ function SwipeableGraduation({
   };
   const panResponder = PanResponder.create({
     onMoveShouldSetPanResponder: (_, gesture) =>
-      Math.abs(gesture.dx) > 8 &&
-      Math.abs(gesture.dx) > Math.abs(gesture.dy),
+      Math.hypot(gesture.dx, gesture.dy) > 8,
+    onMoveShouldSetPanResponderCapture: (_, gesture) =>
+      Math.hypot(gesture.dx, gesture.dy) > 8,
+    onPanResponderGrant: () => swipe.stopAnimation(),
     onPanResponderMove: (_, gesture) => {
-      swipe.setValue({ x: gesture.dx, y: 0 });
+      swipe.setValue({ x: gesture.dx, y: gesture.dy });
     },
     onPanResponderRelease: (_, gesture) => {
-      if (Math.abs(gesture.dx) > 100 || Math.abs(gesture.vx) > 0.75) {
-        continueInDirection(gesture.dx < 0 || (!gesture.dx && gesture.vx < 0) ? -1 : 1);
+      if (Math.abs(gesture.dx) > 100) {
+        continueInDirection(gesture.dx < 0 ? -1 : 1);
       } else {
         Animated.spring(swipe, {
           toValue: { x: 0, y: 0 },
@@ -484,6 +498,7 @@ function SwipeableGraduation({
         }).start();
       }
     },
+    onPanResponderTerminationRequest: () => false,
     onPanResponderTerminate: () => {
       Animated.spring(swipe, {
         toValue: { x: 0, y: 0 },
@@ -505,18 +520,22 @@ function SwipeableGraduation({
         accessibilityLabel="Word learned. Swipe any direction to continue"
         accessibilityActions={[{ name: "activate", label: "Continue" }]}
         onAccessibilityAction={() => continueInDirection(1)}
-        style={{
-          transform: [
-            { translateX: swipe.x },
-            {
-              rotate: swipe.x.interpolate({
-                inputRange: [-240, 0, 240],
-                outputRange: ["-8deg", "0deg", "8deg"],
-                extrapolate: "clamp",
-              }),
-            },
-          ],
-        }}
+        style={[
+          webDragSurface,
+          {
+            transform: [
+              { translateX: swipe.x },
+              { translateY: swipe.y },
+              {
+                rotate: swipe.x.interpolate({
+                  inputRange: [-240, 0, 240],
+                  outputRange: ["-8deg", "0deg", "8deg"],
+                  extrapolate: "clamp",
+                }),
+              },
+            ],
+          },
+        ]}
       >
         <GraduationCelebration
           graduation={graduation}
@@ -870,7 +889,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     letterSpacing: 1.1,
   },
-  wrongBadge: { left: 20, color: colors.red, borderColor: colors.red },
+  wrongBadge: { right: 20, color: colors.red, borderColor: colors.red },
   rightBadge: { right: 20, color: colors.green, borderColor: colors.green },
   hanzi: { fontSize: 66, fontWeight: "700", color: colors.ink },
   pinyin: { fontSize: 20, color: colors.green, marginTop: 6 },
