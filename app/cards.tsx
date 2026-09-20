@@ -219,14 +219,10 @@ export default function Cards() {
           title="Word learned!"
           subtitle="A word graduated from your active card pool."
         />
-        <GraduationCelebration
+        <SwipeableGraduation
           graduation={graduation}
           settings={data.settings}
-        />
-        <Button
-          label={roundEndsAfterCelebration ? "See round results" : "Continue round"}
-          icon="arrow-forward"
-          onPress={continueAfterCelebration}
+          onContinue={continueAfterCelebration}
         />
       </ScrollView>
     );
@@ -336,6 +332,19 @@ export default function Cards() {
             if (!flipped) setFlipped(true);
           }}
         >
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.correctSwipeTint,
+              {
+                opacity: swipe.x.interpolate({
+                  inputRange: [0, 60, 110, 170, 240],
+                  outputRange: [0, 0.04, 0.16, 0.48, 1],
+                  extrapolate: "clamp",
+                }),
+              },
+            ]}
+          />
           {!flipped ? (
             <>
               <Text style={styles.side}>{translationLanguage}</Text>
@@ -433,14 +442,105 @@ export default function Cards() {
   );
 }
 
+function SwipeableGraduation({
+  graduation,
+  settings,
+  onContinue,
+}: {
+  graduation: Graduation;
+  settings: Settings;
+  onContinue: () => void;
+}) {
+  const swipe = useRef(new Animated.ValueXY()).current;
+  const continuing = useRef(false);
+  const continueInDirection = (direction: number) => {
+    if (continuing.current) return;
+    continuing.current = true;
+    Animated.timing(swipe, {
+      toValue: { x: direction * 520, y: 0 },
+      duration: 180,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) onContinue();
+      else continuing.current = false;
+    });
+  };
+  const panResponder = PanResponder.create({
+    onMoveShouldSetPanResponder: (_, gesture) =>
+      Math.abs(gesture.dx) > 8 &&
+      Math.abs(gesture.dx) > Math.abs(gesture.dy),
+    onPanResponderMove: (_, gesture) => {
+      swipe.setValue({ x: gesture.dx, y: 0 });
+    },
+    onPanResponderRelease: (_, gesture) => {
+      if (Math.abs(gesture.dx) > 100 || Math.abs(gesture.vx) > 0.75) {
+        continueInDirection(gesture.dx < 0 || (!gesture.dx && gesture.vx < 0) ? -1 : 1);
+      } else {
+        Animated.spring(swipe, {
+          toValue: { x: 0, y: 0 },
+          useNativeDriver: true,
+          speed: 22,
+          bounciness: 7,
+        }).start();
+      }
+    },
+    onPanResponderTerminate: () => {
+      Animated.spring(swipe, {
+        toValue: { x: 0, y: 0 },
+        useNativeDriver: true,
+      }).start();
+    },
+  });
+  const tintOpacity = swipe.x.interpolate({
+    inputRange: [-240, -170, -110, -60, 0, 60, 110, 170, 240],
+    outputRange: [1, 0.48, 0.16, 0.04, 0, 0.04, 0.16, 0.48, 1],
+    extrapolate: "clamp",
+  });
+  return (
+    <>
+      <Animated.View
+        {...panResponder.panHandlers}
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel="Word learned. Swipe any direction to continue"
+        accessibilityActions={[{ name: "activate", label: "Continue" }]}
+        onAccessibilityAction={() => continueInDirection(1)}
+        style={{
+          transform: [
+            { translateX: swipe.x },
+            {
+              rotate: swipe.x.interpolate({
+                inputRange: [-240, 0, 240],
+                outputRange: ["-8deg", "0deg", "8deg"],
+                extrapolate: "clamp",
+              }),
+            },
+          ],
+        }}
+      >
+        <GraduationCelebration
+          graduation={graduation}
+          settings={settings}
+          swipeTintOpacity={tintOpacity}
+        />
+      </Animated.View>
+      <Text style={styles.graduationSwipeHint}>
+        ← Swipe any direction to continue →
+      </Text>
+    </>
+  );
+}
+
 function GraduationCelebration({
   graduation,
   settings,
   compact = false,
+  swipeTintOpacity,
 }: {
   graduation: Graduation;
   settings: Settings;
   compact?: boolean;
+  swipeTintOpacity?: Animated.AnimatedInterpolation<number>;
 }) {
   const learned = resolveWordPronunciation(
     graduation.learned,
@@ -454,6 +554,12 @@ function GraduationCelebration({
     : undefined;
   return (
     <View style={[styles.celebration, compact && styles.celebrationCompact]}>
+      {swipeTintOpacity ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.correctSwipeTint, { opacity: swipeTintOpacity }]}
+        />
+      ) : null}
       <Text style={styles.confetti}>🎉</Text>
       <Text style={styles.celebrationTitle}>LEARNED</Text>
       <View style={styles.graduationWordRow}>
@@ -474,6 +580,12 @@ function GraduationCelebration({
             compact && styles.replacementCompact,
           ]}
         >
+          {swipeTintOpacity ? (
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.correctSwipeTint, { opacity: swipeTintOpacity }]}
+            />
+          ) : null}
           <Text style={styles.replacementLabel}>NEW IN THE ACTIVE POOL</Text>
           <Text style={styles.confetti}>👀</Text>
           <Text style={styles.learnTitle}>LEARN</Text>
@@ -578,6 +690,13 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   celebrationCompact: { padding: 20 },
+  graduationSwipeHint: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: "700",
+    textAlign: "center",
+    marginBottom: 16,
+  },
   confetti: { fontSize: 42, marginBottom: 8 },
   celebrationTitle: {
     color: colors.coral,
@@ -721,6 +840,11 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
   },
   back: { justifyContent: "flex-start", paddingTop: 50, paddingBottom: 58 },
+  correctSwipeTint: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.green,
+    borderRadius: 24,
+  },
   side: {
     fontSize: 11,
     color: colors.muted,
