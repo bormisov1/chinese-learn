@@ -150,6 +150,11 @@ flock -u 8
 log "Building into a temporary output directory."
 npm --prefix "$WORKTREE_DIR" run build:web -- --output-dir "$BUILD_OUTPUT"
 
+log "Publishing the backend architecture document."
+install -D -m 0644 \
+  "$WORKTREE_DIR/docs/backend-architecture.html" \
+  "$BUILD_OUTPUT/docs/backend-architecture.html"
+
 log "Verifying index.html and its referenced assets."
 node - "$BUILD_OUTPUT" <<'NODE'
 const fs = require('fs');
