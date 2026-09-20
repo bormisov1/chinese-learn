@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Hanzi Deck — Backend Architecture</title>
+<style>
+:root{--bg:#f4f2eb;--paper:#fffdf8;--ink:#18231d;--muted:#607168;--line:#d7ded8;--green:#206648;--mint:#e0f2e8;--coral:#bd573f;--blue:#2d6998;--gold:#9a6815;--shadow:0 10px 36px #18352312}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}a{color:var(--green)}code,pre{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}code{font-size:.9em;background:#e9eeea;padding:.12rem .3rem;border-radius:4px}pre{overflow:auto;background:#17221c;color:#eaf5ed;padding:17px;border-radius:11px;font-size:12px;line-height:1.45}header{background:linear-gradient(135deg,#133d2d,#287250);color:white;padding:48px max(22px,calc((100vw - 1220px)/2));position:relative;overflow:hidden}header:after{content:"汉";position:absolute;right:7%;top:-80px;font-size:250px;font-weight:900;opacity:.065}h1{font-size:clamp(32px,5vw,58px);line-height:1.04;max-width:830px;margin:9px 0 17px}header p{max-width:800px;font-size:18px;color:#d6e9df}.tag{display:inline-block;border:1px solid #ffffff60;border-radius:99px;padding:5px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.1em}nav{position:sticky;top:0;z-index:5;display:flex;gap:3px;overflow:auto;background:#fffdf8ee;backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding:8px max(14px,calc((100vw - 1220px)/2))}nav a{white-space:nowrap;text-decoration:none;color:var(--muted);padding:7px 9px;border-radius:7px;font-size:13px}nav a:hover,nav a[aria-current]{background:var(--mint);color:var(--green)}main{max-width:1220px;margin:auto;padding:26px 20px 80px}section{scroll-margin-top:58px;margin:35px 0 58px}.eyebrow{text-transform:uppercase;color:var(--green);font-weight:800;letter-spacing:.12em;font-size:11px}h2{font-size:30px;margin:4px 0 18px}h3{font-size:18px;margin:0 0 7px}.lead{font-size:17px;color:var(--muted);max-width:900px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:13px}.card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:17px;box-shadow:var(--shadow)}.card p{color:var(--muted);margin:6px 0}.num{display:inline-grid;place-items:center;width:27px;height:27px;border-radius:8px;background:var(--mint);color:var(--green);font-weight:800;margin-right:6px}.pill{display:inline-block;padding:3px 8px;border-radius:99px;background:var(--mint);color:var(--green);font-size:11px;font-weight:750}.pill.blue{background:#e1eef8;color:#285f8a}.pill.red{background:#fbe7e1;color:#943f2e}.callout{border-left:4px solid var(--coral);background:#fff6f1;padding:13px 16px;border-radius:4px 11px 11px 4px;margin:16px 0}.callout.ok{border-color:var(--green);background:var(--mint)}.diagram{background:var(--paper);border:1px solid var(--line);border-radius:15px;padding:10px;overflow:auto;box-shadow:var(--shadow)}svg{min-width:850px;width:100%;height:auto}.b{fill:#fffdf8;stroke:#aebfb5;stroke-width:1.5}.g{fill:#dff1e7;stroke:#519071}.bl{fill:#e1eef8;stroke:#6694b6}.y{fill:#fbefd5;stroke:#ba903e}.r{fill:#fbe6df;stroke:#cb7059}.st{font:bold 15px system-ui;fill:#18231d}.ss{font:12px system-ui;fill:#52645a}.arrow{stroke:#607168;stroke-width:1.6;fill:none;marker-end:url(#a)}table{border-collapse:separate;border-spacing:0;width:100%;background:var(--paper);border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:13px}th,td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--line)}th{background:#edf3ef;color:#365547;font-size:11px;text-transform:uppercase;letter-spacing:.05em}tr:last-child td{border-bottom:0}.table{overflow:auto;border-radius:12px}details{background:var(--paper);border:1px solid var(--line);border-radius:11px;margin:9px 0;padding:0 14px}summary{cursor:pointer;font-weight:750;padding:13px 0}details>div{color:var(--muted);padding:0 0 14px}.flow{display:grid;grid-template-columns:repeat(5,1fr);gap:19px;counter-reset:x}.flow .card{position:relative;min-height:140px}.flow .card:before{counter-increment:x;content:counter(x);display:grid;place-items:center;width:25px;height:25px;border-radius:50%;background:var(--green);color:white;font-weight:800;margin-bottom:8px}.flow .card:not(:last-child):after{content:"→";position:absolute;right:-19px;top:43%;font-size:23px;color:var(--green)}ul{padding-left:22px}.refs{font-size:13px}.refs a{display:block;margin:5px 0}footer{text-align:center;color:var(--muted);border-top:1px solid var(--line);padding:28px}@media(max-width:800px){.flow{grid-template-columns:1fr}.flow .card:not(:last-child):after{content:"↓";right:49%;top:auto;bottom:-24px}header{padding-top:34px}h2{font-size:25px}}@media(prefers-color-scheme:dark){:root{--bg:#101612;--paper:#18211c;--ink:#edf5ef;--muted:#adbbb3;--line:#34463b;--mint:#213c30;--shadow:none}nav{background:#18211cee}code{background:#29362f}.callout{background:#36231f}.callout.ok{background:#213c30}th{background:#203128}.b{fill:#18211c}.g{fill:#203c30}.bl{fill:#1d3040}.y{fill:#392f1b}.r{fill:#3b2722}.st{fill:#edf5ef}.ss{fill:#adbbb3}}
+</style>
+</head>
+<body>
+<header><span class="tag">Proposed · architecture only · 2026-09-20</span><h1>Backend &amp; lossless cross-device sync</h1><p>Hanzi Deck identity, local-first convergence, schemas, inner services, API contracts, privacy-safe measurement, security, deployment, migration, and rollback.</p></header>
+<nav aria-label="Sections"><a href="#drivers">Drivers</a><a href="#c4">C4</a><a href="#services">Services</a><a href="#data">Data</a><a href="#sync">Sync</a><a href="#auth">Auth</a><a href="#api">API</a><a href="#metrics">Metrics</a><a href="#security">Security</a><a href="#ops">Operations</a></nav>
+<main>
+<section id="drivers"><div class="eyebrow">01 · Drivers</div><h2>Architecture invariants</h2><div class="grid">
+<article class="card"><h3><span class="num">1</span>Local write first</h3><p>Action, event, and outbox commit atomically. Network never gates studying.</p></article>
+<article class="card"><h3><span class="num">2</span>Union, never replace</h3><p>Snapshots merge. Backend-missing local records are inventoried and uploaded.</p></article>
+<article class="card"><h3><span class="num">3</span>Immutable facts</h3><p>Reviews/attempts are deduplicated events; SRS and counters are repairable projections.</p></article>
+<article class="card"><h3><span class="num">4</span>Deterministic merge</h3><p>HLC, device, and mutation IDs form total order; identical inputs always converge.</p></article>
+<article class="card"><h3><span class="num">5</span>Soft deletion</h3><p>Tombstones replicate 400 days. Hard deletion only through verified privacy erasure.</p></article>
+<article class="card"><h3><span class="num">6</span>Content-free metrics</h3><p>No words, sentences, answers, OCR/clipboard content, filenames, or secrets.</p></article>
+</div><div class="callout ok"><strong>Safety invariant:</strong> logout, account switching, sync reset, expired cursor, migration failure, and backend outage never silently delete local data.</div></section>
+
+<section id="c4"><div class="eyebrow">02 · C4 level 1</div><h2>System context</h2>
+<div class="diagram"><svg viewBox="0 0 1100 410" role="img" aria-labelledby="ct"><title id="ct">System context</title><defs><marker id="a" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0 0v6l9-3z" fill="#607168"/></marker></defs>
+<rect class="g" x="35" y="140" width="175" height="120" rx="14"/><text class="st" x="123" y="175" text-anchor="middle">Learner</text><text class="ss" x="123" y="202" text-anchor="middle">web · iOS · Android</text><text class="ss" x="123" y="226" text-anchor="middle">studies offline</text>
+<rect class="b" x="300" y="95" width="285" height="210" rx="14"/><text class="st" x="443" y="130" text-anchor="middle">Hanzi Deck app</text><text class="ss" x="443" y="163" text-anchor="middle">local DB + recovery</text><text class="ss" x="443" y="188" text-anchor="middle">domain/SRS projections</text><text class="ss" x="443" y="213" text-anchor="middle">outbox + cursor + reconcile</text><text class="ss" x="443" y="238" text-anchor="middle">telemetry buffer</text><text class="ss" x="443" y="275" text-anchor="middle">always useful offline</text>
+<rect class="bl" x="680" y="65" width="260" height="275" rx="14"/><text class="st" x="810" y="102" text-anchor="middle">Hanzi Cloud</text><text class="ss" x="810" y="140" text-anchor="middle">Identity API</text><text class="ss" x="810" y="167" text-anchor="middle">Sync + reconciliation</text><text class="ss" x="810" y="194" text-anchor="middle">Telemetry API</text><text class="ss" x="810" y="221" text-anchor="middle">Workers</text><text class="ss" x="810" y="266" text-anchor="middle">PostgreSQL · Redis</text><text class="ss" x="810" y="292" text-anchor="middle">encrypted backups</text>
+<rect class="y" x="970" y="40" width="110" height="84" rx="11"/><text class="st" x="1025" y="72" text-anchor="middle">Telegram</text><text class="ss" x="1025" y="98" text-anchor="middle">OIDC</text>
+<rect class="y" x="970" y="162" width="110" height="84" rx="11"/><text class="st" x="1025" y="194" text-anchor="middle">Google</text><text class="ss" x="1025" y="220" text-anchor="middle">OIDC</text>
+<rect class="y" x="970" y="284" width="110" height="84" rx="11"/><text class="st" x="1025" y="316" text-anchor="middle">Email</text><text class="ss" x="1025" y="342" text-anchor="middle">verification</text>
+<path class="arrow" d="M210 200h80"/><path class="arrow" d="M585 200h85"/><path class="arrow" d="M940 82h20"/><path class="arrow" d="M940 204h20"/><path class="arrow" d="M940 326h20"/><text class="ss" x="630" y="186" text-anchor="middle">TLS JSON</text>
+</svg></div>
+<div class="eyebrow" style="margin-top:28px">C4 level 2</div><h2>Containers</h2>
+<div class="diagram"><svg viewBox="0 0 1100 470" role="img" aria-labelledby="co"><title id="co">Deployment containers</title>
+<rect class="g" x="25" y="170" width="175" height="115" rx="13"/><text class="st" x="113" y="205" text-anchor="middle">Expo clients</text><text class="ss" x="113" y="232" text-anchor="middle">SQLite / IndexedDB</text><text class="ss" x="113" y="256" text-anchor="middle">outbox + cursor</text>
+<rect class="b" x="250" y="30" width="680" height="365" rx="18"/><text class="st" x="590" y="63" text-anchor="middle">Stateless modular monolith</text>
+<rect class="bl" x="278" y="90" width="185" height="88" rx="10"/><text class="st" x="371" y="121" text-anchor="middle">Edge / API</text><text class="ss" x="371" y="147" text-anchor="middle">limits · CORS · IDs</text>
+<rect class="bl" x="495" y="90" width="185" height="88" rx="10"/><text class="st" x="588" y="121" text-anchor="middle">Identity</text><text class="ss" x="588" y="147" text-anchor="middle">OIDC · credentials</text>
+<rect class="g" x="712" y="90" width="185" height="88" rx="10"/><text class="st" x="805" y="121" text-anchor="middle">Sync ingress</text><text class="ss" x="805" y="147" text-anchor="middle">push · pull · dedupe</text>
+<rect class="g" x="278" y="215" width="185" height="88" rx="10"/><text class="st" x="371" y="246" text-anchor="middle">Merge/projector</text><text class="ss" x="371" y="272" text-anchor="middle">events → SRS</text>
+<rect class="g" x="495" y="215" width="185" height="88" rx="10"/><text class="st" x="588" y="246" text-anchor="middle">Reconciler</text><text class="ss" x="588" y="272" text-anchor="middle">inventory · snapshot</text>
+<rect class="r" x="712" y="215" width="185" height="88" rx="10"/><text class="st" x="805" y="246" text-anchor="middle">Telemetry</text><text class="ss" x="805" y="272" text-anchor="middle">allowlist · aggregate</text>
+<rect class="y" x="310" y="333" width="530" height="38" rx="8"/><text class="ss" x="575" y="357" text-anchor="middle">Worker: email · projection · compaction · maintenance</text>
+<rect class="b" x="965" y="55" width="110" height="80" rx="10"/><text class="st" x="1020" y="87" text-anchor="middle">Postgres</text><text class="ss" x="1020" y="112" text-anchor="middle">truth + PITR</text>
+<rect class="b" x="965" y="176" width="110" height="75" rx="10"/><text class="st" x="1020" y="207" text-anchor="middle">Redis</text><text class="ss" x="1020" y="232" text-anchor="middle">disposable</text>
+<rect class="b" x="965" y="292" width="110" height="75" rx="10"/><text class="st" x="1020" y="323" text-anchor="middle">Objects</text><text class="ss" x="1020" y="348" text-anchor="middle">backups</text>
+<path class="arrow" d="M200 228h40"/><path class="arrow" d="M930 95h25"/><path class="arrow" d="M930 214h25"/><path class="arrow" d="M930 330h25"/>
+</svg></div><p class="lead">Start as one transactional codebase plus worker—not distributed microservices. Keep module ownership strict and split only from evidence.</p></section>
+
+<section id="services"><div class="eyebrow">03 · C4 level 3</div><h2>Inner services</h2><div class="grid">
+<article class="card"><span class="pill">Identity</span><h3>Identity service</h3><p>Accounts, linking/merge, verification state, sessions, recovery, export/erasure.</p></article>
+<article class="card"><span class="pill">Identity</span><h3>OIDC verifiers</h3><p>Telegram/Google code + PKCE, issuer/audience/signature/nonce/state/expiry checks.</p></article>
+<article class="card"><span class="pill">Identity</span><h3>Credential service</h3><p>Argon2id, KMS pepper, breached-password check, generic errors, throttles.</p></article>
+<article class="card"><span class="pill blue">Sync</span><h3>Sync ingress</h3><p>Validate ownership/schema, idempotently accept, append per-user sequenced change.</p></article>
+<article class="card"><span class="pill blue">Sync</span><h3>Merge engine</h3><p>Field clocks, tombstones, OR-set relations, total order, conflict journal.</p></article>
+<article class="card"><span class="pill blue">Sync</span><h3>Progress projector</h3><p>Fold event union into counters, SRS, active deck; detect projection drift.</p></article>
+<article class="card"><span class="pill blue">Sync</span><h3>Snapshot/reconcile</h3><p>Stable inventory, 256 bucket hashes, bootstrap, local-missing detection.</p></article>
+<article class="card"><span class="pill red">Privacy</span><h3>Telemetry ingress</h3><p>Exact event/property allowlist, content-shape rejection, dedupe, aggregation.</p></article>
+<article class="card"><span class="pill">Worker</span><h3>Background jobs</h3><p>Email retry, projection, aggregation, compaction, deletion, restore checks.</p></article>
+</div></section>
+
+<section id="data"><div class="eyebrow">04 · Data</div><h2>Current state → canonical model</h2>
+<div class="table"><table><thead><tr><th>Current StoreData</th><th>Canonical representation</th><th>Rule</th></tr></thead><tbody>
+<tr><td><code>words[]</code></td><td>words projection + study events</td><td>One bootstrap baseline; new progress as facts</td></tr>
+<tr><td>sentences + index</td><td>sentences + sentence_words</td><td>Index derived; relation is observed-remove set</td></tr>
+<tr><td><code>attempts[]</code></td><td>correctness/direction/time event</td><td><span class="pill red">answer and model feedback local only</span></td></tr>
+<tr><td>SRS/card counters</td><td>projected from baseline + events</td><td>Recompute; never add/max two projections</td></tr>
+<tr><td><code>cardRound</code></td><td>monotonic projection + device state</td><td>Max round; event order reproduces deck</td></tr>
+<tr><td>mix queue/position</td><td>device_state</td><td>Never overwrites another device</td></tr>
+<tr><td>language/onboarding/non-secret settings</td><td>settings with field clocks</td><td>Field-level deterministic LWW</td></tr>
+<tr><td><code>apiKey</code> + validated</td><td>none</td><td><span class="pill red">secure local; sync rejects</span></td></tr>
+<tr><td><code>apiUrl</code>, model</td><td>local only initially</td><td>Arbitrary provider config can be sensitive</td></tr>
+</tbody></table></div>
+<details open><summary>Identity and device schema</summary><div><pre>users(id UUIDv7 PK, state, locale, created_at, verified_at, deletion_due_at)
+auth_identities(id, user_id, provider, provider_subject, email_normalized,
+  email_verified, password_hash, created_at, last_used_at,
+  UNIQUE(provider, provider_subject))
+sessions(id, user_id, device_id, family_id, refresh_hash,
+  expires_at, rotated_at, revoked_at, last_seen_at)
+auth_one_time_tokens(id, user_id, purpose, token_digest,
+  expires_at, consumed_at, superseded_at, attempt_count, created_at)
+devices(id, user_id, platform, app_version, schema_version,
+  last_cursor, last_seen_at, revoked_at)</pre></div></details>
+<details><summary>Learning schema</summary><div><pre>words(id, user_id, hanzi, pinyin, translations JSONB, example_count,
+  created_at_client, card_introduced_at, card_active,
+  card_last_studied_round, card_last_incorrect_at,
+  word_shown_count, srs_level/correct/incorrect/due_at,
+  card_srs_level/correct/incorrect/due_at, card_lapses, clocks..., deleted_at)
+sentences(id, user_id, chinese, pinyin, translations JSONB,
+  grammar_pattern, sentence_shown_count, last_shown_at, clocks..., deleted_at)
+sentence_words(user_id, sentence_id, word_id, position, add_tag, removed_at)
+study_events(id UUID, user_id, device_id, entity_type, entity_id,
+  kind, mode, occurred_at, hlc, payload JSONB, mutation_id)
+settings(user_id, language, tts_provider, tts_voice_uri, tts_rate,
+  automatic_word_addition, onboarding_complete, language_selected, field_clocks)
+device_state(user_id, device_id, mix_queue, mix_position, card_round)</pre></div></details>
+<details><summary>Sync and telemetry schema</summary><div><pre>mutations(user_id, mutation_id, device_id, client_hlc, entity_type,
+  entity_id, operation, body_hash, accepted_seq, received_at)
+change_log(user_id, seq, mutation_id, entity_type, entity_id,
+  operation, canonical_record, server_time)
+sync_heads(user_id, next_seq, min_available_seq)
+analytics_events(event_id, user_id_hash, install_id_hash, session_id,
+  name, occurred_at, received_at, app_version, platform, properties)</pre></div></details>
+<div class="callout"><strong>Common ownership columns:</strong> user, created/updated/deleted times, revision, HLC, writer device, last mutation. User ownership always comes from authenticated session—not request JSON.</div></section>
+
+<section id="sync"><div class="eyebrow">05 · Lossless sync</div><h2>Write → push → merge → pull → audit</h2><div class="flow">
+<article class="card"><h3>Commit locally</h3><p>Projection + fact event + outbox in one transaction.</p></article>
+<article class="card"><h3>Push idempotently</h3><p>≤100 mutations / 512 KiB, oldest first.</p></article>
+<article class="card"><h3>Merge server</h3><p>Validate, dedupe, resolve, sequence canonical changes.</p></article>
+<article class="card"><h3>Pull cursor</h3><p>Apply page + cursor atomically to a stable head.</p></article>
+<article class="card"><h3>Reconcile</h3><p>Login, restore, expiry, anomaly, and every 30 days.</p></article>
+</div>
+<h3 style="margin-top:28px">Missing-record detection</h3>
+<div class="diagram"><svg viewBox="0 0 1100 320" role="img" aria-labelledby="re"><title id="re">Reconciliation sequence</title>
+<rect class="g" x="30" y="25" width="190" height="260" rx="14"/><text class="st" x="125" y="61" text-anchor="middle">Device</text><text class="ss" x="125" y="94" text-anchor="middle">record H0</text><text class="ss" x="125" y="121" text-anchor="middle">256 local hash buckets</text><text class="ss" x="125" y="148" text-anchor="middle">UI writes continue</text>
+<rect class="bl" x="455" y="25" width="190" height="260" rx="14"/><text class="st" x="550" y="61" text-anchor="middle">Reconciler</text><text class="ss" x="550" y="94" text-anchor="middle">stable snapshot token</text><text class="ss" x="550" y="121" text-anchor="middle">IDs · revisions · hashes</text><text class="ss" x="550" y="148" text-anchor="middle">tombstones · head cursor</text>
+<rect class="y" x="880" y="25" width="190" height="260" rx="14"/><text class="st" x="975" y="61" text-anchor="middle">PostgreSQL</text><text class="ss" x="975" y="94" text-anchor="middle">consistent inventory</text><text class="ss" x="975" y="121" text-anchor="middle">change log</text>
+<path class="arrow" d="M220 88h225"/><text class="ss" x="333" y="76" text-anchor="middle">bucket hashes</text><path class="arrow" d="M645 118h225"/><path class="arrow" d="M880 158H655"/><path class="arrow" d="M455 194H230"/><text class="ss" x="343" y="182" text-anchor="middle">unequal inventories</text><path d="M220 245h225" style="stroke:#bd573f;stroke-width:2;fill:none;marker-end:url(#a)"/><text class="ss" x="333" y="233" text-anchor="middle">local-only upserts + repairs</text><path class="arrow" d="M645 245h225"/>
+</svg></div>
+<div class="grid" style="margin-top:13px"><article class="card"><h3>Local live, absent server</h3><p>Enqueue complete upsert, including legacy records created before outbox support.</p></article><article class="card"><h3>Server live, absent local</h3><p>Download and merge. Absence is never deletion.</p></article><article class="card"><h3>Both differ</h3><p>Deterministic merge; upload repair when merged result differs.</p></article><article class="card"><h3>Tombstone conflict</h3><p>Later total-order clock wins; newer live edit explicitly resurrects.</p></article></div>
+<h3 style="margin-top:28px">Conflict matrix</h3><div class="table"><table><thead><tr><th>Data</th><th>Resolution</th></tr></thead><tbody>
+<tr><td>Study/import events</td><td>Set union by UUID; same UUID/different hash → quarantine + alert</td></tr>
+<tr><td>Counters/SRS</td><td>Recompute event union + one baseline; never merge materialized counters</td></tr>
+<tr><td>Scalar fields</td><td>LWW by <code>(field_hlc, device_id, mutation_id)</code>; loser retained 30 days</td></tr>
+<tr><td>Translations</td><td>Same independently per language</td></tr>
+<tr><td>Sentence↔word links</td><td>Observed-remove set; removal clears only observed add-tags</td></tr>
+<tr><td>Active deck</td><td>Rerun existing SRS/<code>fillActivePool</code> from merged events</td></tr>
+<tr><td>Queue/position</td><td>Device-scoped, never cross-overwritten</td></tr>
+<tr><td>Delete/update</td><td>Later total order; resurrection auditable</td></tr>
+</tbody></table></div>
+<h3 style="margin-top:28px">Cache, retention, offline</h3><div class="table"><table><thead><tr><th>Artifact</th><th>Policy</th></tr></thead><tbody>
+<tr><td>Local learning data</td><td>No TTL; offline truth; encrypted where platform permits</td></tr><tr><td>Outbox</td><td>No TTL before exact ack; full-jitter retry 1s→5m</td></tr><tr><td>Cursor/change log/tombstones</td><td>Durable cursor; 400 days; expiry triggers full reconcile</td></tr><tr><td>User reads</td><td>Private ETag; <code>private, no-cache</code>; no shared caching</td></tr><tr><td>Dictionaries/static app</td><td>Content-hashed immutable one year; manifest 5 minutes</td></tr><tr><td>Redis</td><td>10m–24h acceleration; disposable</td></tr><tr><td>Telemetry buffer</td><td>7 days/10,000 events; oldest drops; never blocks sync</td></tr><tr><td>Conflict journal</td><td>30 days</td></tr>
+</tbody></table></div></section>
+
+<section id="auth"><div class="eyebrow">06 · Authentication</div><h2>Telegram, Google/Gmail, or password—one account</h2><div class="grid">
+<article class="card"><h3>Telegram OIDC</h3><p>Current authorization-code flow + PKCE S256. Exact redirect, one-time state/nonce; verify signature, issuer, configured audience, expiry/not-before, code single use. Use immutable <code>sub</code>. Legacy widget only during migration, with server HMAC + ≤5-minute freshness.</p></article>
+<article class="card"><h3>Google OIDC</h3><p>Authorization Code + PKCE S256; validate signature, issuer, audience/authorized party, nonce, times, state, exact redirect. Scopes only <code>openid email profile</code>; no Gmail mailbox access.</p></article>
+<article class="card"><h3>Email + password</h3><p>12–256 chars; allow paste/managers. Argon2id initial target 64 MiB ×3, p=1, benchmarked; unique salt and optional KMS pepper. Breached/common check, generic errors, layered throttles.</p></article>
+</div><div class="callout"><strong>Email confirmation:</strong> pending account; 32-byte random single-use token; store keyed digest only; 30-minute expiry; resend invalidates old tokens. Pending users cannot sync or link.</div>
+<div class="grid"><article class="card"><h3>Safe linking</h3><p>Authenticated session + fresh proof. Never auto-link on equal email. Collision requires authentication to both accounts and transactional idempotent merge.</p></article><article class="card"><h3>Sessions</h3><p>10-minute memory access token. Rotated opaque refresh token in Secure/HttpOnly/SameSite cookie or native secure store. Reuse revokes family.</p></article><article class="card"><h3>Recovery</h3><p>Generic response; 15-minute one-use reset token. Reset revokes refresh families and sends security notice.</p></article></div>
+<div class="refs"><strong>Primary guidance</strong><a href="https://core.telegram.org/bots/telegram-login">Telegram Login / OIDC</a><a href="https://developers.google.com/identity/openid-connect/reference">Google OpenID Connect</a><a href="https://www.rfc-editor.org/rfc/rfc9700.html">OAuth 2.0 Security BCP — RFC 9700</a><a href="https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html">OWASP Password Storage Cheat Sheet</a></div></section>
+
+<section id="api"><div class="eyebrow">07 · API</div><h2>Versioned, idempotent JSON</h2><div class="grid">
+<article class="card"><h3>Auth routes</h3><pre>POST /v1/auth/register
+POST /v1/auth/email/verify
+POST /v1/auth/login/password
+POST /v1/auth/login/telegram/start
+POST /v1/auth/login/telegram/callback
+POST /v1/auth/login/google/start
+POST /v1/auth/login/google/callback
+POST /v1/auth/refresh
+POST /v1/auth/password/forgot
+POST /v1/auth/password/reset
+GET  /v1/auth/sessions</pre></article>
+<article class="card"><h3>Sync/privacy routes</h3><pre>POST /v1/sync/push
+GET  /v1/sync/changes?cursor=N
+POST /v1/sync/snapshot
+POST /v1/sync/reconcile/report
+POST /v1/telemetry/batch
+GET  /v1/account/export
+DELETE /v1/account</pre></article></div>
+<details open><summary>Push contract</summary><div><pre>{
+ "deviceId":"uuid", "schemaVersion":3, "baseCursor":123,
+ "mutations":[{
+   "mutationId":"uuidv7",
+   "hlc":"2026-09-20T12:00:00.000Z-0001-device",
+   "entity":{"type":"word","id":"uuid"},
+   "operation":"upsert",
+   "body":{"pinyin":"…","fieldClocks":{"pinyin":"…"}}
+ }]
+}</pre><p>Server responds with accepted mutation→sequence mappings, itemized rejections, next cursor, and corrected server HLC. Partial/transport retries are safe.</p></div></details>
+<details><summary>Errors and compatibility</summary><div><p><code>{error:{code,message,requestId,retryable,details}}</code>. 400 validation, 401 auth, 403 policy, 409 user action, 413 size, 422 schema, 429 + Retry-After, retryable 5xx. Support current + previous two schemas; unsupported clients preserve outbox/local data.</p></div></details></section>
+
+<section id="metrics"><div class="eyebrow">08 · Metrics</div><h2>Measurement without learner content</h2><div class="callout ok"><strong>Collection guard:</strong> exact event/property allowlists, bounded enums, rotating HMAC pseudonyms, no auth identifier joins, no free text, cohorts under 20 suppressed.</div>
+<div class="table"><table><thead><tr><th>Event</th><th>Allowed properties only</th></tr></thead><tbody>
+<tr><td><code>first_visit</code></td><td>suggested_language, platform, app_version</td></tr>
+<tr><td><code>login_started</code> / <code>login_succeeded</code> / <code>login_failed</code></td><td>telegram/google/password, is_link, bounded failure_class</td></tr>
+<tr><td><code>language_chosen</code></td><td>language, onboarding/settings, suggested_match</td></tr>
+<tr><td><code>word_addition_mode_chosen</code></td><td>manual/automatic, onboarding/settings</td></tr>
+<tr><td><code>import_completed</code></td><td>typed/paste/ocr/hsk/qr, word/sentence/duplicate counts, duration bucket; <strong>never words/text/image/name</strong></td></tr>
+<tr><td><code>mode_entered</code></td><td>cards/sentences/listening/mix, bounded entry point</td></tr>
+<tr><td><code>card_answered</code></td><td>correct, SRS before/after, latency bucket, cards/mix</td></tr>
+<tr><td><code>sentence_answered</code></td><td>correct, direction, latency bucket, sentences/listening/mix; no answer/ID</td></tr>
+<tr><td><code>listening_item_completed</code></td><td>word/sentence, revealed/correct/incorrect, listening/mix</td></tr>
+<tr><td><code>mix_item_completed</code></td><td>bounded item kind and result</td></tr>
+<tr><td><code>settings_changed</code></td><td>allowlisted setting + bucketed old/new; never API config/voice URI</td></tr>
+</tbody></table></div><p class="lead">Derived: card/sentence/listening/mix entry, volume, completion, correctness; login conversion; language/manual/automatic selection; import method/count; D1/D7/D30 retention. Sync health is operational telemetry, separate from product analytics.</p></section>
+
+<section id="security"><div class="eyebrow">09 · Trust</div><h2>Security and privacy</h2><div class="grid">
+<article class="card"><h3>Application</h3><p>TLS 1.2+, HSTS, exact CORS, CSRF, CSP, size/depth/rate limits, parameterized SQL, output encoding, supply-chain scanning.</p></article>
+<article class="card"><h3>Secrets</h3><p>Managed secrets/KMS, environment-separated rotating keys, envelope-encrypted DB/backups, audited break-glass.</p></article>
+<article class="card"><h3>Authorization</h3><p>User only from session; strict UUID/range/enum schema. Private DB, least-privilege RBAC, JIT audited production access.</p></article>
+<article class="card"><h3>Safe logs</h3><p>Request ID, route template, status, latency, bytes, pseudonyms. Never body, token, email, word/sentence/answer/OCR/clipboard/key.</p></article>
+<article class="card"><h3>Privacy lifecycle</h3><p>Export, correct, unlink, delete. Disable login, reversible 30-day deletion window, scheduled purge and minimized audits.</p></article>
+<article class="card"><h3>Abuse defense</h3><p>Enumeration resistance; IP/account/device throttle; OAuth CSRF/replay defense; refresh reuse detection.</p></article>
+</div></section>
+
+<section id="ops"><div class="eyebrow">10 · Operations</div><h2>Observe, deploy, migrate, roll back</h2><div class="grid">
+<article class="card"><h3>SLOs</h3><p>Auth/sync 99.9%; accepted mutation durability 99.999%; p95 batch &lt;500ms; 99% online convergence &lt;60s.</p></article>
+<article class="card"><h3>Signals</h3><p>Outbox age/size, accept/reject/dedupe, cursor lag/expiry, missing-local repairs, conflicts, drift, DB/worker/email.</p></article>
+<article class="card"><h3>Alerts/tests</h3><p>Burn rate, mutation-loss invariant, outbox &gt;10m, hash mismatch, drift, backup failure. Synthetic offline→two-device convergence.</p></article>
+<article class="card"><h3>Recovery</h3><p>Multi-AZ + PITR; daily encrypted cross-account/region backup; quarterly restore. RPO ≤5m, RTO ≤60m.</p></article>
+</div><h3 style="margin-top:28px">Safe evolution</h3><div class="flow">
+<article class="card"><h3>Expand</h3><p>Add compatible nullable structures/readers.</p></article><article class="card"><h3>Migrate</h3><p>Checkpointed online backfill; copy-on-write client.</p></article><article class="card"><h3>Dual mode</h3><p>Dual read/write under flags; validate hashes/counts.</p></article><article class="card"><h3>Canary</h3><p>1→10→50→100%, keep rollback compatibility.</p></article><article class="card"><h3>Contract</h3><p>Only after supported client/recovery window.</p></article></div>
+<div class="callout"><strong>Local migration:</strong> checksum <code>hanzi-deck:v1</code> → timestamped recovery copy → copy-on-write database migration → validate IDs/counts/references/projections → atomic pointer flip. Never auto-delete the source. Failure reopens it.</div>
+<details open><summary>Acceptance gates</summary><div><ul><li>Legacy local record absent server is discovered and uploaded.</li><li>Concurrent offline reviews preserve both facts and reproduce identical SRS.</li><li>Duplicate/reordered requests are idempotent; cursor paging is crash-safe.</li><li>Logout/account switch never deletes data; local stores are account-namespaced.</li><li>Secrets/content cannot enter telemetry or logs under schema/fuzz tests.</li><li>Failed migrations roll back without losing a mutation.</li><li>Restore/replay meets RPO/RTO; current and previous two clients coexist.</li></ul></div></details>
+<h3 style="margin-top:28px">ADR summary</h3><div class="grid"><article class="card"><h3>Outbox + change log</h3><p>Offline safety and idempotent retries.</p></article><article class="card"><h3>Immutable progress</h3><p>Concurrent reviews survive; projections repair.</p></article><article class="card"><h3>Deterministic merge</h3><p>Convergence without routine prompts.</p></article><article class="card"><h3>Modular monolith</h3><p>Transactional simplicity, explicit seams.</p></article><article class="card"><h3>PostgreSQL truth</h3><p>Integrity, sequencing, PITR; Redis disposable.</p></article><article class="card"><h3>Content-free analytics</h3><p>Outcomes without learner text.</p></article></div></section>
+</main>
+<footer>Hanzi Deck backend architecture · self-contained HTML · normative companion: <code>backend-architecture.md</code></footer>
+<script>document.querySelectorAll("nav a").forEach(function(a){a.addEventListener("click",function(){document.querySelectorAll("nav a").forEach(function(x){x.removeAttribute("aria-current")});a.setAttribute("aria-current","page")})});</script>
+</body>
+</html>
