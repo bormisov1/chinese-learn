@@ -22,10 +22,8 @@ function localizeWord(word: Word, currentLanguage: AppLanguage, targetLanguage: 
   const currentMeaning = word.russian.trim();
   if (currentMeaning) translationByLanguage[currentLanguage] = currentMeaning;
   const localized = dictionary.get(word.hanzi);
-  if (localized && (currentLanguage !== targetLanguage || !currentMeaning)) translationByLanguage[targetLanguage] = localized.russian;
-  const targetMeaning = currentLanguage === targetLanguage
-    ? currentMeaning || translationByLanguage[targetLanguage] || localized?.russian || ""
-    : localized?.russian ?? translationByLanguage[targetLanguage] ?? "";
+  if (localized) translationByLanguage[targetLanguage] = localized.russian;
+  const targetMeaning = localized?.russian ?? translationByLanguage[targetLanguage] ?? "";
   return {
     ...word,
     pinyin: localized?.pinyin ?? word.pinyin,
@@ -34,7 +32,7 @@ function localizeWord(word: Word, currentLanguage: AppLanguage, targetLanguage: 
   };
 }
 
-/** Refresh persisted meanings without erasing same-language custom or legacy words. */
+/** Refresh known words from the canonical dictionary and retain fallbacks for unknown words. */
 export function refreshWords(words: Word[], language: AppLanguage, dictionary: Dictionary): Word[] {
   return words.map((word) => localizeWord(word, language, language, dictionary));
 }

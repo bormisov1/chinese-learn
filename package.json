@@ -27,6 +27,7 @@
     "expo-router": "~6.0.21",
     "expo-status-bar": "~3.0.9",
     "jsqr": "^1.4.0",
+    "opencc-js": "^1.4.2",
     "pako": "^3.0.1",
     "qrcode": "^1.5.4",
     "react": "19.1.0",
