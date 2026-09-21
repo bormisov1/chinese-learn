@@ -1,7 +1,9 @@
+import OpenCC from "opencc-js/t2cn";
 import type { Dictionary } from "./dictionary";
 import type { ImportedWord } from "./ocr";
 
 type Match = { words: ImportedWord[]; matchedCharacters: number; wordLengths: number[] };
+const toSimplifiedChinese = OpenCC.Converter({ from: "tw", to: "cn" });
 
 function betterMatch(candidate: Match, current: Match | undefined) {
   if (!current) return true;
@@ -56,7 +58,8 @@ function segment(run: string, dictionary: Dictionary, maximumWordLength: number)
 
 export function parseTextVocabulary(text: string, dictionary: Dictionary | null) {
   if (!dictionary) return { words: [], unmatchedCharacters: 0 };
-  const runs = text.match(/[\p{Script=Han}]+/gu) ?? [];
+  const normalizedText = toSimplifiedChinese(text);
+  const runs = normalizedText.match(/[\p{Script=Han}]+/gu) ?? [];
   const maximumWordLength = Math.max(1, ...[...dictionary.keys()].map((word) => [...word].length));
   const words = new Map<string, ImportedWord>();
   let hanziCount = 0;

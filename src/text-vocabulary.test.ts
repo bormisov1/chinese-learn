@@ -10,6 +10,19 @@ const entry = (hanzi: string) => ({
 const dictionary = (...words: string[]) =>
   new Map(words.map((word) => [word, entry(word)]));
 
+test("normalizes Traditional Chinese before segmentation", () => {
+  const parsed = parseTextVocabulary(
+    "這世界看來很快樂 始終笑著沉默",
+    dictionary("这", "世界", "看来", "很", "快乐", "始终", "笑着", "沉默"),
+  );
+
+  assert.deepEqual(
+    parsed.words.map((word) => word.hanzi),
+    ["这", "世界", "看来", "很", "快乐", "始终", "笑着", "沉默"],
+  );
+  assert.equal(parsed.unmatchedCharacters, 0);
+});
+
 test("prefers a whole dictionary word over individual characters", () => {
   const parsed = parseTextVocabulary("喜欢", dictionary("喜", "欢", "喜欢"));
 
