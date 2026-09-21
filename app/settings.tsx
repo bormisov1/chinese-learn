@@ -9,6 +9,7 @@ import {
   Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -650,8 +651,13 @@ function TtsSettings({
     <View style={[shell.panel, styles.ttsPanel]}>
       <Text style={styles.sectionTitle}>Mandarin audio</Text>
       <Text style={styles.help}>
-        Browser speech is free and stays on-device.
+        {Platform.OS === "web"
+          ? "Browser speech is free and stays on-device."
+          : "Device speech is free and stays on-device."}
       </Text>
+      {Platform.OS === "ios" ? (
+        <Text style={styles.help}>Turn off Silent mode to hear speech on iPhone.</Text>
+      ) : null}
       {!provider.supported() ? (
         <Text style={styles.error}>Speech unavailable in this browser.</Text>
       ) : (
