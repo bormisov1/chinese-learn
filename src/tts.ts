@@ -1,4 +1,5 @@
 import { Platform } from "react-native";
+import * as Speech from "expo-speech";
 import { Settings } from "./types";
 import type { ResolvedPronunciation } from "./pronunciation";
 import { prepareTtsInput } from "./tts-input";
@@ -61,24 +62,94 @@ const browserProvider: TtsProvider = {
   },
 };
 
+const isChineseVoice = (language: string) => /^zh(?:-|_)/i.test(language);
+const selectVoice = (voices: TtsVoice[], voiceId: string) =>
+  voices.find(({ id }) => id === voiceId) ??
+  voices.find(({ language }) => /^zh-CN$/i.test(language)) ??
+  voices.find(({ language }) => isChineseVoice(language));
+
+let nativeVoices: TtsVoice[] = [];
+let nativeVoicesPromise: Promise<TtsVoice[]> | undefined;
+let nativeSpeechRequest = 0;
+const nativeVoiceListeners = new Set<() => void>();
+
+const loadNativeVoices = () => {
+  if (Platform.OS === "web") return Promise.resolve(nativeVoices);
+  if (!nativeVoicesPromise) {
+    nativeVoicesPromise = Speech.getAvailableVoicesAsync()
+      .then((voices) => {
+        nativeVoices = voices
+          .filter(({ language }) => isChineseVoice(language))
+          .map((voice) => ({
+            id: voice.identifier,
+            name: voice.name,
+            language: voice.language,
+            local: true,
+          }));
+        nativeVoiceListeners.forEach((listener) => listener());
+        return nativeVoices;
+      })
+      .catch(() => nativeVoices);
+  }
+  return nativeVoicesPromise;
+};
+
+const nativeProvider: TtsProvider = {
+  id: "expo-speech",
+  supportsSsml: false,
+  supported: () => Platform.OS !== "web",
+  voices() {
+    void loadNativeVoices();
+    return nativeVoices;
+  },
+  speak(input, settings) {
+    const request = ++nativeSpeechRequest;
+    void loadNativeVoices().then((voices) => {
+      if (request !== nativeSpeechRequest) return;
+      const voice = selectVoice(voices, settings.ttsVoiceURI);
+      const speak = () => {
+        if (request !== nativeSpeechRequest) return;
+        Speech.speak(input, {
+          language: "zh-CN",
+          voice: voice?.id,
+          rate: settings.ttsRate || 0.85,
+        });
+      };
+      void Speech.stop().then(speak, speak);
+    });
+  },
+  stop() {
+    nativeSpeechRequest += 1;
+    void Speech.stop();
+  },
+};
+
 // Add another provider here and expose its id in Settings; callers remain unchanged.
 export const ttsProviders: Record<string, TtsProvider> = {
   browser: browserProvider,
+  "expo-speech": nativeProvider,
 };
-export const getTtsProvider = (settings: Settings) =>
-  ttsProviders[settings.ttsProvider] ?? browserProvider;
+export const getTtsProvider = (settings: Settings) => {
+  if (Platform.OS !== "web") return nativeProvider;
+  const provider = ttsProviders[settings.ttsProvider] ?? browserProvider;
+  return provider.supported() ? provider : browserProvider;
+};
 export const speakMandarin = (pronunciation: ResolvedPronunciation, settings: Settings) => {
   const provider = getTtsProvider(settings);
   const voices = provider.voices();
-  const voice = voices.find(({ id }) => id === settings.ttsVoiceURI)
-    ?? voices.find(({ language }) => /^zh-CN$/i.test(language))
-    ?? voices[0];
+  const voice = selectVoice(voices, settings.ttsVoiceURI);
   const input = prepareTtsInput(pronunciation, voice?.id ?? settings.ttsVoiceURI ?? "");
   provider.speak(provider.supportsSsml ? input.ssml : input.text, settings);
 };
 export const subscribeToVoices = (listener: () => void) => {
-  if (!supported()) return () => {};
-  speechSynthesis.addEventListener?.("voiceschanged", listener);
+  if (Platform.OS === "web") {
+    if (!supported()) return () => {};
+    speechSynthesis.addEventListener?.("voiceschanged", listener);
+    listener();
+    return () => speechSynthesis.removeEventListener?.("voiceschanged", listener);
+  }
+  nativeVoiceListeners.add(listener);
   listener();
-  return () => speechSynthesis.removeEventListener?.("voiceschanged", listener);
+  void loadNativeVoices();
+  return () => nativeVoiceListeners.delete(listener);
 };

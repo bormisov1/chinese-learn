@@ -24,6 +24,7 @@
     "expo": "~54.0.30",
     "expo-image-picker": "~17.0.10",
     "expo-router": "~6.0.21",
+    "expo-speech": "~14.0.8",
     "expo-status-bar": "~3.0.9",
     "opencc-js": "^1.4.2",
     "pako": "^3.0.1",
