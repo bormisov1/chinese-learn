@@ -1,10 +1,9 @@
+import { Platform } from "react-native";
+import { dictionaryAssetUrl } from "./dictionary-url";
 import type { AppLanguage } from "./types";
 import type { ImportedWord } from "./types";
 
 export type Dictionary = Map<string, ImportedWord>;
-const ASSETS: Record<AppLanguage, string> = {
-  en: "/dictionaries/hsk-en.json", ru: "/dictionaries/hsk-ru.json",
-};
 const ASSET_BYTES: Record<AppLanguage, number> = {
   en: 8_854_286,
   ru: 410_405,
@@ -26,9 +25,7 @@ export function cleanDictionaryMeaning(value: string): string {
 }
 
 async function downloadDictionary(language: AppLanguage, onProgress?: (value: number | null) => void): Promise<Dictionary> {
-  const asset = ASSETS[language];
-  if (!asset) throw new Error("Unsupported dictionary language.");
-  const response = await fetch(asset, { credentials: "same-origin", cache: "no-cache" });
+  const response = await fetch(dictionaryAssetUrl(language, Platform.OS), { credentials: "same-origin", cache: "no-cache" });
   if (!response.ok) throw new Error(`Dictionary download failed (${response.status}).`);
   const length = Number(response.headers.get("content-length") || 0);
   if (length > MAX_BYTES[language]) throw new Error("Dictionary file is unexpectedly large.");

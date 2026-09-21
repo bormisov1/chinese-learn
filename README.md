@@ -46,7 +46,7 @@ On first launch the app suggests a supported language from the browser locale an
 
 Word meanings are remembered per language, so custom or dictionary-missing meanings return when the learner switches back. QR restores use their encoded source language and relocalize against the active dictionary.
 
-HSK dictionaries are lazy-loaded from the fixed, same-origin `/dictionaries/hsk-<language>.json` allowlist. The loader rejects oversized and malformed files; a stored language value can never become a download URL. Only the active or explicitly requested target dictionary is loaded. Imports merge by Hanzi while preserving study counters.
+HSK dictionaries are lazy-loaded from the fixed `/dictionaries/hsk-<language>.json` allowlist. Web uses same-origin paths; native uses the deployed HTTPS origin. The loader rejects oversized and malformed files; a stored language value can never become a download URL. Only the active or explicitly requested target dictionary is loaded. Imports merge by Hanzi while preserving study counters.
 
 English meanings come from CC-CEDICT. Russian meanings use the original HSK
 dictionary, normalized aliases for legacy spaced keys, and curated corrections from
