@@ -15,14 +15,25 @@ const cases = [
 ] as const;
 
 for (const [hanzi, supplied, displayed] of cases) {
-  test(`${hanzi}: displayed pinyin and TTS use one resolved reading`, () => {
+  test(`${hanzi}: resolves displayed pinyin and speaks the complete Hanzi expression`, () => {
     const pronunciation = resolvePronunciation({ hanzi, pinyin: supplied, meaning: "test" });
     assert.equal(pronunciation.pinyin, displayed);
     const input = prepareTtsInput(pronunciation, "voice-a");
-    assert.equal(input.text, displayed);
-    assert.match(input.ssml, new RegExp(`alias="${displayed}"`));
+    assert.equal(input.text, hanzi);
+    assert.equal(input.ssml, `<speak version="1.0" xml:lang="zh-CN">${hanzi}</speak>`);
   });
 }
+
+test("TTS never sends Latin pinyin for a word", () => {
+  const input = prepareTtsInput(resolveWordPronunciation({
+    hanzi: "房地产",
+    pinyin: "fáng dì chǎn",
+    russian: "real estate",
+  }), "voice-a");
+  assert.equal(input.text, "房地产");
+  assert.doesNotMatch(input.text, /[a-z]/i);
+  assert.doesNotMatch(input.ssml, /fáng|dì|chǎn/);
+});
 
 test("TTS cache identity includes hanzi, resolved pinyin, and voice", () => {
   clearTtsInputCache();
