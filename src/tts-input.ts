@@ -20,8 +20,8 @@ export function prepareTtsInput(pronunciation: ResolvedPronunciation, voice: str
   if (cached) return cached;
   const input = {
     cacheKey,
-    text: pronunciation.pinyin,
-    ssml: `<speak version="1.0" xml:lang="zh-CN"><sub alias="${escapeXml(pronunciation.pinyin)}">${escapeXml(pronunciation.hanzi)}</sub></speak>`,
+    text: pronunciation.hanzi,
+    ssml: `<speak version="1.0" xml:lang="zh-CN">${escapeXml(pronunciation.hanzi)}</speak>`,
   };
   cache.set(cacheKey, input);
   return input;

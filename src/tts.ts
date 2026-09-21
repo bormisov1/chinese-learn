@@ -44,8 +44,8 @@ const browserProvider: TtsProvider = {
   speak(input, settings) {
     if (!supported()) return;
     speechSynthesis.cancel();
-    // Web Speech does not accept SSML. Speaking the resolved pinyin still
-    // preserves the chosen reading instead of making the engine infer hanzi.
+    // Chinese voices must receive the complete Hanzi expression. Supplying
+    // Latin pinyin can make engines spell its letters before saying the word.
     const utterance = new SpeechSynthesisUtterance(input);
     const voices = speechSynthesis.getVoices();
     const voice =
@@ -110,7 +110,7 @@ const nativeProvider: TtsProvider = {
       const speak = () => {
         if (request !== nativeSpeechRequest) return;
         Speech.speak(input, {
-          language: "zh-CN",
+          language: voice?.language || "zh-CN",
           voice: voice?.id,
           rate: settings.ttsRate || 0.85,
         });
