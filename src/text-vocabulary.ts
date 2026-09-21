@@ -1,6 +1,6 @@
 import OpenCC from "opencc-js/t2cn";
 import type { Dictionary } from "./dictionary";
-import type { ImportedWord } from "./ocr";
+import type { ImportedWord } from "./types";
 
 type Match = { words: ImportedWord[]; matchedCharacters: number; wordLengths: number[] };
 const toSimplifiedChinese = OpenCC.Converter({ from: "tw", to: "cn" });

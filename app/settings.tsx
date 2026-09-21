@@ -25,7 +25,7 @@ import { router } from "expo-router";
 import { Settings as SettingsData, Word } from "@/types";
 import { validateApiKey } from "@/deepseek";
 import { getActivePoolQueue } from "@/card-srs";
-import { ImportedWord } from "@/ocr";
+import { ImportedWord } from "@/types";
 import hskLevels from "@/data/hsk-levels.json";
 import {
   getTtsProvider,

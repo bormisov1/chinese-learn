@@ -1,5 +1,5 @@
 import type { AppLanguage } from "./types";
-import type { ImportedWord } from "./ocr";
+import type { ImportedWord } from "./types";
 
 export type Dictionary = Map<string, ImportedWord>;
 const ASSETS: Record<AppLanguage, string> = {

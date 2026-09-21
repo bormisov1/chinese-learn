@@ -12,7 +12,7 @@ Updated: 2026-09-20
 5. **Soft deletion.** Tombstones replicate for 400 days. Hard deletion occurs only in verified privacy erasure, after a 30-day recovery window.
 6. **One account, linked identities.** Telegram, Google (including consumer Gmail accounts), and verified email/password identities link to an opaque user UUID. Email is not an account key.
 7. **Secrets stay local.** API keys, provider tokens, password material, and raw identity payloads never enter sync or analytics.
-8. **Content-free analytics.** Never send words, sentences, translations, answers, OCR/clipboard contents, filenames, or API keys. Import metrics are method and counts only.
+8. **Content-free analytics.** Never send words, sentences, translations, answers, clipboard contents, filenames, or API keys. Import metrics are method and counts only.
 
 ## 2. Context and deployment shape
 
@@ -282,7 +282,7 @@ Common fields: event ID, name, time, session ID, HMAC-pseudonymous install/user 
 | login_started/succeeded/failed | method telegram/google/password, is_link, bounded failure_class |
 | language_chosen | language, onboarding/settings, suggested_match |
 | word_addition_mode_chosen | manual/automatic, onboarding/settings |
-| import_completed | typed/paste/ocr/hsk/qr, word_count, sentence_count, duplicate_count, duration bucket; **never content** |
+| import_completed | typed/paste/hsk/qr, word_count, sentence_count, duplicate_count, duration bucket; **never content** |
 | mode_entered | cards/sentences/listening/mix, bounded entry_point |
 | card_answered | correct, SRS level before/after, latency bucket, cards/mix |
 | sentence_answered | correct, direction, latency bucket, sentences/listening/mix; no answer/ID |
@@ -301,7 +301,7 @@ Controls:
 - TLS 1.2+, HSTS, CSRF, CSP, exact CORS, request depth/size/rate limits, parameterized SQL, output encoding, dependency/container scanning.
 - Ownership only from session; strict UUID/length/range/enum checks. Database private. Least-privilege RBAC, JIT audited production access, secrets manager, signed artifacts/SBOM.
 - KMS envelope encryption for DB/backups; keys separated by environment and rotated.
-- Logs: request ID, route template, status, duration, byte counts, pseudonyms only. Never bodies, headers/tokens, email, learning content, OCR/clipboard, keys. Automated redaction canaries.
+- Logs: request ID, route template, status, duration, byte counts, pseudonyms only. Never bodies, headers/tokens, email, learning content, clipboard contents, keys. Automated redaction canaries.
 - Export/correction/unlink/deletion workflows. Delete disables login then queues purge after a reversible 30-day period; minimize separately retained security audit data.
 
 ## 9. Observability and operations
