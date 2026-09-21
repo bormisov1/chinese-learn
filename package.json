@@ -21,12 +21,10 @@
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "2.2.0",
-    "@zxing/browser": "^0.2.1",
     "expo": "~54.0.30",
     "expo-image-picker": "~17.0.10",
     "expo-router": "~6.0.21",
     "expo-status-bar": "~3.0.9",
-    "jsqr": "^1.4.0",
     "opencc-js": "^1.4.2",
     "pako": "^3.0.1",
     "qrcode": "^1.5.4",

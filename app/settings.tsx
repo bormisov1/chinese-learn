@@ -339,7 +339,7 @@ export default function Settings() {
           <View style={{ flex: 1 }}>
             <Text style={styles.privacyTitle}>Other import options</Text>
             <Text style={styles.help}>
-              Add words from screenshots or restore a QR backup.
+              Add words from screenshots or Chinese text.
             </Text>
           </View>
           <Button
