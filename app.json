@@ -6,7 +6,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "plugins": ["expo-router", ["expo-image-picker", { "photosPermission": "Choose vocabulary screenshots to import." }]],
+    "plugins": ["expo-router"],
     "web": { "bundler": "metro", "output": "single" }
   }
 }
