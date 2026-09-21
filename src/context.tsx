@@ -8,7 +8,7 @@ import { replenishAutomaticWords } from './hsk-vocabulary';
 import { Dictionary, loadDictionary } from './dictionary';
 import { refreshWords, switchStoreLanguage } from './language';
 
-type Context = { data: StoreData; ready: boolean; generating: boolean; error: string; dictionary: Dictionary | null; dictionaryLoading: boolean; dictionaryError: string; dictionaryProgress: number | null; switchingLanguage: AppLanguage | null; selectLanguage: (language: AppLanguage) => Promise<boolean>; retryDictionary: () => void; importWords: (items: ImportedWord[]) => number; importWordBackup: (items: Omit<Word, 'id'>[], sourceLanguage: AppLanguage) => number; patch: (fn: (data: StoreData) => StoreData) => void; setAutomaticWordAddition: (enabled: boolean, completeOnboarding?: boolean) => void; generateBatch: (mandatory?: Word) => Promise<void> };
+type Context = { data: StoreData; ready: boolean; generating: boolean; error: string; dictionary: Dictionary | null; dictionaryLoading: boolean; dictionaryError: string; dictionaryProgress: number | null; switchingLanguage: AppLanguage | null; selectLanguage: (language: AppLanguage) => Promise<boolean>; retryDictionary: () => void; importWords: (items: ImportedWord[]) => number; patch: (fn: (data: StoreData) => StoreData) => void; setAutomaticWordAddition: (enabled: boolean, completeOnboarding?: boolean) => void; generateBatch: (mandatory?: Word) => Promise<void> };
 const StoreContext = createContext<Context>(null as never);
 const id = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -91,22 +91,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (fresh.length) setData(d => ({ ...d, words: fillActivePool([...d.words, ...fresh.map(w => ({ ...w, translationByLanguage: { [d.settings.language]: w.russian }, id: id(), exampleCount: 0, wordShownCount: 0, createdAt: Date.now(), srsLevel: 0, srsCorrect: 0, srsIncorrect: 0, srsDueAt: 0, cardSrsLevel: 0, cardSrsCorrect: 0, cardSrsIncorrect: 0, cardSrsDueAt: 0, cardLapses: 0 }))], Date.now(), d.cardRound) }));
     return fresh.length;
   };
-  const importWordBackup = (items: Omit<Word, 'id'>[], sourceLanguage: AppLanguage) => {
-    if (!dictionary && sourceLanguage !== data.settings.language) throw new Error('Current-language dictionary must finish loading before restoring this backup.');
-    setData(d => {
-      const localized = items.map(w => {
-        const active = dictionary?.get(w.hanzi);
-        const translationByLanguage = { ...w.translationByLanguage, [sourceLanguage]: w.russian };
-        if (active) return { ...w, pinyin: active.pinyin, russian: active.russian, translationByLanguage: { ...translationByLanguage, [d.settings.language]: active.russian } };
-        return { ...w, russian: translationByLanguage[d.settings.language] ?? '', translationByLanguage };
-      });
-      const incoming = new Map(localized.map(w => [w.hanzi, w]));
-      const words = d.words.map(w => incoming.has(w.hanzi) ? { ...incoming.get(w.hanzi)!, translationByLanguage: { ...w.translationByLanguage, ...incoming.get(w.hanzi)!.translationByLanguage }, id: w.id } : w);
-      const existing = new Set(words.map(w => w.hanzi));
-      return { ...d, words: fillActivePool([...words, ...localized.filter(w => !existing.has(w.hanzi)).map(w => ({ ...w, id: id() }))], Date.now(), d.cardRound) };
-    });
-    return items.length;
-  };
   const generateBatch = async (mandatory?: Word) => {
     if (generating || !data.words.length) return;
     const language = data.settings.language;
@@ -128,7 +112,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       });
     } catch (e) { if (languageRef.current === language) setError(e instanceof Error ? e.message : 'Generation failed'); } finally { setGenerating(false); }
   };
-  const value = useMemo(() => ({ data, ready, generating, error, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, selectLanguage, retryDictionary, importWords, importWordBackup, patch, setAutomaticWordAddition, generateBatch }), [data, ready, generating, error, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage]);
+  const value = useMemo(() => ({ data, ready, generating, error, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, selectLanguage, retryDictionary, importWords, patch, setAutomaticWordAddition, generateBatch }), [data, ready, generating, error, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage]);
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
 export const useStore = () => useContext(StoreContext);
