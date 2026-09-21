@@ -483,7 +483,7 @@ function SwipeableGraduation({
       }),
       Animated.delay(650),
       Animated.timing(swipeHint, {
-        toValue: -20,
+        toValue: 20,
         duration: 280,
         useNativeDriver: true,
       }),
@@ -511,12 +511,12 @@ function SwipeableGraduation({
       else continuing.current = false;
     });
   };
-  const revealReplacement = () => {
+  const revealReplacement = (direction: number) => {
     if (continuing.current) return;
     continuing.current = true;
     swipeHint.stopAnimation();
     Animated.timing(swipe, {
-      toValue: { x: -520, y: 0 },
+      toValue: { x: direction * 520, y: 0 },
       duration: 180,
       useNativeDriver: true,
     }).start(({ finished }) => {
@@ -543,8 +543,12 @@ function SwipeableGraduation({
       swipe.setValue({ x: gesture.dx, y: gesture.dy });
     },
     onPanResponderRelease: (_, gesture) => {
-      if (graduation.replacement && !showingReplacement && gesture.dx < -100) {
-        revealReplacement();
+      if (
+        graduation.replacement &&
+        !showingReplacement &&
+        Math.abs(gesture.dx) > 100
+      ) {
+        revealReplacement(gesture.dx < 0 ? -1 : 1);
       } else if (
         (!graduation.replacement || showingReplacement) &&
         Math.abs(gesture.dx) > 100
@@ -581,7 +585,7 @@ function SwipeableGraduation({
         accessibilityLabel={showingReplacement
           ? "New word in the active pool. Swipe any direction to continue"
           : graduation.replacement
-            ? "Word learned. Swipe left to see the new active pool word"
+            ? "Word learned. Swipe either direction to see the new active pool word"
             : "Word learned. Swipe any direction to continue"}
         accessibilityActions={[{
           name: "activate",
@@ -590,7 +594,7 @@ function SwipeableGraduation({
             : "Continue",
         }]}
         onAccessibilityAction={() => {
-          if (graduation.replacement && !showingReplacement) revealReplacement();
+          if (graduation.replacement && !showingReplacement) revealReplacement(1);
           else continueInDirection(1);
         }}
         style={[
@@ -628,7 +632,7 @@ function SwipeableGraduation({
       </Animated.View>
       <Text style={styles.graduationSwipeHint}>
         {graduation.replacement && !showingReplacement
-          ? "← Swipe left to meet the new active word"
+          ? "← Swipe either direction to meet the new active word →"
           : "← Swipe any direction to continue →"}
       </Text>
     </>
