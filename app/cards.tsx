@@ -464,7 +464,41 @@ function SwipeableGraduation({
   onContinue: () => void;
 }) {
   const swipe = useRef(new Animated.ValueXY()).current;
+  const swipeHint = useRef(new Animated.Value(0)).current;
   const continuing = useRef(false);
+  const [showingReplacement, setShowingReplacement] = useState(false);
+  useEffect(() => {
+    if (!graduation.replacement || showingReplacement) return;
+    const animation = Animated.sequence([
+      Animated.delay(450),
+      Animated.timing(swipeHint, {
+        toValue: -20,
+        duration: 280,
+        useNativeDriver: true,
+      }),
+      Animated.timing(swipeHint, {
+        toValue: 0,
+        duration: 360,
+        useNativeDriver: true,
+      }),
+      Animated.delay(650),
+      Animated.timing(swipeHint, {
+        toValue: -20,
+        duration: 280,
+        useNativeDriver: true,
+      }),
+      Animated.timing(swipeHint, {
+        toValue: 0,
+        duration: 360,
+        useNativeDriver: true,
+      }),
+    ]);
+    animation.start();
+    return () => {
+      animation.stop();
+      swipeHint.setValue(0);
+    };
+  }, [graduation.replacement?.id, showingReplacement]);
   const continueInDirection = (direction: number) => {
     if (continuing.current) return;
     continuing.current = true;
@@ -477,17 +511,44 @@ function SwipeableGraduation({
       else continuing.current = false;
     });
   };
+  const revealReplacement = () => {
+    if (continuing.current) return;
+    continuing.current = true;
+    swipeHint.stopAnimation();
+    Animated.timing(swipe, {
+      toValue: { x: -520, y: 0 },
+      duration: 180,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (!finished) {
+        continuing.current = false;
+        return;
+      }
+      swipe.setValue({ x: 0, y: 0 });
+      setShowingReplacement(true);
+      continuing.current = false;
+    });
+  };
   const panResponder = PanResponder.create({
     onMoveShouldSetPanResponder: (_, gesture) =>
       Math.hypot(gesture.dx, gesture.dy) > 8,
     onMoveShouldSetPanResponderCapture: (_, gesture) =>
       Math.hypot(gesture.dx, gesture.dy) > 8,
-    onPanResponderGrant: () => swipe.stopAnimation(),
+    onPanResponderGrant: () => {
+      swipeHint.stopAnimation();
+      swipeHint.setValue(0);
+      swipe.stopAnimation();
+    },
     onPanResponderMove: (_, gesture) => {
       swipe.setValue({ x: gesture.dx, y: gesture.dy });
     },
     onPanResponderRelease: (_, gesture) => {
-      if (Math.abs(gesture.dx) > 100) {
+      if (graduation.replacement && !showingReplacement && gesture.dx < -100) {
+        revealReplacement();
+      } else if (
+        (!graduation.replacement || showingReplacement) &&
+        Math.abs(gesture.dx) > 100
+      ) {
         continueInDirection(gesture.dx < 0 ? -1 : 1);
       } else {
         Animated.spring(swipe, {
@@ -517,14 +578,26 @@ function SwipeableGraduation({
         {...panResponder.panHandlers}
         accessible
         accessibilityRole="button"
-        accessibilityLabel="Word learned. Swipe any direction to continue"
-        accessibilityActions={[{ name: "activate", label: "Continue" }]}
-        onAccessibilityAction={() => continueInDirection(1)}
+        accessibilityLabel={showingReplacement
+          ? "New word in the active pool. Swipe any direction to continue"
+          : graduation.replacement
+            ? "Word learned. Swipe left to see the new active pool word"
+            : "Word learned. Swipe any direction to continue"}
+        accessibilityActions={[{
+          name: "activate",
+          label: graduation.replacement && !showingReplacement
+            ? "Show new active pool word"
+            : "Continue",
+        }]}
+        onAccessibilityAction={() => {
+          if (graduation.replacement && !showingReplacement) revealReplacement();
+          else continueInDirection(1);
+        }}
         style={[
           webDragSurface,
           {
             transform: [
-              { translateX: swipe.x },
+              { translateX: Animated.add(swipe.x, swipeHint) },
               { translateY: swipe.y },
               {
                 rotate: swipe.x.interpolate({
@@ -537,14 +610,26 @@ function SwipeableGraduation({
           },
         ]}
       >
-        <GraduationCelebration
-          graduation={graduation}
-          settings={settings}
-          swipeTintOpacity={tintOpacity}
-        />
+        {showingReplacement && graduation.replacement ? (
+          <ActivePoolCard
+            word={graduation.replacement}
+            settings={settings}
+            swipeTintOpacity={tintOpacity}
+          />
+        ) : (
+          <GraduationCelebration
+            graduation={graduation}
+            settings={settings}
+            showPoolUpdate={!graduation.replacement}
+            standalone
+            swipeTintOpacity={graduation.replacement ? undefined : tintOpacity}
+          />
+        )}
       </Animated.View>
       <Text style={styles.graduationSwipeHint}>
-        ← Swipe any direction to continue →
+        {graduation.replacement && !showingReplacement
+          ? "← Swipe left to meet the new active word"
+          : "← Swipe any direction to continue →"}
       </Text>
     </>
   );
@@ -554,11 +639,15 @@ function GraduationCelebration({
   graduation,
   settings,
   compact = false,
+  showPoolUpdate = true,
+  standalone = false,
   swipeTintOpacity,
 }: {
   graduation: Graduation;
   settings: Settings;
   compact?: boolean;
+  showPoolUpdate?: boolean;
+  standalone?: boolean;
   swipeTintOpacity?: Animated.AnimatedInterpolation<number>;
 }) {
   const learned = resolveWordPronunciation(
@@ -572,7 +661,11 @@ function GraduationCelebration({
       )
     : undefined;
   return (
-    <View style={[styles.celebration, compact && styles.celebrationCompact]}>
+    <View style={[
+      styles.celebration,
+      compact && styles.celebrationCompact,
+      standalone && styles.celebrationStandalone,
+    ]}>
       {swipeTintOpacity ? (
         <Animated.View
           pointerEvents="none"
@@ -592,7 +685,7 @@ function GraduationCelebration({
       <Text style={styles.learnedPinyin}>{learned.pinyin}</Text>
       <Text style={styles.learnedRussian}>{learned.meaning}</Text>
       <WordGuessStats word={graduation.learned} />
-      {graduation.replacement && replacement ? (
+      {showPoolUpdate && graduation.replacement && replacement ? (
         <View
           style={[
             styles.replacement,
@@ -624,9 +717,52 @@ function GraduationCelebration({
           </Text>
           <WordGuessStats word={graduation.replacement} />
         </View>
-      ) : (
+      ) : showPoolUpdate ? (
         <Text style={styles.deckComplete}>No queued word is waiting to replace it.</Text>
-      )}
+      ) : null}
+    </View>
+  );
+}
+
+function ActivePoolCard({
+  word,
+  settings,
+  swipeTintOpacity,
+}: {
+  word: Word;
+  settings: Settings;
+  swipeTintOpacity: Animated.AnimatedInterpolation<number>;
+}) {
+  const pronunciation = resolveWordPronunciation(
+    word,
+    displayTranslation(word.russian, settings.language),
+  );
+  return (
+    <View
+      style={[
+        styles.celebration,
+        styles.celebrationStandalone,
+        styles.activePoolCard,
+      ]}
+    >
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.correctSwipeTint, { opacity: swipeTintOpacity }]}
+      />
+      <Text style={styles.replacementLabel}>NEW IN THE ACTIVE POOL</Text>
+      <Text style={styles.confetti}>👀</Text>
+      <Text style={styles.learnTitle}>LEARN</Text>
+      <View style={styles.graduationWordRow}>
+        <Text style={styles.learnedHanzi}>{pronunciation.hanzi}</Text>
+        <SpeakerButton
+          pronunciation={pronunciation}
+          settings={settings}
+          size={24}
+        />
+      </View>
+      <Text style={styles.learnedPinyin}>{pronunciation.pinyin}</Text>
+      <Text style={styles.learnedRussian}>{pronunciation.meaning}</Text>
+      <WordGuessStats word={word} />
     </View>
   );
 }
@@ -709,6 +845,11 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   celebrationCompact: { padding: 20 },
+  celebrationStandalone: { minHeight: 360, justifyContent: "center" },
+  activePoolCard: {
+    backgroundColor: "#EAF6FF",
+    borderColor: "#B9DDF5",
+  },
   graduationSwipeHint: {
     color: colors.muted,
     fontSize: 13,
