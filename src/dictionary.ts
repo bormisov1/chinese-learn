@@ -1,7 +1,7 @@
 import { Platform } from "react-native";
 import { dictionaryAssetUrl } from "./dictionary-url";
 import type { AppLanguage } from "./types";
-import type { ImportedWord } from "./ocr";
+import type { ImportedWord } from "./types";
 
 export type Dictionary = Map<string, ImportedWord>;
 const ASSET_BYTES: Record<AppLanguage, number> = {

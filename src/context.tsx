@@ -1,8 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { generate, translateWords } from './deepseek';
 import { emptyStore, loadStore, saveStore } from './storage';
-import { AppLanguage, StoreData, Word } from './types';
-import { ImportedWord } from './ocr';
+import { AppLanguage, ImportedWord, StoreData, Word } from './types';
 import { fillActivePool } from './card-srs';
 import { replenishAutomaticWords } from './hsk-vocabulary';
 import { Dictionary, loadDictionary } from './dictionary';

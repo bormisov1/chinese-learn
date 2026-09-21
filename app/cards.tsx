@@ -578,58 +578,75 @@ function SwipeableGraduation({
   });
   return (
     <>
-      <Animated.View
-        {...panResponder.panHandlers}
-        accessible
-        accessibilityRole="button"
-        accessibilityLabel={showingReplacement
-          ? "New word in the active pool. Swipe any direction to continue"
-          : graduation.replacement
-            ? "Word learned. Swipe either direction to see the new active pool word"
-            : "Word learned. Swipe any direction to continue"}
-        accessibilityActions={[{
-          name: "activate",
-          label: graduation.replacement && !showingReplacement
-            ? "Show new active pool word"
-            : "Continue",
-        }]}
-        onAccessibilityAction={() => {
-          if (graduation.replacement && !showingReplacement) revealReplacement(1);
-          else continueInDirection(1);
-        }}
-        style={[
-          webDragSurface,
-          {
-            transform: [
-              { translateX: Animated.add(swipe.x, swipeHint) },
-              { translateY: swipe.y },
-              {
-                rotate: swipe.x.interpolate({
-                  inputRange: [-240, 0, 240],
-                  outputRange: ["-8deg", "0deg", "8deg"],
-                  extrapolate: "clamp",
-                }),
-              },
-            ],
-          },
-        ]}
-      >
-        {showingReplacement && graduation.replacement ? (
-          <ActivePoolCard
-            word={graduation.replacement}
-            settings={settings}
-            swipeTintOpacity={tintOpacity}
-          />
-        ) : (
-          <GraduationCelebration
-            graduation={graduation}
-            settings={settings}
-            showPoolUpdate={!graduation.replacement}
-            standalone
-            swipeTintOpacity={graduation.replacement ? undefined : tintOpacity}
-          />
-        )}
-      </Animated.View>
+      <View style={styles.graduationStack}>
+        {graduation.replacement && !showingReplacement ? (
+          <View
+            accessible={false}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            pointerEvents="none"
+            style={styles.graduationUnderlay}
+          >
+            <ActivePoolCard
+              word={graduation.replacement}
+              settings={settings}
+            />
+          </View>
+        ) : null}
+        <Animated.View
+          {...panResponder.panHandlers}
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel={showingReplacement
+            ? "New word in the active pool. Swipe any direction to continue"
+            : graduation.replacement
+              ? "Word learned. Swipe either direction to see the new active pool word"
+              : "Word learned. Swipe any direction to continue"}
+          accessibilityActions={[{
+            name: "activate",
+            label: graduation.replacement && !showingReplacement
+              ? "Show new active pool word"
+              : "Continue",
+          }]}
+          onAccessibilityAction={() => {
+            if (graduation.replacement && !showingReplacement) revealReplacement(1);
+            else continueInDirection(1);
+          }}
+          style={[
+            webDragSurface,
+            styles.graduationTopCard,
+            {
+              transform: [
+                { translateX: Animated.add(swipe.x, swipeHint) },
+                { translateY: swipe.y },
+                {
+                  rotate: swipe.x.interpolate({
+                    inputRange: [-240, 0, 240],
+                    outputRange: ["-8deg", "0deg", "8deg"],
+                    extrapolate: "clamp",
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          {showingReplacement && graduation.replacement ? (
+            <ActivePoolCard
+              word={graduation.replacement}
+              settings={settings}
+              swipeTintOpacity={tintOpacity}
+            />
+          ) : (
+            <GraduationCelebration
+              graduation={graduation}
+              settings={settings}
+              showPoolUpdate={!graduation.replacement}
+              standalone
+              swipeTintOpacity={graduation.replacement ? undefined : tintOpacity}
+            />
+          )}
+        </Animated.View>
+      </View>
       <Text style={styles.graduationSwipeHint}>
         {graduation.replacement && !showingReplacement
           ? "← Swipe either direction to meet the new active word →"
@@ -735,7 +752,7 @@ function ActivePoolCard({
 }: {
   word: Word;
   settings: Settings;
-  swipeTintOpacity: Animated.AnimatedInterpolation<number>;
+  swipeTintOpacity?: Animated.AnimatedInterpolation<number>;
 }) {
   const pronunciation = resolveWordPronunciation(
     word,
@@ -749,10 +766,12 @@ function ActivePoolCard({
         styles.activePoolCard,
       ]}
     >
-      <Animated.View
-        pointerEvents="none"
-        style={[styles.correctSwipeTint, { opacity: swipeTintOpacity }]}
-      />
+      {swipeTintOpacity ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.correctSwipeTint, { opacity: swipeTintOpacity }]}
+        />
+      ) : null}
       <Text style={styles.replacementLabel}>NEW IN THE ACTIVE POOL</Text>
       <Text style={styles.confetti}>👀</Text>
       <Text style={styles.learnTitle}>LEARN</Text>
@@ -854,6 +873,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#EAF6FF",
     borderColor: "#B9DDF5",
   },
+  graduationStack: { position: "relative" },
+  graduationUnderlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  graduationTopCard: { zIndex: 1 },
   graduationSwipeHint: {
     color: colors.muted,
     fontSize: 13,
