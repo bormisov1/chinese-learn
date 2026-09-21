@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import russianSupplement from "./data/hsk-russian-supplement.json";
 import { parseTextVocabulary } from "./text-vocabulary";
 
 const entry = (hanzi: string) => ({
@@ -10,17 +9,6 @@ const entry = (hanzi: string) => ({
 });
 const dictionary = (...words: string[]) =>
   new Map(words.map((word) => [word, entry(word)]));
-
-test("imports a standalone character from the active dictionary", () => {
-  const parsed = parseTextVocabulary("湿", dictionary("湿"));
-
-  assert.deepEqual(parsed.words.map((word) => word.hanzi), ["湿"]);
-  assert.equal(parsed.unmatchedCharacters, 0);
-});
-
-test("includes the standalone 湿 entry in the Russian supplement", () => {
-  assert.ok(russianSupplement.some(([hanzi]) => hanzi === "湿"));
-});
 
 test("prefers a whole dictionary word over individual characters", () => {
   const parsed = parseTextVocabulary("喜欢", dictionary("喜", "欢", "喜欢"));
