@@ -19,7 +19,7 @@
 <article class="card"><h3><span class="num">3</span>Immutable facts</h3><p>Reviews/attempts are deduplicated events; SRS and counters are repairable projections.</p></article>
 <article class="card"><h3><span class="num">4</span>Deterministic merge</h3><p>HLC, device, and mutation IDs form total order; identical inputs always converge.</p></article>
 <article class="card"><h3><span class="num">5</span>Soft deletion</h3><p>Tombstones replicate 400 days. Hard deletion only through verified privacy erasure.</p></article>
-<article class="card"><h3><span class="num">6</span>Content-free metrics</h3><p>No words, sentences, answers, OCR/clipboard content, filenames, or secrets.</p></article>
+<article class="card"><h3><span class="num">6</span>Content-free metrics</h3><p>No words, sentences, answers, clipboard content, filenames, or secrets.</p></article>
 </div><div class="callout ok"><strong>Safety invariant:</strong> logout, account switching, sync reset, expired cursor, migration failure, and backend outage never silently delete local data.</div></section>
 
 <section id="c4"><div class="eyebrow">02 · C4 level 1</div><h2>System context</h2>
@@ -179,7 +179,7 @@ DELETE /v1/account</pre></article></div>
 <tr><td><code>login_started</code> / <code>login_succeeded</code> / <code>login_failed</code></td><td>telegram/google/password, is_link, bounded failure_class</td></tr>
 <tr><td><code>language_chosen</code></td><td>language, onboarding/settings, suggested_match</td></tr>
 <tr><td><code>word_addition_mode_chosen</code></td><td>manual/automatic, onboarding/settings</td></tr>
-<tr><td><code>import_completed</code></td><td>typed/paste/ocr/hsk/qr, word/sentence/duplicate counts, duration bucket; <strong>never words/text/image/name</strong></td></tr>
+<tr><td><code>import_completed</code></td><td>typed/paste/hsk/qr, word/sentence/duplicate counts, duration bucket; <strong>never words/text/image/name</strong></td></tr>
 <tr><td><code>mode_entered</code></td><td>cards/sentences/listening/mix, bounded entry point</td></tr>
 <tr><td><code>card_answered</code></td><td>correct, SRS before/after, latency bucket, cards/mix</td></tr>
 <tr><td><code>sentence_answered</code></td><td>correct, direction, latency bucket, sentences/listening/mix; no answer/ID</td></tr>
@@ -192,7 +192,7 @@ DELETE /v1/account</pre></article></div>
 <article class="card"><h3>Application</h3><p>TLS 1.2+, HSTS, exact CORS, CSRF, CSP, size/depth/rate limits, parameterized SQL, output encoding, supply-chain scanning.</p></article>
 <article class="card"><h3>Secrets</h3><p>Managed secrets/KMS, environment-separated rotating keys, envelope-encrypted DB/backups, audited break-glass.</p></article>
 <article class="card"><h3>Authorization</h3><p>User only from session; strict UUID/range/enum schema. Private DB, least-privilege RBAC, JIT audited production access.</p></article>
-<article class="card"><h3>Safe logs</h3><p>Request ID, route template, status, latency, bytes, pseudonyms. Never body, token, email, word/sentence/answer/OCR/clipboard/key.</p></article>
+<article class="card"><h3>Safe logs</h3><p>Request ID, route template, status, latency, bytes, pseudonyms. Never body, token, email, word/sentence/answer/clipboard/key.</p></article>
 <article class="card"><h3>Privacy lifecycle</h3><p>Export, correct, unlink, delete. Disable login, reversible 30-day deletion window, scheduled purge and minimized audits.</p></article>
 <article class="card"><h3>Abuse defense</h3><p>Enumeration resistance; IP/account/device throttle; OAuth CSRF/replay defense; refresh reuse detection.</p></article>
 </div></section>

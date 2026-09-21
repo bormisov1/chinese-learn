@@ -1,6 +1,6 @@
 import { Evaluation, Explanation, Sentence, Settings, Word } from './types';
 import type { AppLanguage } from './types';
-import type { ImportedWord } from './ocr';
+import type { ImportedWord } from './types';
 import { evaluateChinesePrompt, evaluatePrompt, explainPrompt, generatePrompt, translateWordsPrompt } from './prompts';
 import { resolveContextualPinyin, resolveSentencePronunciation } from './pronunciation';
 
