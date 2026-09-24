@@ -9,5 +9,6 @@ const NATIVE_ASSET_ORIGIN = "https://zh.x.bormisov.com";
 export function dictionaryAssetUrl(language: AppLanguage, platform: string): string {
   const path = ASSET_PATHS[language];
   if (!path) throw new Error("Unsupported dictionary language.");
-  return platform === "web" ? path : `${NATIVE_ASSET_ORIGIN}${path}`;
+  if (platform === "web") return path;
+  return new URL(path, `${NATIVE_ASSET_ORIGIN}/`).toString();
 }
