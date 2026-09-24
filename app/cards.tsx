@@ -45,6 +45,7 @@ export default function Cards() {
     [graduations, setGraduations] = useState<Graduation[]>([]),
     [roundEndsAfterCelebration, setRoundEndsAfterCelebration] = useState(false);
   const swipe = useRef(new Animated.ValueXY()).current;
+  const cardRotation = useRef(new Animated.Value(0)).current;
   const total = data.words.length;
   const translationLanguage = LANGUAGES.find(item => item.code === data.settings.language)?.label.toUpperCase() ?? "ENGLISH";
   const upcoming = useMemo(
@@ -102,6 +103,7 @@ export default function Cards() {
     setFlipped(false);
     setExamplesExpanded(false);
     swipe.setValue({ x: 0, y: 0 });
+    cardRotation.setValue(0);
     setPhase("studying");
   };
   const startRound = () => begin(upcoming, data.cardRound + 1);
@@ -147,6 +149,7 @@ export default function Cards() {
     setFlipped(false);
     setExamplesExpanded(false);
     swipe.setValue({ x: 0, y: 0 });
+    cardRotation.setValue(0);
   };
   const continueAfterCelebration = () => {
     if (roundEndsAfterCelebration) setPhase("complete");
@@ -163,20 +166,40 @@ export default function Cards() {
       useNativeDriver: true,
     }).start(() => grade(correct));
   };
+  const flipCard = (nextFlipped: boolean) => {
+    if (nextFlipped === flipped) return;
+    const target = nextFlipped ? 180 : 0;
+    Animated.timing(cardRotation, {
+      toValue: 90,
+      duration: 160,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (!finished) return;
+      setFlipped(nextFlipped);
+      Animated.timing(cardRotation, {
+        toValue: target,
+        duration: 160,
+        useNativeDriver: true,
+      }).start();
+    });
+  };
   const panResponder = PanResponder.create({
     onMoveShouldSetPanResponder: (_, gesture) =>
-      flipped &&
       Math.hypot(gesture.dx, gesture.dy) > 8,
     onMoveShouldSetPanResponderCapture: (_, gesture) =>
-      flipped &&
       Math.hypot(gesture.dx, gesture.dy) > 8,
     onPanResponderGrant: () => swipe.stopAnimation(),
     onPanResponderMove: (_, gesture) => {
-      swipe.setValue({ x: gesture.dx, y: gesture.dy });
+      if (flipped) swipe.setValue({ x: gesture.dx, y: gesture.dy });
     },
     onPanResponderRelease: (_, gesture) => {
-      if (gesture.dx > 100) finishSwipe(true);
+      if (!flipped) flipCard(true);
+      else if (gesture.dx > 100) finishSwipe(true);
       else if (gesture.dx < -100) finishSwipe(false);
+      else if (Math.abs(gesture.dy) > 100) {
+        swipe.setValue({ x: 0, y: 0 });
+        flipCard(false);
+      }
       else
         Animated.spring(swipe, {
           toValue: { x: 0, y: 0 },
@@ -315,13 +338,15 @@ export default function Cards() {
           webDragSurface,
           {
             transform: [
-              { translateX: swipe.x },
-              { translateY: swipe.y },
+              { translateX: flipped ? swipe.x : 0 },
+              { translateY: flipped ? swipe.y : 0 },
               {
-                rotate: swipe.x.interpolate({
-                  inputRange: [-240, 0, 240],
-                  outputRange: ["-8deg", "0deg", "8deg"],
-                  extrapolate: "clamp",
+                perspective: 1000,
+              },
+              {
+                rotateY: cardRotation.interpolate({
+                  inputRange: [0, 180],
+                  outputRange: ["0deg", "180deg"],
                 }),
               },
             ],
@@ -357,6 +382,7 @@ export default function Cards() {
               },
             ]}
           />
+          <View style={[styles.cardContent, flipped && styles.cardContentBack]}>
           {!flipped ? (
             <>
               <Text style={styles.side}>{translationLanguage}</Text>
@@ -448,6 +474,7 @@ export default function Cards() {
               <Text style={styles.swipeHint}>← Wrong · Right →</Text>
             </>
           )}
+          </View>
         </Pressable>
       </Animated.View>
     </ScrollView>
@@ -1027,6 +1054,8 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
   },
+  cardContent: { width: "100%", alignItems: "center" },
+  cardContentBack: { transform: [{ rotateY: "180deg" }] },
   back: { justifyContent: "flex-start", paddingTop: 50, paddingBottom: 58 },
   correctSwipeTint: {
     ...StyleSheet.absoluteFillObject,
