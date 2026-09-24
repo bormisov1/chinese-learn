@@ -4,9 +4,35 @@
     "slug": "hanzi-deck",
     "scheme": "hanzideck",
     "version": "1.0.0",
+    "icon": "./assets/icon.png",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "plugins": ["expo-router"],
-    "web": { "bundler": "metro", "output": "single" }
+    "ios": {
+      "bundleIdentifier": "com.bormisov.hanzideck",
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Choose vocabulary screenshots to import."
+        }
+      ],
+      "expo-font"
+    ],
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "e1f3bc6b-2f84-4b20-8b1a-3511c1341559"
+      }
+    }
   }
 }

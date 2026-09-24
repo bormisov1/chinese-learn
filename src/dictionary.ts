@@ -25,7 +25,11 @@ export function cleanDictionaryMeaning(value: string): string {
 }
 
 async function downloadDictionary(language: AppLanguage, onProgress?: (value: number | null) => void): Promise<Dictionary> {
-  const response = await fetch(dictionaryAssetUrl(language, Platform.OS), { credentials: "same-origin", cache: "no-cache" });
+  const url = dictionaryAssetUrl(language, Platform.OS);
+  const response = await fetch(
+    url,
+    Platform.OS === "web" ? { credentials: "same-origin", cache: "no-cache" } : undefined,
+  );
   if (!response.ok) throw new Error(`Dictionary download failed (${response.status}).`);
   const length = Number(response.headers.get("content-length") || 0);
   if (length > MAX_BYTES[language]) throw new Error("Dictionary file is unexpectedly large.");
