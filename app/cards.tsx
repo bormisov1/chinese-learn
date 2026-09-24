@@ -185,9 +185,17 @@ export default function Cards() {
   };
   const panResponder = PanResponder.create({
     onMoveShouldSetPanResponder: (_, gesture) =>
-      Math.hypot(gesture.dx, gesture.dy) > 8,
+      !flipped
+        ? Math.hypot(gesture.dx, gesture.dy) > 8
+        : examplesExpanded
+          ? Math.abs(gesture.dx) > 8 && Math.abs(gesture.dx) >= Math.abs(gesture.dy)
+          : Math.hypot(gesture.dx, gesture.dy) > 8,
     onMoveShouldSetPanResponderCapture: (_, gesture) =>
-      Math.hypot(gesture.dx, gesture.dy) > 8,
+      !flipped
+        ? Math.hypot(gesture.dx, gesture.dy) > 8
+        : examplesExpanded
+          ? Math.abs(gesture.dx) > 8 && Math.abs(gesture.dx) >= Math.abs(gesture.dy)
+          : Math.hypot(gesture.dx, gesture.dy) > 8,
     onPanResponderGrant: () => swipe.stopAnimation(),
     onPanResponderMove: (_, gesture) => {
       if (flipped) swipe.setValue({ x: gesture.dx, y: gesture.dy });
@@ -364,9 +372,9 @@ export default function Cards() {
             if (event.nativeEvent.actionName === "decrement") finishSwipe(false);
             if (event.nativeEvent.actionName === "increment") finishSwipe(true);
           }}
-          style={[styles.card, flipped && styles.back]}
+          style={[styles.card, !flipped && styles.promptCard, flipped && styles.back]}
           onPress={() => {
-            if (!flipped) setFlipped(true);
+            if (!flipped) flipCard(true);
           }}
         >
           <Animated.View
@@ -1041,7 +1049,7 @@ const styles = StyleSheet.create({
   },
   fill: { height: 5, backgroundColor: colors.coral },
   card: {
-    minHeight: 410,
+    minHeight: 0,
     borderRadius: 25,
     backgroundColor: colors.card,
     borderWidth: 1,
@@ -1054,9 +1062,10 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
   },
+  promptCard: { minHeight: 300 },
   cardContent: { width: "100%", alignItems: "center" },
   cardContentBack: { transform: [{ rotateY: "180deg" }] },
-  back: { justifyContent: "flex-start", paddingTop: 50, paddingBottom: 58 },
+  back: { justifyContent: "flex-start", paddingTop: 32, paddingBottom: 20 },
   correctSwipeTint: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: colors.green,
@@ -1070,11 +1079,10 @@ const styles = StyleSheet.create({
   },
   hint: { position: "absolute", bottom: 24, color: colors.muted, fontSize: 13 },
   swipeHint: {
-    position: "absolute",
-    bottom: 18,
     color: colors.muted,
     fontSize: 12,
     fontWeight: "700",
+    marginTop: 14,
   },
   swipeBadge: {
     position: "absolute",
