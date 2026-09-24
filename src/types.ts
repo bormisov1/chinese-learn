@@ -21,6 +21,11 @@ export type Word = {
   cardLastIncorrectAt?: number;
   cardLapses?: number;
 };
+export type ImportedWord = {
+  hanzi: string;
+  pinyin: string;
+  russian: string;
+};
 export type Sentence = {
   id: string;
   chinese: string;

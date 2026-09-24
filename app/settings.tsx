@@ -9,6 +9,7 @@ import {
   Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -25,7 +26,7 @@ import { router } from "expo-router";
 import { Settings as SettingsData, Word } from "@/types";
 import { validateApiKey } from "@/deepseek";
 import { getActivePoolQueue } from "@/card-srs";
-import { ImportedWord } from "@/ocr";
+import { ImportedWord } from "@/types";
 import hskLevels from "@/data/hsk-levels.json";
 import {
   getTtsProvider,
@@ -339,7 +340,7 @@ export default function Settings() {
           <View style={{ flex: 1 }}>
             <Text style={styles.privacyTitle}>Other import options</Text>
             <Text style={styles.help}>
-              Add words from screenshots or restore a QR backup.
+              Add words from screenshots or Chinese text.
             </Text>
           </View>
           <Button
@@ -650,8 +651,13 @@ function TtsSettings({
     <View style={[shell.panel, styles.ttsPanel]}>
       <Text style={styles.sectionTitle}>Mandarin audio</Text>
       <Text style={styles.help}>
-        Browser speech is free and stays on-device.
+        {Platform.OS === "web"
+          ? "Browser speech is free and stays on-device."
+          : "Device speech is free and stays on-device."}
       </Text>
+      {Platform.OS === "ios" ? (
+        <Text style={styles.help}>Turn off Silent mode to hear speech on iPhone.</Text>
+      ) : null}
       {!provider.supported() ? (
         <Text style={styles.error}>Speech unavailable in this browser.</Text>
       ) : (
