@@ -111,7 +111,10 @@ export function HskBadge({ hanzi }: { hanzi: string }) {
 
 const TRANSLATION_FONT_SIZE = 31;
 const TRANSLATION_LINE_HEIGHT = 39;
-const MINIMUM_TRANSLATION_SCALE = 0.75;
+// Keep the card prompt readable on narrow iPhone widths.  Going as low as
+// 0.75 made the prompt look noticeably soft on iOS, especially next to the
+// icon rendered on the answer face.
+const MINIMUM_TRANSLATION_SCALE = 0.9;
 
 export function FittedTranslation({ text }: { text: string }) {
   const [availableWidth, setAvailableWidth] = React.useState(0);
@@ -138,6 +141,7 @@ export function FittedTranslation({ text }: { text: string }) {
     >
       <Text
         aria-hidden
+        allowFontScaling={false}
         onTextLayout={(event) => {
           const width = event.nativeEvent.lines.reduce(
             (total, line) => total + line.width,
@@ -159,6 +163,7 @@ export function FittedTranslation({ text }: { text: string }) {
       >
         <Text
           numberOfLines={4}
+          allowFontScaling={false}
           style={[
             s.translationText,
             {
@@ -230,6 +235,7 @@ const s = StyleSheet.create({
     backgroundColor: colors.pale,
     alignItems: "center",
     justifyContent: "center",
+    flexShrink: 0,
   },
   hskBadge: {
     paddingHorizontal: 6,
