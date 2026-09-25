@@ -45,7 +45,7 @@ export default function Cards() {
     [graduations, setGraduations] = useState<Graduation[]>([]),
     [roundEndsAfterCelebration, setRoundEndsAfterCelebration] = useState(false);
   const swipe = useRef(new Animated.ValueXY()).current;
-  const cardRotation = useRef(new Animated.Value(0)).current;
+  const cardOpacity = useRef(new Animated.Value(1)).current;
   const total = data.words.length;
   const translationLanguage = LANGUAGES.find(item => item.code === data.settings.language)?.label.toUpperCase() ?? "ENGLISH";
   const upcoming = useMemo(
@@ -103,7 +103,7 @@ export default function Cards() {
     setFlipped(false);
     setExamplesExpanded(false);
     swipe.setValue({ x: 0, y: 0 });
-    cardRotation.setValue(0);
+    cardOpacity.setValue(1);
     setPhase("studying");
   };
   const startRound = () => begin(upcoming, data.cardRound + 1);
@@ -149,7 +149,7 @@ export default function Cards() {
     setFlipped(false);
     setExamplesExpanded(false);
     swipe.setValue({ x: 0, y: 0 });
-    cardRotation.setValue(0);
+    cardOpacity.setValue(1);
   };
   const continueAfterCelebration = () => {
     if (roundEndsAfterCelebration) setPhase("complete");
@@ -168,17 +168,16 @@ export default function Cards() {
   };
   const flipCard = (nextFlipped: boolean) => {
     if (nextFlipped === flipped) return;
-    const target = nextFlipped ? 180 : 0;
-    Animated.timing(cardRotation, {
-      toValue: 90,
-      duration: 160,
+    Animated.timing(cardOpacity, {
+      toValue: 0,
+      duration: 100,
       useNativeDriver: true,
     }).start(({ finished }) => {
       if (!finished) return;
       setFlipped(nextFlipped);
-      Animated.timing(cardRotation, {
-        toValue: target,
-        duration: 160,
+      Animated.timing(cardOpacity, {
+        toValue: 1,
+        duration: 140,
         useNativeDriver: true,
       }).start();
     });
@@ -348,16 +347,8 @@ export default function Cards() {
             transform: [
               { translateX: flipped ? swipe.x : 0 },
               { translateY: flipped ? swipe.y : 0 },
-              {
-                perspective: 1000,
-              },
-              {
-                rotateY: cardRotation.interpolate({
-                  inputRange: [0, 180],
-                  outputRange: ["0deg", "180deg"],
-                }),
-              },
             ],
+            opacity: cardOpacity,
           },
         ]}
       >
@@ -390,7 +381,7 @@ export default function Cards() {
               },
             ]}
           />
-          <View style={[styles.cardContent, flipped && styles.cardContentBack]}>
+          <View style={styles.cardContent}>
           {!flipped ? (
             <>
               <Text style={styles.side}>{translationLanguage}</Text>
@@ -1072,7 +1063,6 @@ const styles = StyleSheet.create({
   },
   promptCard: { minHeight: 300 },
   cardContent: { width: "100%", alignItems: "center" },
-  cardContentBack: { transform: [{ rotateY: "180deg" }] },
   back: { justifyContent: "flex-start", paddingTop: 32, paddingBottom: 20 },
   correctSwipeTint: {
     ...StyleSheet.absoluteFillObject,
