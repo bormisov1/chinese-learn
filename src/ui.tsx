@@ -254,8 +254,10 @@ const s = StyleSheet.create({
   },
   translationViewport: {
     width: "100%",
+    minHeight: TRANSLATION_LINE_HEIGHT,
     maxHeight: TRANSLATION_LINE_HEIGHT * 4,
     marginTop: 20,
+    marginBottom: 12,
     overflow: "hidden",
   },
   translationMeasure: {
