@@ -12,6 +12,7 @@ import {
   StyleSheet,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStore } from "@/context";
 import { colors } from "@/theme";
 import { Button, FittedTranslation, Header, HskBadge, shell, SpeakerButton } from "@/ui";
@@ -35,6 +36,7 @@ const webDragSurface = Platform.OS === "web"
 
 export default function Cards() {
   const { data, patch, generateBatch } = useStore();
+  const insets = useSafeAreaInsets();
   const [studyRound, setStudyRound] = useState(data.cardRound + 1),
     [roundIds, setRoundIds] = useState<string[]>([]),
     [position, setPosition] = useState(0),
@@ -82,7 +84,7 @@ export default function Cards() {
 
   if (!total)
     return (
-      <ScrollView style={shell.page} contentContainerStyle={shell.content}>
+      <ScrollView style={shell.page} contentContainerStyle={[shell.content, { paddingTop: insets.top, paddingBottom: 40 + insets.bottom }]}>
         <Header
           eyebrow="Recall practice"
           title="Flashcards"
@@ -227,7 +229,7 @@ export default function Cards() {
 
   if (phase === "ready")
     return (
-      <ScrollView style={shell.page} contentContainerStyle={shell.content}>
+      <ScrollView style={shell.page} contentContainerStyle={[shell.content, { paddingTop: insets.top, paddingBottom: 40 + insets.bottom }]}>
         <Header
           eyebrow={`Round ${data.cardRound + 1}`}
           title="Ready for a card round?"
@@ -252,7 +254,7 @@ export default function Cards() {
   if (phase === "celebrating") {
     const graduation = graduations[graduations.length - 1];
     return (
-      <ScrollView style={shell.page} contentContainerStyle={shell.content}>
+      <ScrollView style={shell.page} contentContainerStyle={[shell.content, { paddingTop: insets.top, paddingBottom: 40 + insets.bottom }]}>
         <Header
           eyebrow={`Round ${studyRound} · Milestone`}
           title="Word learned!"
@@ -272,7 +274,7 @@ export default function Cards() {
       .map((id) => data.words.find((w) => w.id === id))
       .filter(Boolean);
     return (
-      <ScrollView style={shell.page} contentContainerStyle={shell.content}>
+      <ScrollView style={shell.page} contentContainerStyle={[shell.content, { paddingTop: insets.top, paddingBottom: 40 + insets.bottom }]}>
         <Header
           eyebrow={`Round ${studyRound} complete`}
           title={
@@ -326,7 +328,7 @@ export default function Cards() {
   }
 
   return (
-    <ScrollView style={shell.page} contentContainerStyle={shell.content}>
+    <ScrollView style={shell.page} contentContainerStyle={[shell.content, { paddingTop: insets.top, paddingBottom: 40 + insets.bottom }]}>
       <Header
         eyebrow={`Round ${studyRound} · Card ${position + 1} of ${roundWords.length}`}
         title="Flashcards"
@@ -971,7 +973,14 @@ const styles = StyleSheet.create({
   },
   deckComplete: { color: colors.muted, textAlign: "center", marginTop: 20 },
   guessStats: { color: colors.muted, fontSize: 9, marginTop: 4 },
-  hanziRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  hanziRow: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    gap: 10,
+  },
   exampleChinese: {
     flex: 1,
     flexDirection: "row",
@@ -1061,6 +1070,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
+    backfaceVisibility: "hidden",
   },
   promptCard: { minHeight: 300 },
   cardContent: { width: "100%", alignItems: "center" },
