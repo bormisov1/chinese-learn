@@ -1101,7 +1101,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.1,
   },
   wrongBadge: { right: 20, color: colors.red, borderColor: colors.red },
-  rightBadge: { right: 20, color: colors.green, borderColor: colors.green },
+  rightBadge: { left: 20, color: colors.green, borderColor: colors.green },
   hanzi: { fontSize: 66, fontWeight: "700", color: colors.ink },
   pinyin: { fontSize: 20, color: colors.green, marginTop: 6 },
   rule: {
