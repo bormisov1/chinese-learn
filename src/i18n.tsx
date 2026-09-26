@@ -7,6 +7,7 @@ import translations from "./data/ui-translations.json";
 export const LANGUAGES: { code: AppLanguage; label: string; nativeLabel: string }[] = [
   { code: "en", label: "English", nativeLabel: "English" },
   { code: "ru", label: "Russian", nativeLabel: "Русский" },
+  { code: "th", label: "Thai", nativeLabel: "ไทย" },
 ];
 export const isAppLanguage = (value: unknown): value is AppLanguage => LANGUAGES.some(item => item.code === value);
 
