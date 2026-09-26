@@ -231,7 +231,7 @@ export default function Cards() {
     return (
       <ScrollView style={shell.page} contentContainerStyle={shell.content}>
         <Header
-          eyebrow={`Round ${data.cardRound + 1}`}
+          eyebrow={`${t("Round")} ${data.cardRound + 1}`}
           title="Ready for a card round?"
           subtitle={`${upcoming.length} of ${CARD_ROUND_SIZE} cards · ${activeCount} of ${ACTIVE_CARD_LIMIT} active`}
         />
@@ -256,7 +256,7 @@ export default function Cards() {
     return (
       <ScrollView style={shell.page} contentContainerStyle={shell.content}>
         <Header
-          eyebrow={`Round ${studyRound} · Milestone`}
+          eyebrow={`${t("Round")} ${studyRound} · ${t("Milestone")}`}
           title="Word learned!"
           subtitle="A word graduated from your active card pool."
         />
@@ -276,7 +276,7 @@ export default function Cards() {
     return (
       <ScrollView style={shell.page} contentContainerStyle={shell.content}>
         <Header
-          eyebrow={`Round ${studyRound} complete`}
+          eyebrow={`${t("Round")} ${studyRound} ${t("complete")}`}
           title={
             mistaken.length ? `${mistaken.length} to review` : "Perfect round!"
           }
@@ -330,9 +330,9 @@ export default function Cards() {
   return (
     <ScrollView style={shell.page} contentContainerStyle={shell.content}>
       <Header
-        eyebrow={`Round ${studyRound} · Card ${position + 1} of ${roundWords.length}`}
+        eyebrow={`${t("Round")} ${studyRound} · ${t("Card")} ${position + 1} ${t("of")} ${roundWords.length}`}
         title="Flashcards"
-        subtitle={`${word.cardSrsLevel < CARD_GRADUATION_LEVEL ? `Learning step ${word.cardSrsLevel + 1} of ${CARD_GRADUATION_LEVEL}` : `Retention level ${word.cardSrsLevel}`} · ${mistakeIds.length} mistaken`}
+        subtitle={`${word.cardSrsLevel < CARD_GRADUATION_LEVEL ? `${t("Learning step")} ${word.cardSrsLevel + 1} ${t("of")} ${CARD_GRADUATION_LEVEL}` : `${t("Retention level")} ${word.cardSrsLevel}`} · ${mistakeIds.length} ${t("mistaken")}`}
       />
       <View style={styles.progress}>
         <View
