@@ -400,7 +400,6 @@ export default function Cards() {
                 )}
               />
               <WordGuessStats word={word} />
-              <Text style={styles.hint}>Tap to reveal</Text>
             </>
           ) : (
             <>
@@ -482,6 +481,7 @@ export default function Cards() {
             </>
           )}
           </View>
+          {!flipped ? <Text style={styles.hint}>Tap to reveal</Text> : null}
         </Pressable>
       </Animated.View>
     </ScrollView>
@@ -1055,6 +1055,7 @@ const styles = StyleSheet.create({
   },
   fill: { height: 5, backgroundColor: colors.coral },
   card: {
+    position: "relative",
     minHeight: 0,
     borderRadius: 25,
     backgroundColor: colors.card,
@@ -1083,7 +1084,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 1.8,
   },
-  hint: { position: "absolute", bottom: 24, color: colors.muted, fontSize: 13 },
+  hint: { position: "absolute", left: 0, right: 0, bottom: 24, textAlign: "center", color: colors.muted, fontSize: 13 },
   swipeHint: {
     color: colors.muted,
     fontSize: 12,
