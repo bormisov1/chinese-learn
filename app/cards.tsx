@@ -45,7 +45,7 @@ export default function Cards() {
     [graduations, setGraduations] = useState<Graduation[]>([]),
     [roundEndsAfterCelebration, setRoundEndsAfterCelebration] = useState(false);
   const swipe = useRef(new Animated.ValueXY()).current;
-  const cardOpacity = useRef(new Animated.Value(1)).current;
+  const cardSpin = useRef(new Animated.Value(0)).current;
   const total = data.words.length;
   const translationLanguage = LANGUAGES.find(item => item.code === data.settings.language)?.label.toUpperCase() ?? "ENGLISH";
   const upcoming = useMemo(
@@ -103,7 +103,7 @@ export default function Cards() {
     setFlipped(false);
     setExamplesExpanded(false);
     swipe.setValue({ x: 0, y: 0 });
-    cardOpacity.setValue(1);
+    cardSpin.setValue(0);
     setPhase("studying");
   };
   const startRound = () => begin(upcoming, data.cardRound + 1);
@@ -149,7 +149,7 @@ export default function Cards() {
     setFlipped(false);
     setExamplesExpanded(false);
     swipe.setValue({ x: 0, y: 0 });
-    cardOpacity.setValue(1);
+    cardSpin.setValue(0);
   };
   const continueAfterCelebration = () => {
     if (roundEndsAfterCelebration) setPhase("complete");
@@ -168,18 +168,20 @@ export default function Cards() {
   };
   const flipCard = (nextFlipped: boolean) => {
     if (nextFlipped === flipped) return;
-    Animated.timing(cardOpacity, {
-      toValue: 0,
-      duration: 100,
+    Animated.timing(cardSpin, {
+      toValue: 0.5,
+      duration: 180,
       useNativeDriver: true,
     }).start(({ finished }) => {
       if (!finished) return;
       setFlipped(nextFlipped);
-      Animated.timing(cardOpacity, {
+      Animated.timing(cardSpin, {
         toValue: 1,
-        duration: 140,
+        duration: 180,
         useNativeDriver: true,
-      }).start();
+      }).start(({ finished: completed }) => {
+        if (completed) cardSpin.setValue(0);
+      });
     });
   };
   const panResponder = PanResponder.create({
@@ -347,8 +349,13 @@ export default function Cards() {
             transform: [
               { translateX: flipped ? swipe.x : 0 },
               { translateY: flipped ? swipe.y : 0 },
+              {
+                rotateY: cardSpin.interpolate({
+                  inputRange: [0, 0.5, 1],
+                  outputRange: ["0deg", "90deg", "0deg"],
+                }),
+              },
             ],
-            opacity: cardOpacity,
           },
         ]}
       >
