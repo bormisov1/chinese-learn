@@ -1,4 +1,4 @@
-import { displayTranslation, LANGUAGES, maskTranslatedHanzi, Text } from "@/i18n";
+import { displayTranslation, LANGUAGES, maskTranslatedHanzi, Text, useTranslation } from "@/i18n";
 import { useEffect,
   useMemo,
   useRef,
@@ -35,6 +35,7 @@ const webDragSurface = Platform.OS === "web"
 
 export default function Cards() {
   const { data, patch, generateBatch } = useStore();
+  const t = useTranslation();
   const [studyRound, setStudyRound] = useState(data.cardRound + 1),
     [roundIds, setRoundIds] = useState<string[]>([]),
     [position, setPosition] = useState(0),
@@ -47,7 +48,7 @@ export default function Cards() {
   const swipe = useRef(new Animated.ValueXY()).current;
   const cardSpin = useRef(new Animated.Value(0)).current;
   const total = data.words.length;
-  const translationLanguage = LANGUAGES.find(item => item.code === data.settings.language)?.label.toUpperCase() ?? "ENGLISH";
+  const translationLanguage = LANGUAGES.find(item => item.code === data.settings.language)?.nativeLabel.toUpperCase() ?? "ENGLISH";
   const upcoming = useMemo(
     () => selectRound(data.words, data.cardRound + 1),
     [data.words, data.cardRound],
@@ -417,7 +418,7 @@ export default function Cards() {
                   },
                 ]}
               >
-                WRONG
+                {t("WRONG")}
               </Animated.Text>
               <Animated.Text
                 pointerEvents="none"
@@ -433,7 +434,7 @@ export default function Cards() {
                   },
                 ]}
               >
-                RIGHT
+                {t("RIGHT")}
               </Animated.Text>
               <View style={styles.hanziRow}>
                 <Pressable onPress={() => copyText(wordPronunciation!.hanzi)}>
