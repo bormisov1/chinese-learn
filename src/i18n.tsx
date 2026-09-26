@@ -4,6 +4,51 @@ import type { ComponentProps } from "react";
 import type { AppLanguage } from "./types";
 import translations from "./data/ui-translations.json";
 
+const contextualTranslations: Partial<Record<AppLanguage, Record<string, string>>> = {
+  ru: {
+    "2 examples": "2 примера",
+    "1 of 6 cards · 1 of 12 active": "1 из 6 карточек · 1 из 12 активных",
+    "Correct cards skip the next round. Three correct appearances move a word to retention review and bring in another deck word.": "Правильные карточки пропускают следующий раунд. Три правильных ответа переводят слово в повторение и добавляют другое слово из колоды.",
+    "Start 1-card round": "Начать раунд из 1 карточки",
+    "Sentence generation and explanations use DeepSeek V4 Pro. Translation checks use DeepSeek V4 Flash.": "Генерация предложений и объяснения используют ДипСик В4 Про. Проверка переводов использует ДипСик В4 Флэш.",
+    "Vocabulary, generated sentences, indexes, SRS counters, and attempts remain on device. Only AI requests go to DeepSeek.": "Словарь, созданные предложения, индексы, счётчики СРС и попытки остаются на устройстве. Только запросы к ИИ отправляются в ДипСик.",
+    "Build your deck from an HSK level or another source.": "Соберите колоду из уровня ХСК или другого источника.",
+    "Keep 20 learning words ready, adding them in order from HSK 1 onward.": "Поддерживайте 20 слов для изучения, добавляя их по порядку начиная с ХСК 1.",
+    "Choose a level and add seven new words at a time.": "Выберите уровень и добавляйте по семь новых слов за раз.",
+    "Add words from screenshots or Chinese text.": "Добавляйте слова со снимков экрана или из китайского текста.",
+    "Create one compact QR. Sentences excluded.": "Создайте один компактный КР. Предложения не включаются.",
+    "1 of 12 words · six cards per full round": "1 из 12 слов · шесть карточек за полный раунд",
+    "Words enter the active set in this order as learning slots open.": "Слова входят в активный набор в этом порядке по мере освобождения учебных слотов.",
+    "English": "Английский",
+    "LANGUAGE": "ЯЗЫК",
+    "Add": "Добавить",
+    "words remaining": "слов осталось",
+    "six cards per full round": "шесть карточек за полный раунд",
+    "due": "срок",
+  },
+  th: {
+    "2 examples": "2 ตัวอย่าง",
+    "1 of 6 cards · 1 of 12 active": "1 จาก 6 บัตรคำ · 1 จาก 12 ที่กำลังเรียน",
+    "Correct cards skip the next round. Three correct appearances move a word to retention review and bring in another deck word.": "บัตรคำที่ตอบถูกจะข้ามรอบถัดไป ตอบถูกสามครั้งจะย้ายคำไปทบทวนและนำคำอื่นจากชุดคำศัพท์มาแทน",
+    "Start 1-card round": "เริ่มรอบ 1 บัตรคำ",
+    "Sentence generation and explanations use DeepSeek V4 Pro. Translation checks use DeepSeek V4 Flash.": "การสร้างประโยคและคำอธิบายใช้ดีปซีค วี4 โปร การตรวจคำแปลใช้ดีปซีค วี4 แฟลช",
+    "Vocabulary, generated sentences, indexes, SRS counters, and attempts remain on device. Only AI requests go to DeepSeek.": "คลังคำศัพท์ ประโยคที่สร้าง ดัชนี ตัวนับเอสอาร์เอส และความพยายามอยู่ในอุปกรณ์ คำขอจากเอไอเท่านั้นที่ส่งไปดีปซีค",
+    "Build your deck from an HSK level or another source.": "สร้างชุดคำศัพท์จากระดับเอชเอสเคหรือแหล่งอื่น",
+    "Keep 20 learning words ready, adding them in order from HSK 1 onward.": "เตรียมคำสำหรับเรียนรู้ 20 คำ โดยเพิ่มตามลำดับเริ่มจากเอชเอสเค 1",
+    "Choose a level and add seven new words at a time.": "เลือกระดับและเพิ่มคำใหม่ครั้งละเจ็ดคำ",
+    "Add words from screenshots or Chinese text.": "เพิ่มคำจากภาพหน้าจอหรือข้อความภาษาจีน",
+    "Create one compact QR. Sentences excluded.": "สร้างคิวอาร์ขนาดกะทัดรัดหนึ่งรายการ ไม่รวมประโยค",
+    "1 of 12 words · six cards per full round": "1 จาก 12 คำ · หกบัตรคำต่อรอบเต็ม",
+    "Words enter the active set in this order as learning slots open.": "คำศัพท์จะเข้าสู่ชุดที่กำลังเรียนตามลำดับนี้เมื่อมีช่องว่าง",
+    "English": "อังกฤษ",
+    "LANGUAGE": "ภาษา",
+    "Add": "เพิ่ม",
+    "words remaining": "คำที่เหลือ",
+    "six cards per full round": "หกบัตรคำต่อรอบเต็ม",
+    "due": "ถึงกำหนด",
+  },
+};
+
 export const LANGUAGES: { code: AppLanguage; label: string; nativeLabel: string }[] = [
   { code: "en", label: "English", nativeLabel: "English" },
   { code: "ru", label: "Russian", nativeLabel: "Русский" },
@@ -28,7 +73,17 @@ export function suggestedLanguage(): AppLanguage {
 export function translate(language: AppLanguage, value: string): string {
   if (language === "en") return value;
   const table = translations[language] as Record<string, string> | undefined;
-  return table?.[value] || value;
+  if (!table) return value;
+  const contextual = contextualTranslations[language] ?? {};
+  if (contextual[value] || table[value]) return contextual[value] || table[value];
+  const entries = Object.entries({ ...table, ...contextual });
+  const normalized = value.replace(/\s+/g, " ").trim();
+  const normalizedMatch = entries.find(([source]) => source.replace(/\s+/g, " ").trim() === normalized);
+  if (normalizedMatch) return normalizedMatch[1];
+  return entries
+    .filter(([source]) => source.length > 1 && value.includes(source))
+    .sort(([a], [b]) => b.length - a.length)
+    .reduce((result, [source, target]) => result.replaceAll(source, target), value);
 }
 
 export function displayTranslation(value: string, language: AppLanguage): string {
@@ -51,7 +106,7 @@ export function useTranslation() {
 
 export function Text(props: ComponentProps<typeof NativeText>) {
   const t = useTranslation();
-  const children = typeof props.children === "string" ? t(props.children) : props.children;
+  const children = React.Children.map(props.children, child => typeof child === "string" ? t(child) : child);
   return <NativeText {...props}>{children}</NativeText>;
 }
 
