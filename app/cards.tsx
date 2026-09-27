@@ -41,7 +41,7 @@ export default function Cards() {
     [position, setPosition] = useState(0),
     [phase, setPhase] = useState<Phase>("ready"),
     [flipped, setFlipped] = useState(false),
-    [examplesExpanded, setExamplesExpanded] = useState(false),
+    [exampleIndex, setExampleIndex] = useState(0),
     [mistakeIds, setMistakeIds] = useState<string[]>([]),
     [graduations, setGraduations] = useState<Graduation[]>([]),
     [roundEndsAfterCelebration, setRoundEndsAfterCelebration] = useState(false);
@@ -102,7 +102,7 @@ export default function Cards() {
     setGraduations([]);
     setRoundEndsAfterCelebration(false);
     setFlipped(false);
-    setExamplesExpanded(false);
+    setExampleIndex(0);
     swipe.setValue({ x: 0, y: 0 });
     cardSpin.setValue(0);
     setPhase("studying");
@@ -148,7 +148,7 @@ export default function Cards() {
     } else if (roundComplete) setPhase("complete");
     else setPosition((p) => p + 1);
     setFlipped(false);
-    setExamplesExpanded(false);
+    setExampleIndex(0);
     swipe.setValue({ x: 0, y: 0 });
     cardSpin.setValue(0);
   };
@@ -187,17 +187,13 @@ export default function Cards() {
   };
   const panResponder = PanResponder.create({
     onMoveShouldSetPanResponder: (_, gesture) =>
-      !flipped
-        ? Math.hypot(gesture.dx, gesture.dy) > 8
-        : examplesExpanded
-          ? Math.abs(gesture.dx) > 8 && Math.abs(gesture.dx) >= Math.abs(gesture.dy)
-          : Math.hypot(gesture.dx, gesture.dy) > 8,
+      flipped
+        ? Math.abs(gesture.dx) > 8 && Math.abs(gesture.dx) >= Math.abs(gesture.dy)
+        : Math.hypot(gesture.dx, gesture.dy) > 8,
     onMoveShouldSetPanResponderCapture: (_, gesture) =>
-      !flipped
-        ? Math.hypot(gesture.dx, gesture.dy) > 8
-        : examplesExpanded
-          ? Math.abs(gesture.dx) > 8 && Math.abs(gesture.dx) >= Math.abs(gesture.dy)
-          : Math.hypot(gesture.dx, gesture.dy) > 8,
+      flipped
+        ? Math.abs(gesture.dx) > 8 && Math.abs(gesture.dx) >= Math.abs(gesture.dy)
+        : Math.hypot(gesture.dx, gesture.dy) > 8,
     onPanResponderGrant: () => swipe.stopAnimation(),
     onPanResponderMove: (_, gesture) => {
       if (flipped) swipe.setValue({ x: gesture.dx, y: gesture.dy });
@@ -449,33 +445,12 @@ export default function Cards() {
               <Text style={styles.pinyin}>{wordPronunciation!.pinyin}</Text>
               <View style={styles.rule} />
               {examples.length ? (
-                <>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityState={{ expanded: examplesExpanded }}
-                    onPress={(event) => {
-                      event.stopPropagation();
-                      setExamplesExpanded((value) => !value);
-                    }}
-                    style={styles.examplesToggle}
-                  >
-                    <Text style={styles.side}>EXAMPLES</Text>
-                    <Text style={styles.examplesToggleIcon}>
-                      {examplesExpanded ? "−" : "+"}
-                    </Text>
-                  </Pressable>
-                  {examplesExpanded ? (
-                    <View style={styles.examples}>
-                      {examples.map((s) => (
-                        <ExampleRow
-                          key={s!.id}
-                          sentence={s!}
-                          settings={data.settings}
-                        />
-                      ))}
-                    </View>
-                  ) : null}
-                </>
+                <ExampleCarousel
+                  examples={examples as Sentence[]}
+                  settings={data.settings}
+                  index={exampleIndex}
+                  onIndexChange={setExampleIndex}
+                />
               ) : null}
               <Text style={styles.swipeHint}>← Wrong · Right →</Text>
             </>
@@ -891,6 +866,88 @@ function ExampleRow({
   );
 }
 
+function ExampleCarousel({
+  examples,
+  settings,
+  index,
+  onIndexChange,
+}: {
+  examples: Sentence[];
+  settings: Settings;
+  index: number;
+  onIndexChange: (index: number) => void;
+}) {
+  const animation = useRef(new Animated.Value(0)).current;
+  const [transition, setTransition] = useState<{ next: number; direction: -1 | 1 } | null>(null);
+  const move = (direction: -1 | 1) => {
+    if (transition || examples.length < 2) return;
+    const next = (index + direction + examples.length) % examples.length;
+    setTransition({ next, direction });
+    animation.setValue(0);
+    Animated.timing(animation, {
+      toValue: 1,
+      duration: 220,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) onIndexChange(next);
+      setTransition(null);
+      animation.setValue(0);
+    });
+  };
+  const current = examples[index];
+  const incoming = transition ? examples[transition.next] : null;
+  const offset = transition?.direction === -1 ? -1 : 1;
+  return (
+    <View style={styles.exampleCarousel}>
+      <View style={styles.exampleViewport}>
+        <Animated.View
+          style={[
+            styles.exampleSlide,
+            transition && {
+              transform: [{ translateY: animation.interpolate({ inputRange: [0, 1], outputRange: [0, offset * 110] }) }],
+            },
+          ]}
+        >
+          <ExampleRow sentence={current} settings={settings} />
+        </Animated.View>
+        {incoming ? (
+          <Animated.View
+            style={[
+              styles.exampleSlide,
+              styles.exampleIncoming,
+              {
+                transform: [{ translateY: animation.interpolate({ inputRange: [0, 1], outputRange: [-offset * 110, 0] }) }],
+              },
+            ]}
+          >
+            <ExampleRow sentence={incoming} settings={settings} />
+          </Animated.View>
+        ) : null}
+      </View>
+      <View style={styles.exampleControls}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Previous example"
+          disabled={examples.length < 2 || !!transition}
+          onPress={(event) => { event.stopPropagation(); move(-1); }}
+          style={styles.exampleButton}
+        >
+          <Text style={styles.exampleButtonText}>↑</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Next example"
+          disabled={examples.length < 2 || !!transition}
+          onPress={(event) => { event.stopPropagation(); move(1); }}
+          style={styles.exampleButton}
+        >
+          <Text style={styles.exampleButtonText}>↓</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   celebration: {
     marginBottom: 16,
@@ -1113,21 +1170,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.line,
     marginVertical: 27,
   },
-  examplesToggle: {
-    width: "100%",
-    minHeight: 40,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  examplesToggleIcon: {
-    color: colors.green,
-    fontSize: 19,
-    fontWeight: "700",
-    lineHeight: 20,
-  },
-  examples: { width: "100%", marginTop: 8 },
+  exampleCarousel: { width: "100%", flexDirection: "row", alignItems: "center", gap: 10 },
+  exampleViewport: { flex: 1, minHeight: 76, overflow: "hidden", position: "relative" },
+  exampleSlide: { width: "100%", minHeight: 76, justifyContent: "center" },
+  exampleIncoming: { position: "absolute", left: 0, top: 0 },
+  exampleControls: { width: 34, gap: 7 },
+  exampleButton: { width: 34, height: 30, borderRadius: 8, backgroundColor: colors.pale, alignItems: "center", justifyContent: "center" },
+  exampleButtonText: { color: colors.green, fontSize: 19, lineHeight: 21, fontWeight: "800" },
   exampleRow: {
     width: "100%",
     minHeight: 58,
