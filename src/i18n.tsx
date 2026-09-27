@@ -94,6 +94,20 @@ export const LANGUAGES: { code: AppLanguage; label: string; nativeLabel: string 
 ];
 export const isAppLanguage = (value: unknown): value is AppLanguage => LANGUAGES.some(item => item.code === value);
 
+function keepProductTermsInEnglish(language: AppLanguage, value: string): string {
+  if (language === "en") return value;
+  return value
+    .replaceAll("АПИ", "API")
+    .replaceAll("ДИПСИК", "DEEPSEEK")
+    .replaceAll("ДипСик", "DeepSeek")
+    .replaceAll("ХСК", "HSK")
+    .replaceAll("СРС", "SRS")
+    .replaceAll("เอพีไอ", "API")
+    .replaceAll("ดีปซีค", "DeepSeek")
+    .replaceAll("เอชเอสเค", "HSK")
+    .replaceAll("เอสอาร์เอส", "SRS");
+}
+
 const LanguageContext = createContext<AppLanguage>("en");
 export const I18nProvider = LanguageContext.Provider;
 export const useLanguage = () => useContext(LanguageContext);
@@ -111,17 +125,17 @@ export function suggestedLanguage(): AppLanguage {
 export function translate(language: AppLanguage, value: string): string {
   if (language === "en") return value;
   const table = translations[language] as Record<string, string> | undefined;
-  if (!table) return value;
+  if (!table) return keepProductTermsInEnglish(language, value);
   const contextual = contextualTranslations[language] ?? {};
-  if (contextual[value] || table[value]) return contextual[value] || table[value];
+  if (contextual[value] || table[value]) return keepProductTermsInEnglish(language, contextual[value] || table[value]);
   const entries = Object.entries({ ...table, ...contextual });
   const normalized = value.replace(/\s+/g, " ").trim();
   const normalizedMatch = entries.find(([source]) => source.replace(/\s+/g, " ").trim() === normalized);
-  if (normalizedMatch) return normalizedMatch[1];
-  return entries
+  if (normalizedMatch) return keepProductTermsInEnglish(language, normalizedMatch[1]);
+  return keepProductTermsInEnglish(language, entries
     .filter(([source]) => source.length > 1 && value.includes(source))
     .sort(([a], [b]) => b.length - a.length)
-    .reduce((result, [source, target]) => result.replaceAll(source, target), value);
+    .reduce((result, [source, target]) => result.replaceAll(source, target), value));
 }
 
 export function displayTranslation(value: string, language: AppLanguage): string {
