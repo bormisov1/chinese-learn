@@ -6,6 +6,8 @@ import translations from "./data/ui-translations.json";
 
 const contextualTranslations: Partial<Record<AppLanguage, Record<string, string>>> = {
   ru: {
+    "1 example": "пример",
+    "examples": "примеров",
     "2 examples": "2 примера",
     "1 of 6 cards · 1 of 12 active": "1 из 6 карточек · 1 из 12 активных",
     "Correct cards skip the next round. Three correct appearances move a word to retention review and bring in another deck word.": "Правильные карточки пропускают следующий раунд. Три правильных ответа переводят слово в повторение и добавляют другое слово из колоды.",
@@ -25,8 +27,27 @@ const contextualTranslations: Partial<Record<AppLanguage, Record<string, string>
     "words remaining": "слов осталось",
     "six cards per full round": "шесть карточек за полный раунд",
     "due": "срок",
+    "Correct": "Знал",
+    "Not quite yet": "Не знал",
+    "WRONG": "НЕ ЗНАЛ",
+    "RIGHT": "ЗНАЛ",
+    "Wrong": "Не знал",
+    "Right": "Знал",
+    "← Wrong · Right →": "← Не знал · Знал →",
+    "HSK": "HSK",
+    "SRS": "SRS",
+    "DEEPSEEK API KEY": "DEEPSEEK API KEY",
+    "API ENDPOINT": "API ENDPOINT",
+    "How to get a DeepSeek API key": "How to get a DeepSeek API key",
+    "to review": "на повторение",
+    "correct": "знал",
+    "mistaken": "не знал",
+    "Swipe either direction to meet the new active word": "Проведите в любую сторону, чтобы увидеть новое активное слово",
+    "Swipe any direction to continue": "Проведите в любую сторону, чтобы продолжить",
   },
   th: {
+    "1 example": "ตัวอย่าง",
+    "examples": "ตัวอย่าง",
     "2 examples": "2 ตัวอย่าง",
     "1 of 6 cards · 1 of 12 active": "1 จาก 6 บัตรคำ · 1 จาก 12 ที่กำลังเรียน",
     "Correct cards skip the next round. Three correct appearances move a word to retention review and bring in another deck word.": "บัตรคำที่ตอบถูกจะข้ามรอบถัดไป ตอบถูกสามครั้งจะย้ายคำไปทบทวนและนำคำอื่นจากชุดคำศัพท์มาแทน",
@@ -46,6 +67,23 @@ const contextualTranslations: Partial<Record<AppLanguage, Record<string, string>
     "words remaining": "คำที่เหลือ",
     "six cards per full round": "หกบัตรคำต่อรอบเต็ม",
     "due": "ถึงกำหนด",
+    "Correct": "ทราบแล้ว",
+    "Not quite yet": "ไม่ทราบ",
+    "WRONG": "ไม่ทราบ",
+    "RIGHT": "ทราบแล้ว",
+    "Wrong": "ไม่ทราบ",
+    "Right": "ทราบแล้ว",
+    "← Wrong · Right →": "← ไม่ทราบ · ทราบแล้ว →",
+    "HSK": "HSK",
+    "SRS": "SRS",
+    "DEEPSEEK API KEY": "DEEPSEEK API KEY",
+    "API ENDPOINT": "API ENDPOINT",
+    "How to get a DeepSeek API key": "How to get a DeepSeek API key",
+    "to review": "ต้องทบทวน",
+    "correct": "ทราบแล้ว",
+    "mistaken": "ไม่ทราบ",
+    "Swipe either direction to meet the new active word": "ปัดไปทางใดก็ได้เพื่อดูคำที่กำลังเรียนคำใหม่",
+    "Swipe any direction to continue": "ปัดไปทางใดก็ได้เพื่อดำเนินการต่อ",
   },
 };
 
@@ -55,6 +93,20 @@ export const LANGUAGES: { code: AppLanguage; label: string; nativeLabel: string 
   { code: "th", label: "Thai", nativeLabel: "ไทย" },
 ];
 export const isAppLanguage = (value: unknown): value is AppLanguage => LANGUAGES.some(item => item.code === value);
+
+function keepProductTermsInEnglish(language: AppLanguage, value: string): string {
+  if (language === "en") return value;
+  return value
+    .replaceAll("АПИ", "API")
+    .replaceAll("ДИПСИК", "DEEPSEEK")
+    .replaceAll("ДипСик", "DeepSeek")
+    .replaceAll("ХСК", "HSK")
+    .replaceAll("СРС", "SRS")
+    .replaceAll("เอพีไอ", "API")
+    .replaceAll("ดีปซีค", "DeepSeek")
+    .replaceAll("เอชเอสเค", "HSK")
+    .replaceAll("เอสอาร์เอส", "SRS");
+}
 
 const LanguageContext = createContext<AppLanguage>("en");
 export const I18nProvider = LanguageContext.Provider;
@@ -73,17 +125,17 @@ export function suggestedLanguage(): AppLanguage {
 export function translate(language: AppLanguage, value: string): string {
   if (language === "en") return value;
   const table = translations[language] as Record<string, string> | undefined;
-  if (!table) return value;
+  if (!table) return keepProductTermsInEnglish(language, value);
   const contextual = contextualTranslations[language] ?? {};
-  if (contextual[value] || table[value]) return contextual[value] || table[value];
+  if (contextual[value] || table[value]) return keepProductTermsInEnglish(language, contextual[value] || table[value]);
   const entries = Object.entries({ ...table, ...contextual });
   const normalized = value.replace(/\s+/g, " ").trim();
   const normalizedMatch = entries.find(([source]) => source.replace(/\s+/g, " ").trim() === normalized);
-  if (normalizedMatch) return normalizedMatch[1];
-  return entries
+  if (normalizedMatch) return keepProductTermsInEnglish(language, normalizedMatch[1]);
+  return keepProductTermsInEnglish(language, entries
     .filter(([source]) => source.length > 1 && value.includes(source))
     .sort(([a], [b]) => b.length - a.length)
-    .reduce((result, [source, target]) => result.replaceAll(source, target), value);
+    .reduce((result, [source, target]) => result.replaceAll(source, target), value));
 }
 
 export function displayTranslation(value: string, language: AppLanguage): string {

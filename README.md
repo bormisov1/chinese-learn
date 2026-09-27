@@ -44,7 +44,7 @@ Add a DeepSeek API key under Settings. Vocabulary can be added from typed or pas
 
 On first launch the app suggests a supported language from the browser locale and asks the learner to confirm it. The language can be changed later in Settings. A change first downloads and validates the target dictionary, then atomically updates the language and saved word meanings. Download failures leave the current language and study data untouched. Generated sentences are cleared after confirmation because their translations belong to the previous language; vocabulary and SRS progress are preserved.
 
-Word meanings are remembered per language, so custom or dictionary-missing meanings return when the learner switches back. QR restores use their encoded source language and relocalize against the active dictionary.
+Word meanings are remembered per language, so custom or dictionary-missing meanings return when the learner switches back.
 
 HSK dictionaries are lazy-loaded from the fixed `/dictionaries/hsk-<language>.json` allowlist. Web uses same-origin paths; native uses the deployed HTTPS origin. The loader rejects oversized and malformed files; a stored language value can never become a download URL. Only the active or explicitly requested target dictionary is loaded. Imports merge by Hanzi while preserving study counters.
 

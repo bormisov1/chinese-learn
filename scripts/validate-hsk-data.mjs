@@ -6,6 +6,7 @@ const LEVELS = new URL("../src/data/hsk-levels.json", import.meta.url);
 const DICTIONARIES = {
   en: new URL("../public/dictionaries/hsk-en.json", import.meta.url),
   ru: new URL("../public/dictionaries/hsk-ru.json", import.meta.url),
+  th: new URL("../public/dictionaries/hsk-th.json", import.meta.url),
 };
 const EXPECTED_COUNTS = [150, 297, 595, 1193, 2491, 4991];
 

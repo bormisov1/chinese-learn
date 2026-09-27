@@ -139,7 +139,7 @@ export default function Home() {
               <Text style={styles.russian}>{displayTranslation(word.russian, data.settings.language)}</Text>
               <Text style={styles.guessStats}>✓ {word.cardSrsCorrect} · ✗ {word.cardSrsIncorrect}</Text>
             </View>
-            <Text style={styles.count}>{word.exampleCount} examples</Text>
+              <Text style={styles.count}>{word.exampleCount} {t(word.exampleCount === 1 ? "1 example" : "examples")}</Text>
           </View>
         )) : <Text style={styles.empty}>Your imported words will appear here.</Text>}
       </View>

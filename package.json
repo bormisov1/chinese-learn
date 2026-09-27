@@ -11,6 +11,7 @@
     "build:hsk-levels": "node scripts/build-hsk-levels.mjs",
     "build:dictionary": "node scripts/build-english-dictionary.mjs",
     "build:dictionary:ru": "node scripts/build-russian-dictionary.mjs",
+    "build:dictionary:th": "node scripts/build-thai-dictionary.mjs",
     "validate:hsk-data": "node scripts/validate-hsk-data.mjs",
     "test": "tsx --test src/*.test.ts",
     "serve:web": "serve -s dist -l tcp://0.0.0.0:8081",
