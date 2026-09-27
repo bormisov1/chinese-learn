@@ -7,7 +7,7 @@ export type Dictionary = Map<string, ImportedWord>;
 const ASSET_BYTES: Record<AppLanguage, number> = {
   en: 8_854_286,
   ru: 410_405,
-  th: 8_854_286,
+  th: 278_114,
 };
 const MAX_BYTES: Record<AppLanguage, number> = {
   en: 30_000_000,

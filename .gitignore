@@ -5,3 +5,5 @@ dist/
 dist-*/
 .expo/
 node_modules/
+.thai-translation-progress.json
+.thai-translation-partial.json
