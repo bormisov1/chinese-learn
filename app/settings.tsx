@@ -139,7 +139,7 @@ export default function Settings() {
     <View style={styles.srsCell}>
       <Text style={styles.level}>
         L{level}
-        {dueAt <= now ? " · due" : ""}
+        {""}
       </Text>
       <Text style={styles.score}>
         ✓{correct} ✗{incorrect}

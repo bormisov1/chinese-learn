@@ -278,9 +278,9 @@ export default function Cards() {
         <Header
           eyebrow={`${t("Round")} ${studyRound} ${t("complete")}`}
           title={
-            mistaken.length ? `${mistaken.length} to review` : "Perfect round!"
+            mistaken.length ? `${mistaken.length} ${t("to review")}` : "Perfect round!"
           }
-          subtitle={`${roundWords.length - mistaken.length} correct · ${mistaken.length} mistaken`}
+          subtitle={`${roundWords.length - mistaken.length} ${t("correct")} · ${mistaken.length} ${t("mistaken")}`}
         />
         {graduations.map((graduation) => (
           <GraduationCelebration
@@ -497,6 +497,7 @@ function SwipeableGraduation({
   settings: Settings;
   onContinue: () => void;
 }) {
+  const t = useTranslation();
   const swipe = useRef(new Animated.ValueXY()).current;
   const swipeHint = useRef(new Animated.Value(0)).current;
   const continuing = useRef(false);
@@ -683,8 +684,8 @@ function SwipeableGraduation({
       </View>
       <Text style={styles.graduationSwipeHint}>
         {graduation.replacement && !showingReplacement
-          ? "← Swipe either direction to meet the new active word →"
-          : "← Swipe any direction to continue →"}
+          ? `← ${t("Swipe either direction to meet the new active word")} →`
+          : `← ${t("Swipe any direction to continue")} →`}
       </Text>
     </>
   );
