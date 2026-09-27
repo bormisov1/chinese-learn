@@ -1,0 +1,9 @@
+{
+  "name": "hanzi-deck-backend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run src/server.ts",
+    "test": "bun test"
+  }
+}
