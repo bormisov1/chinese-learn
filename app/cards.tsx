@@ -1,4 +1,4 @@
-import { displayTranslation, LANGUAGES, maskTranslatedHanzi, Text } from "@/i18n";
+import { displayTranslation, LANGUAGES, maskTranslatedHanzi, Text, useTranslation } from "@/i18n";
 import { useEffect,
   useMemo,
   useRef,
@@ -35,6 +35,7 @@ const webDragSurface = Platform.OS === "web"
 
 export default function Cards() {
   const { data, patch, generateBatch } = useStore();
+  const t = useTranslation();
   const [studyRound, setStudyRound] = useState(data.cardRound + 1),
     [roundIds, setRoundIds] = useState<string[]>([]),
     [position, setPosition] = useState(0),
@@ -45,9 +46,9 @@ export default function Cards() {
     [graduations, setGraduations] = useState<Graduation[]>([]),
     [roundEndsAfterCelebration, setRoundEndsAfterCelebration] = useState(false);
   const swipe = useRef(new Animated.ValueXY()).current;
-  const cardOpacity = useRef(new Animated.Value(1)).current;
+  const cardSpin = useRef(new Animated.Value(0)).current;
   const total = data.words.length;
-  const translationLanguage = LANGUAGES.find(item => item.code === data.settings.language)?.label.toUpperCase() ?? "ENGLISH";
+  const translationLanguage = LANGUAGES.find(item => item.code === data.settings.language)?.nativeLabel.toUpperCase() ?? "ENGLISH";
   const upcoming = useMemo(
     () => selectRound(data.words, data.cardRound + 1),
     [data.words, data.cardRound],
@@ -103,7 +104,7 @@ export default function Cards() {
     setFlipped(false);
     setExamplesExpanded(false);
     swipe.setValue({ x: 0, y: 0 });
-    cardOpacity.setValue(1);
+    cardSpin.setValue(0);
     setPhase("studying");
   };
   const startRound = () => begin(upcoming, data.cardRound + 1);
@@ -149,7 +150,7 @@ export default function Cards() {
     setFlipped(false);
     setExamplesExpanded(false);
     swipe.setValue({ x: 0, y: 0 });
-    cardOpacity.setValue(1);
+    cardSpin.setValue(0);
   };
   const continueAfterCelebration = () => {
     if (roundEndsAfterCelebration) setPhase("complete");
@@ -168,18 +169,20 @@ export default function Cards() {
   };
   const flipCard = (nextFlipped: boolean) => {
     if (nextFlipped === flipped) return;
-    Animated.timing(cardOpacity, {
-      toValue: 0,
-      duration: 100,
+    Animated.timing(cardSpin, {
+      toValue: 0.5,
+      duration: 180,
       useNativeDriver: true,
     }).start(({ finished }) => {
       if (!finished) return;
       setFlipped(nextFlipped);
-      Animated.timing(cardOpacity, {
+      Animated.timing(cardSpin, {
         toValue: 1,
-        duration: 140,
+        duration: 180,
         useNativeDriver: true,
-      }).start();
+      }).start(({ finished: completed }) => {
+        if (completed) cardSpin.setValue(0);
+      });
     });
   };
   const panResponder = PanResponder.create({
@@ -228,7 +231,7 @@ export default function Cards() {
     return (
       <ScrollView style={shell.page} contentContainerStyle={shell.content}>
         <Header
-          eyebrow={`Round ${data.cardRound + 1}`}
+          eyebrow={`${t("Round")} ${data.cardRound + 1}`}
           title="Ready for a card round?"
           subtitle={`${upcoming.length} of ${CARD_ROUND_SIZE} cards · ${activeCount} of ${ACTIVE_CARD_LIMIT} active`}
         />
@@ -253,7 +256,7 @@ export default function Cards() {
     return (
       <ScrollView style={shell.page} contentContainerStyle={shell.content}>
         <Header
-          eyebrow={`Round ${studyRound} · Milestone`}
+          eyebrow={`${t("Round")} ${studyRound} · ${t("Milestone")}`}
           title="Word learned!"
           subtitle="A word graduated from your active card pool."
         />
@@ -273,7 +276,7 @@ export default function Cards() {
     return (
       <ScrollView style={shell.page} contentContainerStyle={shell.content}>
         <Header
-          eyebrow={`Round ${studyRound} complete`}
+          eyebrow={`${t("Round")} ${studyRound} ${t("complete")}`}
           title={
             mistaken.length ? `${mistaken.length} to review` : "Perfect round!"
           }
@@ -327,9 +330,9 @@ export default function Cards() {
   return (
     <ScrollView style={shell.page} contentContainerStyle={shell.content}>
       <Header
-        eyebrow={`Round ${studyRound} · Card ${position + 1} of ${roundWords.length}`}
+        eyebrow={`${t("Round")} ${studyRound} · ${t("Card")} ${position + 1} ${t("of")} ${roundWords.length}`}
         title="Flashcards"
-        subtitle={`${word.cardSrsLevel < CARD_GRADUATION_LEVEL ? `Learning step ${word.cardSrsLevel + 1} of ${CARD_GRADUATION_LEVEL}` : `Retention level ${word.cardSrsLevel}`} · ${mistakeIds.length} mistaken`}
+        subtitle={`${word.cardSrsLevel < CARD_GRADUATION_LEVEL ? `${t("Learning step")} ${word.cardSrsLevel + 1} ${t("of")} ${CARD_GRADUATION_LEVEL}` : `${t("Retention level")} ${word.cardSrsLevel}`} · ${mistakeIds.length} ${t("mistaken")}`}
       />
       <View style={styles.progress}>
         <View
@@ -347,8 +350,13 @@ export default function Cards() {
             transform: [
               { translateX: flipped ? swipe.x : 0 },
               { translateY: flipped ? swipe.y : 0 },
+              {
+                rotateY: cardSpin.interpolate({
+                  inputRange: [0, 0.5, 1],
+                  outputRange: ["0deg", "90deg", "0deg"],
+                }),
+              },
             ],
-            opacity: cardOpacity,
           },
         ]}
       >
@@ -392,7 +400,6 @@ export default function Cards() {
                 )}
               />
               <WordGuessStats word={word} />
-              <Text style={styles.hint}>Tap to reveal</Text>
             </>
           ) : (
             <>
@@ -410,7 +417,7 @@ export default function Cards() {
                   },
                 ]}
               >
-                WRONG
+                {t("WRONG")}
               </Animated.Text>
               <Animated.Text
                 pointerEvents="none"
@@ -426,7 +433,7 @@ export default function Cards() {
                   },
                 ]}
               >
-                RIGHT
+                {t("RIGHT")}
               </Animated.Text>
               <View style={styles.hanziRow}>
                 <Pressable onPress={() => copyText(wordPronunciation!.hanzi)}>
@@ -474,6 +481,7 @@ export default function Cards() {
             </>
           )}
           </View>
+          {!flipped ? <Text style={styles.hint}>Tap to reveal</Text> : null}
         </Pressable>
       </Animated.View>
     </ScrollView>
@@ -1047,6 +1055,7 @@ const styles = StyleSheet.create({
   },
   fill: { height: 5, backgroundColor: colors.coral },
   card: {
+    position: "relative",
     minHeight: 0,
     borderRadius: 25,
     backgroundColor: colors.card,
@@ -1075,7 +1084,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 1.8,
   },
-  hint: { position: "absolute", bottom: 24, color: colors.muted, fontSize: 13 },
+  hint: { position: "absolute", left: 0, right: 0, bottom: 24, textAlign: "center", color: colors.muted, fontSize: 13 },
   swipeHint: {
     color: colors.muted,
     fontSize: 12,
@@ -1094,7 +1103,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.1,
   },
   wrongBadge: { right: 20, color: colors.red, borderColor: colors.red },
-  rightBadge: { right: 20, color: colors.green, borderColor: colors.green },
+  rightBadge: { left: 20, color: colors.green, borderColor: colors.green },
   hanzi: { fontSize: 66, fontWeight: "700", color: colors.ink },
   pinyin: { fontSize: 20, color: colors.green, marginTop: 6 },
   rule: {

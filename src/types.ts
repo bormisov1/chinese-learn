@@ -64,7 +64,7 @@ export type Settings = {
   ttsRate: number;
   automaticWordAddition: boolean;
 };
-export type AppLanguage = "en" | "ru";
+export type AppLanguage = "en" | "ru" | "th";
 export type PracticeDirection = "zh-ru" | "ru-zh";
 export type SentenceAttempt = {
   sentenceId: string;

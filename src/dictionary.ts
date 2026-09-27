@@ -7,14 +7,17 @@ export type Dictionary = Map<string, ImportedWord>;
 const ASSET_BYTES: Record<AppLanguage, number> = {
   en: 8_854_286,
   ru: 410_405,
+  th: 8_854_286,
 };
 const MAX_BYTES: Record<AppLanguage, number> = {
   en: 30_000_000,
   ru: 2_000_000,
+  th: 30_000_000,
 };
 const MAX_ENTRIES: Record<AppLanguage, number> = {
   en: 150_000,
   ru: 10_000,
+  th: 150_000,
 };
 const METADATA_GLOSS = /^(?:CL:|(?:also |Taiwan )?pr\.|(?:old )?variant of |see |abbr\. for )/i;
 const cache = new Map<AppLanguage, Promise<Dictionary>>();

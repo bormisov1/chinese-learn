@@ -1,4 +1,4 @@
-import { displayTranslation, Text } from "@/i18n";
+import { displayTranslation, Text, useTranslation } from "@/i18n";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -15,11 +15,12 @@ import { roundsByDay } from "@/round-history";
 
 export default function Home() {
   const { data, error } = useStore();
+  const t = useTranslation();
   const [showApiTip, setShowApiTip] = useState(false);
   const passedWords = data.words.filter(
     (word) => word.cardSrsLevel >= CARD_GRADUATION_LEVEL,
   ).length;
-  const passedProgress = `${passedWords} ${passedWords === 1 ? "word" : "words"} passed · ${data.cardRound} ${data.cardRound === 1 ? "round" : "rounds"} passed`;
+  const passedProgress = `${passedWords} ${passedWords === 1 ? t("word") : t("words")} ${t("passed")} · ${data.cardRound} ${data.cardRound === 1 ? t("round") : t("rounds")} ${t("passed")}`;
   const aiEnabled = data.settings.apiKeyValidated;
   const roundDays = roundsByDay(data.roundCompletions);
   const sevenDayRounds = roundDays.reduce((sum, item) => sum + item.count, 0);
@@ -32,11 +33,11 @@ export default function Home() {
   ] as const;
   return (
     <ScrollView style={shell.page} contentContainerStyle={shell.content}>
-      <Header eyebrow="Your Mandarin study" title={"Learn what matters.\nRemember what you learn."} subtitle="A private vocabulary deck shaped around the words you choose." />
+      <Header eyebrow={t("Your Mandarin study")} title={t("Learn what matters.\nRemember what you learn.")} subtitle={t("A private vocabulary deck shaped around the words you choose.")} />
       <View style={styles.hero}>
         <Text style={styles.heroMark}>好</Text>
         <View style={{ flex: 1 }}>
-          <Text style={styles.heroTitle}>{data.words.length ? `${data.words.length} words in your deck` : "Start with your own words"}</Text>
+          <Text style={styles.heroTitle}>{data.words.length ? `${data.words.length} ${t("words in your deck")}` : t("Start with your own words")}</Text>
           <Text style={styles.heroText}>{data.words.length ? passedProgress : "Import a screenshot or paste a vocabulary list. Nothing is hardcoded."}</Text>
         </View>
       </View>
