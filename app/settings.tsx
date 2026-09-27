@@ -37,7 +37,7 @@ import {
 import { resolvePronunciation, resolveWordPronunciation } from "@/pronunciation";
 
 export default function Settings() {
-  const { data, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, importWords, patch, retryDictionary, selectLanguage, setAutomaticWordAddition } = useStore();
+  const { data, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, importWords, patch, retryDictionary, selectLanguage, setAutomaticWordAddition, account, authBusy, authError, signIn, signOut } = useStore();
   const scrollRef = useRef<ScrollView>(null);
   const sectionOffsets = useRef<Record<SettingsSection, number>>({
     general: 0,
@@ -226,6 +226,11 @@ export default function Settings() {
           title="Settings"
           subtitle="Your key and study data stay in this app's local storage."
         />
+        <View style={shell.panel}>
+          <Text style={styles.label}>ACCOUNT</Text>
+          {account ? <><Text style={styles.help}>{account.name || account.email || account.id}</Text><Button secondary label="Sign out" onPress={() => void signOut()} /></> : <View style={styles.authButtons}><Button label="Continue with Google / Gmail" disabled={authBusy} onPress={() => void signIn("google")} /><Button secondary label="Continue with Telegram" disabled={authBusy} onPress={() => void signIn("telegram")} /></View>}
+          {authError ? <Text style={styles.error}>{authError}</Text> : null}
+        </View>
         <View
           onLayout={recordSection("general")}
           style={[
@@ -917,6 +922,7 @@ const styles = StyleSheet.create({
   choiceText: { color: colors.muted, fontSize: 13 },
   choiceTextSelected: { color: colors.green, fontWeight: "800" },
   testButton: { marginTop: 16, alignSelf: "flex-start" },
+  authButtons: { gap: 10 },
   error: { color: colors.red, marginTop: 12 },
   dictionaryStatus: { flexDirection: "row", alignItems: "center", gap: 9, marginTop: 12 },
   languageSection: { marginBottom: 22 },
