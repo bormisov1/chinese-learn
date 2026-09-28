@@ -9,7 +9,7 @@ export default function AuthCallback() {
   const { authError } = useStore();
   useEffect(() => {
     if (typeof window === "undefined" || !params.code) return;
-    window.dispatchEvent(new CustomEvent("hanzideck-auth", { detail: `${window.location.origin}/auth/callback?code=${encodeURIComponent(params.code)}` }));
+    window.dispatchEvent(new CustomEvent("hanzideck-auth", { detail: `${window.location.origin}/auth-callback?code=${encodeURIComponent(params.code)}` }));
   }, [params.code]);
   return <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.paper }}><ActivityIndicator color={colors.green} />{authError ? null : null}</View>;
 }
