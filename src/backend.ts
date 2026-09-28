@@ -4,7 +4,10 @@ import { Platform } from "react-native";
 export type AuthTokens = { accessToken: string; refreshToken: string; userId: string };
 export type Account = { id: string; name: string | null; email: string | null; picture: string | null; createdAt: string };
 
-export const BACKEND_URL = (process.env.EXPO_PUBLIC_BACKEND_URL || "http://localhost:8787").replace(/\/$/, "");
+const defaultBackendUrl = Platform.OS === "web" && typeof window !== "undefined"
+  ? `${window.location.origin}/api`
+  : "http://localhost:8787";
+export const BACKEND_URL = (process.env.EXPO_PUBLIC_BACKEND_URL || defaultBackendUrl).replace(/\/$/, "");
 const TOKEN_KEY = "hanzi-deck:auth:v1";
 
 async function readRaw() {
