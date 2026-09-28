@@ -226,7 +226,7 @@ export default function Settings() {
           title="Settings"
           subtitle="Your key and study data stay in this app's local storage."
         />
-        <View style={shell.panel}>
+        <View style={[shell.panel, styles.accountPanel]}>
           <Text style={styles.label}>ACCOUNT</Text>
           {account ? <><Text style={styles.help}>{account.name || account.email || account.id}</Text><Button secondary label="Sign out" onPress={() => void signOut()} /></> : <View style={styles.authButtons}><Button label="Continue with Google / Gmail" disabled={authBusy} onPress={() => void signIn("google")} /><Button secondary label="Continue with Telegram" disabled={authBusy} onPress={() => void signIn("telegram")} /></View>}
           {authError ? <Text style={styles.error}>{authError}</Text> : null}
@@ -778,6 +778,7 @@ function Field(props: {
 
 const styles = StyleSheet.create({
   settingsContent: { paddingTop: 32 },
+  accountPanel: { marginBottom: 14 },
   settingsScroll: { marginLeft: SIDEBAR_WIDTH },
   sideMenu: {
     position: "absolute",
