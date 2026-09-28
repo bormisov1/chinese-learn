@@ -35,9 +35,11 @@ import {
   TtsVoice,
 } from "@/tts";
 import { resolvePronunciation, resolveWordPronunciation } from "@/pronunciation";
+import { parseBackup } from "@/backup";
+import { chooseBackup, downloadBackup } from "@/backup-files";
 
 export default function Settings() {
-  const { data, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, importWords, patch, retryDictionary, selectLanguage, setAutomaticWordAddition, account, authBusy, authError, signIn, signOut } = useStore();
+  const { data, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, importWords, patch, retryDictionary, selectLanguage, setAutomaticWordAddition, account, authBusy, authError, signIn, signOut, createBackup, mergeBackup } = useStore();
   const scrollRef = useRef<ScrollView>(null);
   const sectionOffsets = useRef<Record<SettingsSection, number>>({
     general: 0,
@@ -48,6 +50,8 @@ export default function Settings() {
   });
   const [activeSection, setActiveSection] = useState<SettingsSection>("general");
   const [selectedWord, setSelectedWord] = useState<Word | null>(null);
+  const [backupBusy, setBackupBusy] = useState(false);
+  const [backupMessage, setBackupMessage] = useState("");
   const indicatorPosition = useRef(new Animated.Value(0)).current;
   const [keyValidation, setKeyValidation] = useState<
     "idle" | "checking" | "valid" | "invalid" | "error"
@@ -175,6 +179,26 @@ export default function Settings() {
       y: Math.max(0, sectionOffsets.current[section] - 16),
       animated: true,
     });
+  };
+  const exportBackup = async () => {
+    setBackupBusy(true); setBackupMessage("");
+    try {
+      await downloadBackup(createBackup());
+      setBackupMessage("Backup ready. Keep the JSON file somewhere safe.");
+    } catch (error) {
+      setBackupMessage(error instanceof Error ? error.message : "Could not create backup.");
+    } finally { setBackupBusy(false); }
+  };
+  const importBackup = async () => {
+    setBackupBusy(true); setBackupMessage("");
+    try {
+      const raw = await chooseBackup();
+      if (!raw) return;
+      const summary = mergeBackup(parseBackup(raw));
+      setBackupMessage(`Merged ${summary.wordsAdded} words, ${summary.sentencesAdded} sentences, and ${summary.attemptsAdded} attempts.`);
+    } catch (error) {
+      setBackupMessage(error instanceof Error ? error.message : "Could not import backup.");
+    } finally { setBackupBusy(false); }
   };
 
   return (
@@ -316,6 +340,17 @@ export default function Settings() {
             Vocabulary, generated sentences, indexes, SRS counters, and attempts
             remain on device. Only AI requests go to DeepSeek.
           </Text>
+        </View>
+      </View>
+      <View style={styles.backupPanel}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.privacyTitle}>Backup study data</Text>
+          <Text style={styles.help}>Download or merge a JSON backup containing vocabulary, sentences, SRS progress, and review history. API keys are never included.</Text>
+          {backupMessage ? <Text style={styles.backupMessage}>{backupMessage}</Text> : null}
+        </View>
+        <View style={styles.backupButtons}>
+          <Button secondary label="Export JSON" icon="download-outline" disabled={backupBusy} onPress={() => void exportBackup()} />
+          <Button secondary label="Import JSON" icon="folder-open-outline" disabled={backupBusy} onPress={() => void importBackup()} />
         </View>
       </View>
       <View onLayout={recordSection("vocabulary")}>
@@ -944,6 +979,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.pale,
     borderRadius: 15,
   },
+  backupPanel: {
+    gap: 14,
+    marginTop: 14,
+    padding: 17,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 15,
+  },
+  backupButtons: { flexDirection: "row", flexWrap: "wrap", gap: 9 },
+  backupMessage: { color: colors.green, fontSize: 12, lineHeight: 18, marginTop: 8 },
   icon: { color: colors.green, fontSize: 24 },
   privacyTitle: { color: colors.ink, fontWeight: "800" },
   help: { color: colors.muted, marginTop: 5, lineHeight: 20 },
