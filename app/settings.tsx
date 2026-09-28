@@ -356,22 +356,6 @@ export default function Settings() {
           />
         </View>
       </View>
-      <View
-        style={styles.settingsAction}
-      >
-        <View style={{ flex: 1 }}>
-          <Text style={styles.privacyTitle}>Transfer vocabulary + SRS</Text>
-          <Text style={styles.help}>
-            Create one compact QR. Sentences excluded.
-          </Text>
-        </View>
-        <Button
-          secondary
-          label="Show QR"
-          icon="qr-code-outline"
-          onPress={() => router.push("/qr-export")}
-        />
-      </View>
       <View style={styles.sectionHeading} onLayout={recordSection("cards")}>
         <View>
           <Text style={styles.sectionTitle}>Active card set</Text>
