@@ -26,6 +26,7 @@ import {
 import { finishExercise } from "@/exercise-progress";
 import { resolveSentencePronunciation, resolveWordPronunciation } from "@/pronunciation";
 import { recordRoundCompletion } from "@/round-history";
+import { track } from "@/telemetry";
 
 type Phase = "ready" | "studying" | "celebrating" | "complete";
 type Graduation = { learned: Word; replacement?: Word };
@@ -94,6 +95,7 @@ export default function Cards() {
     );
 
   const begin = (words: typeof data.words, round: number) => {
+    void track("round_started", { round, size: words.length, mode: "cards" });
     setStudyRound(round);
     patch((d) => ({ ...d, cardRound: Math.max(d.cardRound, round) }));
     setRoundIds(words.map((w) => w.id));
@@ -132,6 +134,8 @@ export default function Cards() {
         : progressed;
     });
     if (!correct) setMistakeIds((ids) => [...ids, word.id]);
+    void track("card_reviewed", { round: studyRound, result: correct ? "correct" : "incorrect", mode: "cards" });
+    if (roundComplete) void track("round_completed", { round: studyRound, size: roundWords.length, mode: "cards" });
     const learned = updatedWords.find(
       (item) => item.id === word.id && word.cardActive && !item.cardActive,
     );

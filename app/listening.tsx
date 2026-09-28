@@ -19,6 +19,7 @@ import {
   resolveSentencePronunciation,
   resolveWordPronunciation,
 } from "@/pronunciation";
+import { track } from "@/telemetry";
 
 type ListeningItem =
   | { kind: "word"; id: string; pronunciation: ResolvedPronunciation; word: Word }
@@ -59,6 +60,7 @@ export default function Listening() {
     setEvaluation(undefined); setExplanation(undefined); setError("");
   };
   const next = () => {
+    void track("listening_item_completed", { kind: item.kind, result: item.kind === "sentence" ? (evaluation?.correct === true ? "correct" : "incorrect") : "revealed" });
     if (item.kind === "sentence") {
       patch((current) => finishExercise(current, { kind: "sentence", sentenceId: item.sentence.id, correct: evaluation?.correct === true }));
     } else {
