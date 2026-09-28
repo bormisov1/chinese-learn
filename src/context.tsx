@@ -9,8 +9,9 @@ import { Dictionary, loadDictionary } from './dictionary';
 import { refreshWords, switchStoreLanguage } from './language';
 import { Account, authUrl, clearTokens, exchangeCode, getAccount, getTokens } from './backend';
 import { bootstrapStore, syncableSnapshot } from './sync';
+import { createBackup, mergeBackupData, type BackupFile, type BackupMergeSummary } from './backup';
 
-type Context = { data: StoreData; ready: boolean; generating: boolean; error: string; dictionary: Dictionary | null; dictionaryLoading: boolean; dictionaryError: string; dictionaryProgress: number | null; switchingLanguage: AppLanguage | null; account: Account | null; authBusy: boolean; authError: string; selectLanguage: (language: AppLanguage) => Promise<boolean>; retryDictionary: () => void; importWords: (items: ImportedWord[]) => number; patch: (fn: (data: StoreData) => StoreData) => void; setAutomaticWordAddition: (enabled: boolean, completeOnboarding?: boolean) => void; generateBatch: (mandatory?: Word) => Promise<void>; signIn: (provider: "google" | "telegram") => Promise<void>; signOut: () => Promise<void> };
+type Context = { data: StoreData; ready: boolean; generating: boolean; error: string; dictionary: Dictionary | null; dictionaryLoading: boolean; dictionaryError: string; dictionaryProgress: number | null; switchingLanguage: AppLanguage | null; account: Account | null; authBusy: boolean; authError: string; selectLanguage: (language: AppLanguage) => Promise<boolean>; retryDictionary: () => void; importWords: (items: ImportedWord[]) => number; patch: (fn: (data: StoreData) => StoreData) => void; createBackup: () => BackupFile; mergeBackup: (backup: BackupFile) => BackupMergeSummary; setAutomaticWordAddition: (enabled: boolean, completeOnboarding?: boolean) => void; generateBatch: (mandatory?: Word) => Promise<void>; signIn: (provider: "google" | "telegram") => Promise<void>; signOut: () => Promise<void> };
 const StoreContext = createContext<Context>(null as never);
 const id = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -141,6 +142,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (fresh.length) setData(d => ({ ...d, words: fillActivePool([...d.words, ...fresh.map(w => ({ ...w, translationByLanguage: { [d.settings.language]: w.russian }, id: id(), exampleCount: 0, wordShownCount: 0, createdAt: Date.now(), srsLevel: 0, srsCorrect: 0, srsIncorrect: 0, srsDueAt: 0, cardSrsLevel: 0, cardSrsCorrect: 0, cardSrsIncorrect: 0, cardSrsDueAt: 0, cardLapses: 0 }))], Date.now(), d.cardRound) }));
     return fresh.length;
   };
+  const makeBackup = () => createBackup(dataRef.current);
+  const mergeBackup = (backup: BackupFile) => {
+    const result = mergeBackupData(dataRef.current, backup);
+    dataRef.current = result.data;
+    setData(result.data);
+    return result.summary;
+  };
   const generateBatch = async (mandatory?: Word) => {
     if (generating || !data.words.length) return;
     const language = data.settings.language;
@@ -162,7 +170,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       });
     } catch (e) { if (languageRef.current === language) setError(e instanceof Error ? e.message : 'Generation failed'); } finally { setGenerating(false); }
   };
-  const value = useMemo(() => ({ data, ready, generating, error, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, account, authBusy, authError, selectLanguage, retryDictionary, importWords, patch, setAutomaticWordAddition, generateBatch, signIn, signOut }), [data, ready, generating, error, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, account, authBusy, authError]);
+  const value = useMemo(() => ({ data, ready, generating, error, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, account, authBusy, authError, selectLanguage, retryDictionary, importWords, patch, createBackup: makeBackup, mergeBackup, setAutomaticWordAddition, generateBatch, signIn, signOut }), [data, ready, generating, error, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, account, authBusy, authError]);
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
 export const useStore = () => useContext(StoreContext);
