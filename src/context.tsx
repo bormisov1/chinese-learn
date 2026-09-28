@@ -8,7 +8,7 @@ import { replenishAutomaticWords } from './hsk-vocabulary';
 import { Dictionary, loadDictionary } from './dictionary';
 import { refreshWords, switchStoreLanguage } from './language';
 import { Account, authUrl, clearTokens, exchangeCode, getAccount, getTokens } from './backend';
-import { bootstrapStore } from './sync';
+import { bootstrapStore, syncableSnapshot } from './sync';
 
 type Context = { data: StoreData; ready: boolean; generating: boolean; error: string; dictionary: Dictionary | null; dictionaryLoading: boolean; dictionaryError: string; dictionaryProgress: number | null; switchingLanguage: AppLanguage | null; account: Account | null; authBusy: boolean; authError: string; selectLanguage: (language: AppLanguage) => Promise<boolean>; retryDictionary: () => void; importWords: (items: ImportedWord[]) => number; patch: (fn: (data: StoreData) => StoreData) => void; setAutomaticWordAddition: (enabled: boolean, completeOnboarding?: boolean) => void; generateBatch: (mandatory?: Word) => Promise<void>; signIn: (provider: "google" | "telegram") => Promise<void>; signOut: () => Promise<void> };
 const StoreContext = createContext<Context>(null as never);
@@ -20,7 +20,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [loadedDictionary, setLoadedDictionary] = useState<{ language: AppLanguage; value: Dictionary } | null>(null);
   const [dictionaryLoading, setDictionaryLoading] = useState(false), [dictionaryError, setDictionaryError] = useState(''), [dictionaryProgress, setDictionaryProgress] = useState<number | null>(null), [switchingLanguage, setSwitchingLanguage] = useState<AppLanguage | null>(null), [dictionaryReload, setDictionaryReload] = useState(0);
   const dictionaryRef = useRef<{ language: AppLanguage; value: Dictionary } | null>(null), switchRequest = useRef(0), languageRef = useRef<AppLanguage>(data.settings.language);
-  const dataRef = useRef(data), authCodeInFlight = useRef<string | null>(null), handledAuthCodes = useRef(new Set<string>());
+  const dataRef = useRef(data), authCodeInFlight = useRef<string | null>(null), handledAuthCodes = useRef(new Set<string>()), syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null), syncedSnapshot = useRef<string | null>(null);
   dataRef.current = data;
   languageRef.current = data.settings.language;
   const dictionary = loadedDictionary?.language === data.settings.language ? loadedDictionary.value : null;
@@ -38,6 +38,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const remoteAccount = await getAccount();
       setAccount(remoteAccount);
       const merged = await bootstrapStore(dataRef.current);
+      syncedSnapshot.current = JSON.stringify(syncableSnapshot(merged));
       setData(merged);
       handledAuthCodes.current.add(code);
     } catch (reason) { setAuthError(reason instanceof Error ? reason.message : "Authentication failed"); }
@@ -54,6 +55,22 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const signIn = async (provider: "google" | "telegram") => { setAuthError(''); await Linking.openURL(authUrl(provider, redirectUri())); };
   const signOut = async () => { await clearTokens(); setAccount(null); };
   useEffect(() => { if (ready) saveStore(data); }, [data, ready]);
+  useEffect(() => {
+    if (!ready || !account || authBusy) return;
+    const snapshotKey = JSON.stringify(syncableSnapshot(data));
+    if (syncedSnapshot.current === snapshotKey) return;
+    if (syncTimer.current) clearTimeout(syncTimer.current);
+    syncTimer.current = setTimeout(() => {
+      syncTimer.current = null;
+      void bootstrapStore(dataRef.current).then(merged => {
+        syncedSnapshot.current = JSON.stringify(syncableSnapshot(merged));
+        setData(merged);
+      }).catch(() => {
+        // Local-first behavior: leave the local store intact and retry on the next change.
+      });
+    }, 750);
+    return () => { if (syncTimer.current) { clearTimeout(syncTimer.current); syncTimer.current = null; } };
+  }, [account, authBusy, data, ready]);
   useEffect(() => {
     if (!ready || !data.languageSelected || dictionaryRef.current?.language === data.settings.language) return;
     const language = data.settings.language;
