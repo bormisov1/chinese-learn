@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { Linking, Platform } from 'react-native';
 import { generate, translateWords } from './deepseek';
 import { emptyStore, loadStore, saveStore } from './storage';
 import { AppLanguage, ImportedWord, StoreData, Word } from './types';
@@ -6,20 +7,71 @@ import { fillActivePool } from './card-srs';
 import { replenishAutomaticWords } from './hsk-vocabulary';
 import { Dictionary, loadDictionary } from './dictionary';
 import { refreshWords, switchStoreLanguage } from './language';
+import { Account, authUrl, clearTokens, exchangeCode, getAccount, getTokens } from './backend';
+import { bootstrapStore, syncableSnapshot } from './sync';
+import { createBackup, mergeBackupData, type BackupFile, type BackupMergeSummary } from './backup';
 
-type Context = { data: StoreData; ready: boolean; generating: boolean; error: string; dictionary: Dictionary | null; dictionaryLoading: boolean; dictionaryError: string; dictionaryProgress: number | null; switchingLanguage: AppLanguage | null; selectLanguage: (language: AppLanguage) => Promise<boolean>; retryDictionary: () => void; importWords: (items: ImportedWord[]) => number; patch: (fn: (data: StoreData) => StoreData) => void; setAutomaticWordAddition: (enabled: boolean, completeOnboarding?: boolean) => void; generateBatch: (mandatory?: Word) => Promise<void> };
+type Context = { data: StoreData; ready: boolean; generating: boolean; error: string; dictionary: Dictionary | null; dictionaryLoading: boolean; dictionaryError: string; dictionaryProgress: number | null; switchingLanguage: AppLanguage | null; account: Account | null; authBusy: boolean; authError: string; selectLanguage: (language: AppLanguage) => Promise<boolean>; retryDictionary: () => void; importWords: (items: ImportedWord[]) => number; patch: (fn: (data: StoreData) => StoreData) => void; createBackup: () => BackupFile; mergeBackup: (backup: BackupFile) => BackupMergeSummary; setAutomaticWordAddition: (enabled: boolean, completeOnboarding?: boolean) => void; generateBatch: (mandatory?: Word) => Promise<void>; signIn: (provider: "google" | "telegram") => Promise<void>; signOut: () => Promise<void> };
 const StoreContext = createContext<Context>(null as never);
 const id = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [data, setData] = useState<StoreData>(emptyStore), [ready, setReady] = useState(false), [generating, setGenerating] = useState(false), [error, setError] = useState('');
+  const [account, setAccount] = useState<Account | null>(null), [authBusy, setAuthBusy] = useState(false), [authError, setAuthError] = useState('');
   const [loadedDictionary, setLoadedDictionary] = useState<{ language: AppLanguage; value: Dictionary } | null>(null);
   const [dictionaryLoading, setDictionaryLoading] = useState(false), [dictionaryError, setDictionaryError] = useState(''), [dictionaryProgress, setDictionaryProgress] = useState<number | null>(null), [switchingLanguage, setSwitchingLanguage] = useState<AppLanguage | null>(null), [dictionaryReload, setDictionaryReload] = useState(0);
   const dictionaryRef = useRef<{ language: AppLanguage; value: Dictionary } | null>(null), switchRequest = useRef(0), languageRef = useRef<AppLanguage>(data.settings.language);
+  const dataRef = useRef(data), authCodeInFlight = useRef<string | null>(null), handledAuthCodes = useRef(new Set<string>()), syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null), syncedSnapshot = useRef<string | null>(null);
+  dataRef.current = data;
   languageRef.current = data.settings.language;
   const dictionary = loadedDictionary?.language === data.settings.language ? loadedDictionary.value : null;
   useEffect(() => { loadStore().then(value => { setData(value); setReady(true); }); }, []);
+  const redirectUri = () => Platform.OS === "web" && typeof window !== "undefined" ? `${window.location.origin}/auth-callback` : "hanzideck://auth/callback";
+  const completeAuth = async (url: string) => {
+    const parsed = new URL(url);
+    const code = parsed.searchParams.get("code");
+    if (!code) return;
+    if (authCodeInFlight.current === code || handledAuthCodes.current.has(code)) return;
+    authCodeInFlight.current = code;
+    setAuthBusy(true); setAuthError('');
+    try {
+      await exchangeCode(code, redirectUri());
+      const remoteAccount = await getAccount();
+      setAccount(remoteAccount);
+      const merged = await bootstrapStore(dataRef.current);
+      syncedSnapshot.current = JSON.stringify(syncableSnapshot(merged));
+      setData(merged);
+      handledAuthCodes.current.add(code);
+    } catch (reason) { setAuthError(reason instanceof Error ? reason.message : "Authentication failed"); }
+    finally { if (authCodeInFlight.current === code) authCodeInFlight.current = null; setAuthBusy(false); }
+  };
+  useEffect(() => {
+    const subscription = Linking.addEventListener("url", event => { void completeAuth(event.url); });
+    const webSubscription = typeof window !== "undefined" ? ((event: Event) => { const detail = (event as CustomEvent<string>).detail; if (detail) void completeAuth(detail); }) : null;
+    if (webSubscription && typeof window !== "undefined") window.addEventListener("hanzideck-auth", webSubscription);
+    Linking.getInitialURL().then(value => { if (value) void completeAuth(value); });
+    getTokens().then(tokens => { if (!tokens) return; getAccount().then(setAccount).catch(() => clearTokens()); });
+    return () => { subscription.remove(); if (webSubscription && typeof window !== "undefined") window.removeEventListener("hanzideck-auth", webSubscription); };
+  }, [ready]);
+  const signIn = async (provider: "google" | "telegram") => { setAuthError(''); await Linking.openURL(authUrl(provider, redirectUri())); };
+  const signOut = async () => { await clearTokens(); setAccount(null); };
   useEffect(() => { if (ready) saveStore(data); }, [data, ready]);
+  useEffect(() => {
+    if (!ready || !account || authBusy) return;
+    const snapshotKey = JSON.stringify(syncableSnapshot(data));
+    if (syncedSnapshot.current === snapshotKey) return;
+    if (syncTimer.current) clearTimeout(syncTimer.current);
+    syncTimer.current = setTimeout(() => {
+      syncTimer.current = null;
+      void bootstrapStore(dataRef.current).then(merged => {
+        syncedSnapshot.current = JSON.stringify(syncableSnapshot(merged));
+        setData(merged);
+      }).catch(() => {
+        // Local-first behavior: leave the local store intact and retry on the next change.
+      });
+    }, 750);
+    return () => { if (syncTimer.current) { clearTimeout(syncTimer.current); syncTimer.current = null; } };
+  }, [account, authBusy, data, ready]);
   useEffect(() => {
     if (!ready || !data.languageSelected || dictionaryRef.current?.language === data.settings.language) return;
     const language = data.settings.language;
@@ -90,6 +142,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (fresh.length) setData(d => ({ ...d, words: fillActivePool([...d.words, ...fresh.map(w => ({ ...w, translationByLanguage: { [d.settings.language]: w.russian }, id: id(), exampleCount: 0, wordShownCount: 0, createdAt: Date.now(), srsLevel: 0, srsCorrect: 0, srsIncorrect: 0, srsDueAt: 0, cardSrsLevel: 0, cardSrsCorrect: 0, cardSrsIncorrect: 0, cardSrsDueAt: 0, cardLapses: 0 }))], Date.now(), d.cardRound) }));
     return fresh.length;
   };
+  const makeBackup = () => createBackup(dataRef.current);
+  const mergeBackup = (backup: BackupFile) => {
+    const result = mergeBackupData(dataRef.current, backup);
+    dataRef.current = result.data;
+    setData(result.data);
+    return result.summary;
+  };
   const generateBatch = async (mandatory?: Word) => {
     if (generating || !data.words.length) return;
     const language = data.settings.language;
@@ -111,7 +170,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       });
     } catch (e) { if (languageRef.current === language) setError(e instanceof Error ? e.message : 'Generation failed'); } finally { setGenerating(false); }
   };
-  const value = useMemo(() => ({ data, ready, generating, error, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, selectLanguage, retryDictionary, importWords, patch, setAutomaticWordAddition, generateBatch }), [data, ready, generating, error, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage]);
+  const value = useMemo(() => ({ data, ready, generating, error, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, account, authBusy, authError, selectLanguage, retryDictionary, importWords, patch, createBackup: makeBackup, mergeBackup, setAutomaticWordAddition, generateBatch, signIn, signOut }), [data, ready, generating, error, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, account, authBusy, authError]);
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
 export const useStore = () => useContext(StoreContext);

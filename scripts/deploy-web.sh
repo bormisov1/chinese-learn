@@ -161,6 +161,10 @@ install -D -m 0644 \
   "$WORKTREE_DIR/docs/backend-architecture.html" \
   "$BUILD_OUTPUT/docs/backend-architecture/index.html"
 
+# Nginx serves the atomic output directly; make every published directory and
+# file traversable/readable by the web server regardless of mktemp defaults.
+chmod -R a+rX "$BUILD_OUTPUT"
+
 log "Verifying index.html and its referenced assets."
 node - "$BUILD_OUTPUT" <<'NODE'
 const fs = require('fs');
@@ -227,7 +231,45 @@ provision_branch_host() {
       --non-interactive --agree-tos --no-eff-email
   fi
 
-  cat >"$config_staging" <<NGINX
+  if [[ "$CURRENT_BRANCH" == dev ]]; then
+    cat >"$config_staging" <<NGINX
+server {
+    listen 8443 ssl http2 proxy_protocol;
+    server_name $DEPLOY_HOST;
+
+    set_real_ip_from 127.0.0.1;
+    real_ip_header proxy_protocol;
+
+    ssl_certificate /etc/letsencrypt/live/$DEPLOY_HOST/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$DEPLOY_HOST/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    root $DEPLOY_TARGET;
+    index index.html;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:8787/;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    }
+
+    location /v1/ {
+        proxy_pass http://127.0.0.1:8787/v1/;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    }
+
+    location / {
+        try_files \$uri \$uri/ /index.html;
+    }
+}
+NGINX
+  else
+    cat >"$config_staging" <<NGINX
 server {
     listen 8443 ssl http2 proxy_protocol;
     server_name $DEPLOY_HOST;
@@ -247,6 +289,7 @@ server {
     }
 }
 NGINX
+  fi
   sudo install -m 0644 "$config_staging" "$config_path"
   rm -f -- "$config_staging"
   sudo ln -sfn "$config_path" "$NGINX_SITES_ENABLED/chinese-learn-$DEPLOY_SLUG"

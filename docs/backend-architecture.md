@@ -282,7 +282,7 @@ Common fields: event ID, name, time, session ID, HMAC-pseudonymous install/user 
 | login_started/succeeded/failed | method telegram/google/password, is_link, bounded failure_class |
 | language_chosen | language, onboarding/settings, suggested_match |
 | word_addition_mode_chosen | manual/automatic, onboarding/settings |
-| import_completed | typed/paste/hsk/qr, word_count, sentence_count, duplicate_count, duration bucket; **never content** |
+| import_completed | typed/paste/hsk, word_count, sentence_count, duplicate_count, duration bucket; **never content** |
 | mode_entered | cards/sentences/listening/mix, bounded entry_point |
 | card_answered | correct, SRS level before/after, latency bucket, cards/mix |
 | sentence_answered | correct, direction, latency bucket, sentences/listening/mix; no answer/ID |
