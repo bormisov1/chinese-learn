@@ -20,6 +20,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [loadedDictionary, setLoadedDictionary] = useState<{ language: AppLanguage; value: Dictionary } | null>(null);
   const [dictionaryLoading, setDictionaryLoading] = useState(false), [dictionaryError, setDictionaryError] = useState(''), [dictionaryProgress, setDictionaryProgress] = useState<number | null>(null), [switchingLanguage, setSwitchingLanguage] = useState<AppLanguage | null>(null), [dictionaryReload, setDictionaryReload] = useState(0);
   const dictionaryRef = useRef<{ language: AppLanguage; value: Dictionary } | null>(null), switchRequest = useRef(0), languageRef = useRef<AppLanguage>(data.settings.language);
+  const dataRef = useRef(data), authCodeInFlight = useRef<string | null>(null), handledAuthCodes = useRef(new Set<string>());
+  dataRef.current = data;
   languageRef.current = data.settings.language;
   const dictionary = loadedDictionary?.language === data.settings.language ? loadedDictionary.value : null;
   useEffect(() => { loadStore().then(value => { setData(value); setReady(true); }); }, []);
@@ -28,16 +30,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const parsed = new URL(url);
     const code = parsed.searchParams.get("code");
     if (!code) return;
+    if (authCodeInFlight.current === code || handledAuthCodes.current.has(code)) return;
+    authCodeInFlight.current = code;
     setAuthBusy(true); setAuthError('');
     try {
       await exchangeCode(code, redirectUri());
       const remoteAccount = await getAccount();
       setAccount(remoteAccount);
-      setData(current => current);
-      const merged = await bootstrapStore(data);
+      const merged = await bootstrapStore(dataRef.current);
       setData(merged);
+      handledAuthCodes.current.add(code);
     } catch (reason) { setAuthError(reason instanceof Error ? reason.message : "Authentication failed"); }
-    finally { setAuthBusy(false); }
+    finally { if (authCodeInFlight.current === code) authCodeInFlight.current = null; setAuthBusy(false); }
   };
   useEffect(() => {
     const subscription = Linking.addEventListener("url", event => { void completeAuth(event.url); });
