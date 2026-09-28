@@ -12,7 +12,7 @@ export default function AuthCallback() {
   const sawBusy = useRef(false);
   useEffect(() => {
     if (typeof window === "undefined" || !params.code) return;
-    window.dispatchEvent(new CustomEvent("hanzideck-auth", { detail: `${window.location.origin}/auth-callback?code=${encodeURIComponent(params.code)}` }));
+    window.dispatchEvent(new CustomEvent("hanzideck-auth", { detail: `${window.location.origin}/auth/callback?code=${encodeURIComponent(params.code)}` }));
     setStarted(true);
   }, [params.code]);
   useEffect(() => {
