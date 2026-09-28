@@ -6,6 +6,7 @@ import translations from "./data/ui-translations.json";
 
 const contextualTranslations: Partial<Record<AppLanguage, Record<string, string>>> = {
   ru: {
+    "ACCOUNT": "АККАУНТ",
     "1 example": "пример",
     "examples": "примеров",
     "2 examples": "2 примера",
@@ -46,6 +47,7 @@ const contextualTranslations: Partial<Record<AppLanguage, Record<string, string>
     "Swipe any direction to continue": "Проведите в любую сторону, чтобы продолжить",
   },
   th: {
+    "ACCOUNT": "บัญชี",
     "1 example": "ตัวอย่าง",
     "examples": "ตัวอย่าง",
     "2 examples": "2 ตัวอย่าง",
