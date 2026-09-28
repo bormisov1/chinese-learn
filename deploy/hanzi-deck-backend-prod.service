@@ -1,0 +1,17 @@
+[Unit]
+Description=Hanzi Deck production backend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=claude
+WorkingDirectory=/home/claude/chinese-learn/app/backend
+EnvironmentFile=/home/claude/chinese-learn/app/backend/.env.prod
+ExecStart=/usr/local/bin/bun run src/server.ts
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
