@@ -27,7 +27,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   languageRef.current = data.settings.language;
   const dictionary = loadedDictionary?.language === data.settings.language ? loadedDictionary.value : null;
   useEffect(() => { loadStore().then(value => { setData(value); setReady(true); void initializeTelemetry(); }); }, []);
-  const redirectUri = () => Platform.OS === "web" && typeof window !== "undefined" ? `${window.location.origin}/auth-callback` : "hanzideck://auth/callback";
+  const redirectUri = () => Platform.OS === "web" && typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : "hanzideck://auth/callback";
   const completeAuth = async (url: string) => {
     const parsed = new URL(url);
     const code = parsed.searchParams.get("code");
