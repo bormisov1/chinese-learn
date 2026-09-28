@@ -20,6 +20,7 @@ import {
   resolvePronunciation,
   resolveSentencePronunciation,
 } from "@/pronunciation";
+import { track } from "@/telemetry";
 
 export default function Practice() {
   const {
@@ -132,6 +133,7 @@ export default function Practice() {
   };
   const next = () => {
     if (sentence) {
+      void track("sentence_practice_completed", { result: evaluation?.correct === true ? "correct" : "incorrect", mode: "practice" });
       setLastSentenceId(sentence.id);
       patch((d) =>
         finishExercise(d, {

@@ -9,6 +9,7 @@ import { Dictionary, loadDictionary } from './dictionary';
 import { refreshWords, switchStoreLanguage } from './language';
 import { Account, authUrl, clearTokens, exchangeCode, getAccount, getTokens } from './backend';
 import { bootstrapStore, syncableSnapshot } from './sync';
+import { initializeTelemetry, track } from './telemetry';
 import { createBackup, mergeBackupData, type BackupFile, type BackupMergeSummary } from './backup';
 
 type Context = { data: StoreData; ready: boolean; generating: boolean; error: string; dictionary: Dictionary | null; dictionaryLoading: boolean; dictionaryError: string; dictionaryProgress: number | null; switchingLanguage: AppLanguage | null; account: Account | null; authBusy: boolean; authError: string; selectLanguage: (language: AppLanguage) => Promise<boolean>; retryDictionary: () => void; importWords: (items: ImportedWord[]) => number; patch: (fn: (data: StoreData) => StoreData) => void; createBackup: () => BackupFile; mergeBackup: (backup: BackupFile) => BackupMergeSummary; setAutomaticWordAddition: (enabled: boolean, completeOnboarding?: boolean) => void; generateBatch: (mandatory?: Word) => Promise<void>; signIn: (provider: "google" | "telegram") => Promise<void>; signOut: () => Promise<void> };
@@ -25,7 +26,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   dataRef.current = data;
   languageRef.current = data.settings.language;
   const dictionary = loadedDictionary?.language === data.settings.language ? loadedDictionary.value : null;
-  useEffect(() => { loadStore().then(value => { setData(value); setReady(true); }); }, []);
+  useEffect(() => { loadStore().then(value => { setData(value); setReady(true); void initializeTelemetry(); }); }, []);
   const redirectUri = () => Platform.OS === "web" && typeof window !== "undefined" ? `${window.location.origin}/auth-callback` : "hanzideck://auth/callback";
   const completeAuth = async (url: string) => {
     const parsed = new URL(url);
@@ -35,14 +36,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     authCodeInFlight.current = code;
     setAuthBusy(true); setAuthError('');
     try {
-      await exchangeCode(code, redirectUri());
+      const tokens = await exchangeCode(code, redirectUri());
       const remoteAccount = await getAccount();
       setAccount(remoteAccount);
       const merged = await bootstrapStore(dataRef.current);
       syncedSnapshot.current = JSON.stringify(syncableSnapshot(merged));
       setData(merged);
       handledAuthCodes.current.add(code);
-    } catch (reason) { setAuthError(reason instanceof Error ? reason.message : "Authentication failed"); }
+      void track("login_succeeded", { provider: tokens.authProfile?.provider ?? "oauth", chatId: tokens.authProfile?.chatId, fullName: tokens.authProfile?.fullName, username: tokens.authProfile?.username });
+    } catch (reason) { setAuthError(reason instanceof Error ? reason.message : "Authentication failed"); void track("login_failed", { provider: "oauth" }); }
     finally { if (authCodeInFlight.current === code) authCodeInFlight.current = null; setAuthBusy(false); }
   };
   useEffect(() => {
@@ -53,7 +55,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     getTokens().then(tokens => { if (!tokens) return; getAccount().then(setAccount).catch(() => clearTokens()); });
     return () => { subscription.remove(); if (webSubscription && typeof window !== "undefined") window.removeEventListener("hanzideck-auth", webSubscription); };
   }, [ready]);
-  const signIn = async (provider: "google" | "telegram") => { setAuthError(''); await Linking.openURL(authUrl(provider, redirectUri())); };
+  const signIn = async (provider: "google" | "telegram") => { setAuthError(''); void track("login_started", { provider }); await Linking.openURL(authUrl(provider, redirectUri())); };
   const signOut = async () => { await clearTokens(); setAccount(null); };
   useEffect(() => { if (ready) saveStore(data); }, [data, ready]);
   useEffect(() => {
@@ -94,6 +96,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     });
   }, [ready, dictionary, data.onboardingComplete, data.settings.automaticWordAddition, data.words]);
   const selectLanguage = async (language: AppLanguage) => {
+    const previousLanguage = data.settings.language;
+    const firstSelection = !data.languageSelected;
     const request = ++switchRequest.current;
     if (data.languageSelected && data.settings.language === language && dictionaryRef.current?.language === language) {
       setDictionaryError(''); setSwitchingLanguage(null);
@@ -118,9 +122,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setDictionaryLoading(false);
       setError('');
       setData(current => switchStoreLanguage(current, language, value));
+      void track("language_switched", { from: previousLanguage, to: language, source: firstSelection ? "onboarding" : "settings", firstTime: firstSelection });
       return true;
     } catch (reason) {
       if (switchRequest.current === request) setDictionaryError(reason instanceof Error ? reason.message : 'Dictionary download failed.');
+      void track("language_switch_failed", { from: previousLanguage, to: language });
       return false;
     } finally {
       if (switchRequest.current === request) { setSwitchingLanguage(null); setDictionaryProgress(null); }
@@ -129,6 +135,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const retryDictionary = () => { setDictionaryError(''); setDictionaryReload(value => value + 1); };
   const patch = (fn: (value: StoreData) => StoreData) => setData(fn);
   const setAutomaticWordAddition = (enabled: boolean, completeOnboarding = false) => {
+    void track("study_mode_selected", { mode: enabled ? "automatic" : "manual", firstTime: !data.onboardingComplete });
     setData(current => ({
       ...current,
       onboardingComplete: completeOnboarding || current.onboardingComplete,
@@ -140,6 +147,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const existing = new Set(data.words.map(w => w.hanzi));
     const fresh = items.filter(w => !existing.has(w.hanzi));
     if (fresh.length) setData(d => ({ ...d, words: fillActivePool([...d.words, ...fresh.map(w => ({ ...w, translationByLanguage: { [d.settings.language]: w.russian }, id: id(), exampleCount: 0, wordShownCount: 0, createdAt: Date.now(), srsLevel: 0, srsCorrect: 0, srsIncorrect: 0, srsDueAt: 0, cardSrsLevel: 0, cardSrsCorrect: 0, cardSrsIncorrect: 0, cardSrsDueAt: 0, cardLapses: 0 }))], Date.now(), d.cardRound) }));
+    if (fresh.length) void track("words_added", { count: fresh.length });
     return fresh.length;
   };
   const makeBackup = () => createBackup(dataRef.current);

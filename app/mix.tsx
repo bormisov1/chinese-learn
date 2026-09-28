@@ -20,6 +20,7 @@ import {
   resolveSentencePronunciation,
   resolveWordPronunciation,
 } from "@/pronunciation";
+import { track } from "@/telemetry";
 
 type MixItem =
   | { id: string; mode: "word"; word: Word }
@@ -98,6 +99,7 @@ export default function Mix() {
   const answered = Boolean(evaluation || explanation);
   const reset = () => { setRevealed(false); setAnswer(""); setSubmittedAnswer(""); setEvaluation(undefined); setExplanation(undefined); setError(""); };
   const advance = (completion?: Parameters<typeof finishExercise>[1]) => {
+    if (completion) void track("mix_item_completed", { kind: completion.kind, result: "completed", mode: "mix" });
     patch((current) => {
       const progressed = completion ? finishExercise(current, completion) : current;
       const atEnd = position + 1 >= queue.length;

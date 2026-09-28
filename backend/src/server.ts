@@ -35,12 +35,64 @@ db.exec(`
     user_id TEXT PRIMARY KEY REFERENCES users(id), snapshot_json TEXT NOT NULL,
     updated_at TEXT NOT NULL, bootstrap_id TEXT
   );
+  CREATE TABLE IF NOT EXISTS analytics_events (
+    event_id TEXT PRIMARY KEY, name TEXT NOT NULL, occurred_at TEXT NOT NULL,
+    received_at TEXT NOT NULL, platform TEXT NOT NULL, app_version TEXT NOT NULL,
+    install_id_hash TEXT NOT NULL, properties_json TEXT NOT NULL
+  );
 `);
 try { db.exec("ALTER TABLE oauth_states ADD COLUMN code_verifier TEXT NOT NULL DEFAULT ''"); } catch {}
 try { db.exec("ALTER TABLE oauth_states ADD COLUMN nonce TEXT NOT NULL DEFAULT ''"); } catch {}
 
 type Provider = "google" | "telegram";
 type Snapshot = Record<string, unknown>;
+
+const metricCounters = new Map<string, number>();
+const metricHistograms = new Map<string, { buckets: number[]; counts: number[]; sum: number; count: number }>();
+const requestBuckets = [0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10];
+const telemetryNames = new Set([
+  "app_opened", "first_app_opened", "login_started", "login_succeeded", "login_failed",
+  "language_switched", "language_switch_failed", "words_added", "round_started",
+  "round_completed", "card_reviewed", "sentence_practice_completed", "listening_item_completed",
+  "mix_item_completed", "sync_bootstrap", "study_mode_selected",
+]);
+const metricLabel = (value: string) => value.replace(/[^a-zA-Z0-9_.:-]/g, "_").slice(0, 80) || "unknown";
+const inc = (name: string, labels: Record<string, string> = {}, amount = 1) => {
+  const suffix = Object.entries(labels).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => `${key}=${metricLabel(value)}`).join(",");
+  const key = suffix ? `${name}|${suffix}` : name;
+  metricCounters.set(key, (metricCounters.get(key) ?? 0) + amount);
+};
+const observe = (name: string, seconds: number, labels: Record<string, string> = {}) => {
+  const suffix = Object.entries(labels).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => `${key}=${metricLabel(value)}`).join(",");
+  const key = suffix ? `${name}|${suffix}` : name;
+  const entry = metricHistograms.get(key) ?? { buckets: requestBuckets, counts: requestBuckets.map(() => 0), sum: 0, count: 0 };
+  entry.count += 1; entry.sum += seconds;
+  entry.buckets.forEach((bucket, index) => { if (seconds <= bucket) entry.counts[index] += 1; });
+  metricHistograms.set(key, entry);
+};
+const labelsText = (value: string) => {
+  const labels = value.split(",").filter(Boolean).map(item => {
+    const index = item.indexOf("=");
+    return `${item.slice(0, index)}="${item.slice(index + 1)}"`;
+  });
+  return labels.length ? `{${labels.join(",")}}` : "";
+};
+const prometheus = () => {
+  let output = "# HELP http_requests_total HTTP requests handled by the backend.\n# TYPE http_requests_total counter\n";
+  const counterNames = new Set([...metricCounters.keys()].map(key => key.split("|")[0]));
+  for (const name of counterNames) if (name !== "http_requests_total") output += `# TYPE ${name} counter\n`;
+  for (const [key, value] of metricCounters) {
+    const [name, suffix = ""] = key.split("|");
+    output += `${name}${labelsText(suffix)} ${value}\n`;
+  }
+  for (const [key, value] of metricHistograms) {
+    const [name, suffix = ""] = key.split("|");
+    value.buckets.forEach((bucket, index) => output += `${name}_bucket${labelsText(suffix ? `${suffix},le=${bucket}` : `le=${bucket}`)} ${value.counts[index]}\n`);
+    output += `${name}_bucket${labelsText(suffix ? `${suffix},le=+Inf` : "le=+Inf")} ${value.count}\n`;
+    output += `${name}_sum${labelsText(suffix)} ${value.sum}\n${name}_count${labelsText(suffix)} ${value.count}\n`;
+  }
+  return output;
+};
 
 const json = (value: unknown, status = 200) =>
   Response.json(value, { status, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "content-type, authorization", "access-control-allow-methods": "GET,POST,OPTIONS" } });
@@ -51,6 +103,26 @@ const token = () => randomBytes(32).toString("base64url");
 const base64Url = (value: string) => Buffer.from(value).toString("base64url");
 const pkceChallenge = async (verifier: string) => base64Url(Buffer.from(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
 const safeJson = (value: unknown): Snapshot => value && typeof value === "object" && !Array.isArray(value) ? value as Snapshot : {};
+
+function recordTelemetry(event: Snapshot) {
+  const name = String(event.name ?? "");
+  if (!telemetryNames.has(name)) return false;
+  const properties = safeJson(event.properties);
+  const boundedProperties: Snapshot = {};
+  for (const key of ["platform", "provider", "source", "language", "from", "to", "mode", "kind", "result", "round", "count", "size", "firstTime", "chatId", "fullName", "username"]) {
+    if (properties[key] !== undefined) boundedProperties[key] = typeof properties[key] === "number" ? Math.max(0, Math.min(100000, Math.trunc(Number(properties[key])))) : String(properties[key]).slice(0, 40);
+  }
+  const eventId = String(event.eventId ?? "");
+  if (!eventId) return false;
+  const insert = db.query("INSERT OR IGNORE INTO analytics_events(event_id, name, occurred_at, received_at, platform, app_version, install_id_hash, properties_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+    .run(eventId, name, String(event.occurredAt ?? iso()), iso(), String(event.platform ?? "unknown").slice(0, 20), String(event.appVersion ?? "unknown").slice(0, 40), hash(String(event.installId ?? "unknown")), JSON.stringify(boundedProperties));
+  if (insert.changes === 0) return true;
+  const labels: Record<string, string> = { event: name };
+  for (const key of ["platform", "provider", "language", "from", "to", "source", "mode", "kind", "result", "firstTime"]) if (boundedProperties[key] !== undefined) labels[key] = String(boundedProperties[key]);
+  if (boundedProperties.round !== undefined) labels.round = String(boundedProperties.round);
+  inc("client_events_total", labels);
+  return true;
+}
 
 async function verifyIdToken(value: string, issuer: string, audience: string, jwksUrl: string, nonce: string) {
   const [encodedHeader, encodedPayload, encodedSignature] = value.split(".");
@@ -98,7 +170,19 @@ function issueSession(userId: string) {
   const refreshToken = token();
   db.query("INSERT INTO sessions(id, user_id, refresh_hash, created_at, expires_at) VALUES (?, ?, ?, ?, ?)")
     .run(accessToken, userId, hash(refreshToken), iso(), new Date(Date.now() + 30 * 86400_000).toISOString());
-  return { accessToken, refreshToken, userId };
+  const identity = db.query("SELECT provider, profile_json FROM identities WHERE user_id = ? ORDER BY created_at DESC LIMIT 1").get(userId) as { provider: string; profile_json: string } | null;
+  const profile = identity ? safeJson(JSON.parse(identity.profile_json)) : {};
+  return {
+    accessToken,
+    refreshToken,
+    userId,
+    authProfile: {
+      provider: identity?.provider,
+      chatId: profile.chatId as string | undefined,
+      fullName: profile.name as string | undefined,
+      username: profile.username as string | undefined,
+    },
+  };
 }
 
 function userForAccess(request: Request) {
@@ -189,16 +273,23 @@ async function providerProfile(provider: Provider, code: string, verifier: strin
   if (!response.ok) throw new Error("Telegram token exchange failed");
   const tokens = await response.json() as { id_token?: string };
   const profile = await verifyIdToken(String(tokens.id_token ?? ""), "https://oauth.telegram.org", process.env.TELEGRAM_CLIENT_ID ?? "", "https://oauth.telegram.org/.well-known/jwks.json", nonce);
-  return { subject: String(profile.sub), profile: { name: profile.name ?? profile.preferred_username, picture: profile.picture } };
+  return { subject: String(profile.sub), profile: { name: profile.name ?? profile.preferred_username, username: profile.preferred_username, chatId: String(profile.sub), picture: profile.picture } };
 }
 
-const server = Bun.serve({
-  port,
-  async fetch(request) {
+async function fetchRequest(request: Request) {
     if (request.method === "OPTIONS") return json({}, 204);
     const url = new URL(request.url);
     try {
+      if (url.pathname === "/metrics") return new Response(prometheus(), { headers: { "content-type": "text/plain; version=0.0.4" } });
       if (url.pathname === "/health") return json({ ok: true, service: "hanzi-deck-backend" });
+      if (request.method === "POST" && url.pathname === "/v1/telemetry/batch") {
+        const body = safeJson(await request.json());
+        const events = Array.isArray(body.events) ? body.events.slice(0, 100) : [];
+        let accepted = 0;
+        for (const event of events) if (recordTelemetry(safeJson(event))) accepted += 1;
+        inc("telemetry_batches_total", { result: "accepted" });
+        return json({ accepted, rejected: events.length - accepted });
+      }
       const authMatch = url.pathname.match(/^\/v1\/auth\/(google|telegram)\/start$/);
       if (request.method === "GET" && authMatch) {
         const provider = authMatch[1] as Provider;
@@ -258,6 +349,24 @@ const server = Bun.serve({
       console.error(error);
       return json({ error: error instanceof Error ? error.message : "server_error" }, 500);
     }
+}
+
+const server = Bun.serve({
+  port,
+  async fetch(request) {
+    const started = performance.now();
+    let response: Response;
+    try {
+      response = await fetchRequest(request);
+    } catch (error) {
+      inc("http_requests_total", { method: request.method, route: "uncaught", status: "500" });
+      observe("http_request_duration_seconds", (performance.now() - started) / 1000, { method: request.method, route: "uncaught" });
+      throw error;
+    }
+    const route = new URL(request.url).pathname.replace(/^\/v1\/auth\/(google|telegram)\/.*$/, "/v1/auth/:provider").replace(/^\/v1\/auth\/.*$/, "/v1/auth/:action");
+    inc("http_requests_total", { method: request.method, route, status: String(response.status) });
+    observe("http_request_duration_seconds", (performance.now() - started) / 1000, { method: request.method, route });
+    return response;
   },
 });
 

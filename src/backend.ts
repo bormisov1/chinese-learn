@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
-export type AuthTokens = { accessToken: string; refreshToken: string; userId: string };
+export type AuthTokens = { accessToken: string; refreshToken: string; userId: string; authProfile?: { provider?: string; chatId?: string; fullName?: string; username?: string } };
 export type Account = { id: string; name: string | null; email: string | null; picture: string | null; createdAt: string };
 
 const defaultBackendUrl = Platform.OS === "web" && typeof window !== "undefined"
