@@ -6,6 +6,13 @@ import translations from "./data/ui-translations.json";
 
 const contextualTranslations: Partial<Record<AppLanguage, Record<string, string>>> = {
   ru: {
+    "Explanation": "Объяснение",
+    "Back": "Назад",
+    "Refresh explanation": "Обновить объяснение",
+    "Get explanation": "Получить объяснение",
+    "No cached explanation yet.": "Сохранённого объяснения пока нет.",
+    "Cached explanation for": "Сохранённое объяснение:",
+    "Get explanation for": "Получить объяснение:",
     "ACCOUNT": "АККАУНТ",
     "1 example": "пример",
     "examples": "примеров",
@@ -46,6 +53,13 @@ const contextualTranslations: Partial<Record<AppLanguage, Record<string, string>
     "Swipe any direction to continue": "Проведите в любую сторону, чтобы продолжить",
   },
   th: {
+    "Explanation": "คำอธิบาย",
+    "Back": "กลับ",
+    "Refresh explanation": "สร้างคำอธิบายใหม่",
+    "Get explanation": "สร้างคำอธิบาย",
+    "No cached explanation yet.": "ยังไม่มีคำอธิบายที่บันทึกไว้",
+    "Cached explanation for": "คำอธิบายที่บันทึกไว้:",
+    "Get explanation for": "สร้างคำอธิบาย:",
     "ACCOUNT": "บัญชี",
     "1 example": "ตัวอย่าง",
     "examples": "ตัวอย่าง",

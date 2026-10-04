@@ -1,4 +1,5 @@
 import { StoreData } from "./types";
+import { mergeExplanations } from "./word-explanations";
 
 function hasStudyData(data: Partial<StoreData>) {
   return Boolean(
@@ -7,7 +8,8 @@ function hasStudyData(data: Partial<StoreData>) {
     data.words?.length ||
     data.sentences?.length ||
     data.attempts?.length ||
-    data.roundCompletions?.length,
+    data.roundCompletions?.length ||
+    Object.keys(data.explanations ?? {}).length,
   );
 }
 
@@ -17,6 +19,7 @@ export function applyBootstrapSnapshot(local: StoreData, remote: Partial<StoreDa
   return {
     ...local,
     ...remote,
+    explanations: mergeExplanations(local.explanations, remote.explanations),
     settings: { ...local.settings, ...(remote.settings ?? {}) },
     mixQueue: local.mixQueue,
     mixPosition: local.mixPosition,

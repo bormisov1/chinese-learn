@@ -233,6 +233,13 @@ function mergeSnapshot(server: Snapshot, client: Snapshot): Snapshot {
   merged.sentences = mergeList(Array.isArray(server.sentences) ? server.sentences as Snapshot[] : [], Array.isArray(client.sentences) ? client.sentences as Snapshot[] : [], keyForSentence);
   merged.attempts = mergeList(Array.isArray(server.attempts) ? server.attempts as Snapshot[] : [], Array.isArray(client.attempts) ? client.attempts as Snapshot[] : [], item => `${item.sentenceId}:${item.at}:${item.direction ?? ""}`);
   merged.roundCompletions = mergeList(Array.isArray(server.roundCompletions) ? server.roundCompletions as Snapshot[] : [], Array.isArray(client.roundCompletions) ? client.roundCompletions as Snapshot[] : [], item => String(item.round));
+  const explanations: Snapshot = { ...safeJson(server.explanations) };
+  for (const [key, value] of Object.entries(safeJson(client.explanations))) {
+    const previous = safeJson(explanations[key]);
+    const incoming = safeJson(value);
+    if (!explanations[key] || Number(incoming.updatedAt ?? 0) >= Number(previous.updatedAt ?? 0)) explanations[key] = incoming;
+  }
+  merged.explanations = explanations;
   merged.cardRound = Math.max(Number(server.cardRound ?? 0), Number(client.cardRound ?? 0));
   const serverByLanguage = safeJson(server.sentenceDataByLanguage), clientByLanguage = safeJson(client.sentenceDataByLanguage);
   const languageData: Snapshot = {};
