@@ -7,3 +7,4 @@ dist-*/
 node_modules/
 .thai-translation-progress.json
 .thai-translation-partial.json
+.english-card-gloss-progress.json

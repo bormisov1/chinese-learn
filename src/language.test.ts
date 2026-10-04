@@ -48,3 +48,16 @@ test("refresh retains the saved fallback when a word is absent from the dictiona
   assert.equal(result.russian, "сохранённый перевод");
   assert.equal(result.translationByLanguage?.ru, "сохранённый перевод");
 });
+
+test("refresh repairs a saved English gloss and reading from the new dictionary", () => {
+  const dictionary: Dictionary = new Map([
+    ["书", { hanzi: "书", pinyin: "shū", russian: "book; letter" }],
+  ]);
+  const [result] = refreshWords([
+    word({ hanzi: "书", pinyin: "Shū", russian: "abbr. for 书经", translationByLanguage: { en: "abbr. for 书经" } }),
+  ], "en", dictionary);
+
+  assert.equal(result.pinyin, "shū");
+  assert.equal(result.russian, "book; letter");
+  assert.equal(result.translationByLanguage?.en, "book; letter");
+});
