@@ -12,6 +12,7 @@ import { Button, Header, shell } from "@/ui";
 import { colors } from "@/theme";
 import { CARD_GRADUATION_LEVEL } from "@/card-srs";
 import { roundsByDay } from "@/round-history";
+import { ExplanationButton } from "@/explanation-button";
 
 export default function Home() {
   const { data, error } = useStore();
@@ -133,6 +134,7 @@ export default function Home() {
       <View style={shell.panel}>
         {data.words.length ? data.words.slice(-5).reverse().map((word, index) => (
           <View key={word.id} style={[styles.word, index > 0 && styles.border]}>
+            <ExplanationButton kind="word" text={word.hanzi} size={19} />
             <Text style={styles.hanzi}>{word.hanzi}</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.pinyin}>{word.pinyin}</Text>

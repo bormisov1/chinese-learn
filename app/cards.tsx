@@ -27,6 +27,7 @@ import { finishExercise } from "@/exercise-progress";
 import { resolveSentencePronunciation, resolveWordPronunciation } from "@/pronunciation";
 import { recordRoundCompletion } from "@/round-history";
 import { track } from "@/telemetry";
+import { ExplanationButton } from "@/explanation-button";
 
 type Phase = "ready" | "studying" | "celebrating" | "complete";
 type Graduation = { learned: Word; replacement?: Word };
@@ -297,6 +298,7 @@ export default function Cards() {
               {mistaken.map((w) => {
                 const pronunciation = resolveWordPronunciation(w!, displayTranslation(w!.russian, data.settings.language));
                 return <View key={w!.id} style={styles.mistake}>
+                  <ExplanationButton kind="word" text={pronunciation.hanzi} size={19} />
                   <Pressable onPress={() => copyText(pronunciation.hanzi)}>
                     <Text style={styles.mistakeHanzi}>{pronunciation.hanzi}</Text>
                   </Pressable>
@@ -434,6 +436,7 @@ export default function Cards() {
                 {t("RIGHT")}
               </Animated.Text>
               <View style={styles.hanziRow}>
+                <ExplanationButton kind="word" text={wordPronunciation!.hanzi} />
                 <Pressable onPress={() => copyText(wordPronunciation!.hanzi)}>
                   <Text style={styles.hanzi}>{wordPronunciation!.hanzi}</Text>
                 </Pressable>
@@ -788,6 +791,7 @@ function ActivePoolCard({
       <Text style={styles.confetti}>👀</Text>
       <Text style={styles.learnTitle}>LEARN</Text>
       <View style={styles.graduationWordRow}>
+        <ExplanationButton kind="word" text={pronunciation.hanzi} />
         <Text style={styles.learnedHanzi}>{pronunciation.hanzi}</Text>
         <SpeakerButton
           pronunciation={pronunciation}
@@ -837,6 +841,7 @@ function ExampleRow({
       style={styles.exampleRow}
     >
       <View style={styles.exampleChinese}>
+        <ExplanationButton kind="sentence" text={sentence.chinese} size={19} />
         <Text style={styles.example}>
           {pronunciation.hanzi}
         </Text>

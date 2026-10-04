@@ -21,6 +21,7 @@ import {
   resolveSentencePronunciation,
 } from "@/pronunciation";
 import { track } from "@/telemetry";
+import { ExplanationButton } from "@/explanation-button";
 
 export default function Practice() {
   const {
@@ -223,6 +224,7 @@ export default function Practice() {
         style={styles.sentence}
       >
         <View style={styles.sentenceContent}>
+          <ExplanationButton kind="sentence" text={sentence.chinese} inverted />
           <Text style={chineseFirst ? styles.chinese : styles.russian}>
             {chineseFirst
               ? pronunciation.hanzi
@@ -315,6 +317,7 @@ export default function Practice() {
           {explanation.words.map((w, i) => {
             const wordPronunciation = resolveExplainedPronunciation(w, data.words);
             return <View key={`${w.word}-${i}`} style={styles.audioRow}>
+              <ExplanationButton kind="word" text={wordPronunciation.hanzi} size={19} />
               <Text style={[styles.word, { flex: 1 }]}>
                 <Text style={{ fontWeight: "800" }}>{wordPronunciation.hanzi}</Text> ·{" "}
                 {wordPronunciation.meaning}
@@ -340,7 +343,7 @@ export default function Practice() {
 }
 
 const styles = StyleSheet.create({
-  sentenceContent: { alignItems: "center", gap: 10 },
+  sentenceContent: { flexDirection: "row", alignItems: "center", justifyContent: "center", flexWrap: "wrap", gap: 10 },
   audioRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   direction: { flexDirection: "row", gap: 8, marginBottom: 14 },
   sentence: {

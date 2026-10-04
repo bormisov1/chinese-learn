@@ -1,8 +1,9 @@
-import { Evaluation, Explanation, Sentence, Settings, Word } from './types';
+import { Evaluation, Explanation, Sentence, Settings, Word, WordExplanation } from './types';
 import type { AppLanguage } from './types';
 import type { ImportedWord } from './types';
-import { evaluateChinesePrompt, evaluatePrompt, explainPrompt, generatePrompt, translateWordsPrompt } from './prompts';
+import { evaluateChinesePrompt, evaluatePrompt, explainPrompt, generatePrompt, translateWordsPrompt, wordExplanationPrompt } from './prompts';
 import { resolveContextualPinyin, resolveSentencePronunciation } from './pronunciation';
+import { validateWordExplanation } from './word-explanations';
 
 const DEEPSEEK_PRO_MODEL = 'deepseek-v4-pro';
 const DEEPSEEK_FLASH_MODEL = 'deepseek-v4-flash';
@@ -16,10 +17,10 @@ export async function validateApiKey(apiKey: string, signal?: AbortSignal) {
   if (!response.ok) throw new Error(`DeepSeek validation error ${response.status}.`);
 }
 
-async function call<T>(settings: Settings, model: string, system: string, user: string): Promise<T> {
+async function call<T>(settings: Settings, model: string, system: string, user: string, temperature = 0.8): Promise<T> {
   if (!settings.apiKey) throw new Error('Add your DeepSeek API key in Settings.');
   let response: Response;
-  try { response = await fetch(settings.apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settings.apiKey}` }, body: JSON.stringify({ model, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], temperature: 0.8 }) }); }
+  try { response = await fetch(settings.apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settings.apiKey}` }, body: JSON.stringify({ model, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], temperature }) }); }
   catch { throw new Error('Could not reach DeepSeek. Check the API endpoint, network, and browser console.'); }
   if (!response.ok) throw new Error(`DeepSeek error ${response.status}`);
   const json = await response.json();
@@ -51,6 +52,10 @@ export const evaluateChinese = (settings: Settings, sentence: Sentence, answer: 
   return call<Evaluation>(settings, DEEPSEEK_FLASH_MODEL, 'Evaluate a translation into Mandarin. JSON only.', evaluateChinesePrompt(settings.language, sentence.chinese, pronunciation.pinyin, pronunciation.meaning, answer));
 };
 export const explain = (settings: Settings, sentence: Sentence, words: Word[]) => call<Explanation>(settings, DEEPSEEK_PRO_MODEL, 'Explain Mandarin to the learner in their selected language. JSON only.', explainPrompt(settings.language, sentence.chinese, words.filter(w => sentence.wordIds.includes(w.id))));
+export async function explainWordOrSentence(settings: Settings, kind: 'word' | 'sentence', text: string): Promise<WordExplanation> {
+  const result = await call<WordExplanation>(settings, DEEPSEEK_PRO_MODEL, 'You are a precise Mandarin teacher. Follow the JSON schema and respond in the learner language. JSON only.', wordExplanationPrompt(settings.language, kind, text), 0.2);
+  return validateWordExplanation(result, text);
+}
 export async function translateWords(settings: Settings, words: string[], language: AppLanguage): Promise<ImportedWord[]> {
   const translated: ImportedWord[] = [];
   for (let start = 0; start < words.length; start += 50) {

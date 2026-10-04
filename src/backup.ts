@@ -1,5 +1,6 @@
 import { fillActivePool, migrateCardPool } from "./card-srs";
 import { migrateRoundCompletions } from "./round-history";
+import { mergeExplanations } from "./word-explanations";
 import type {
   AppLanguage,
   LanguageSentenceData,
@@ -272,6 +273,7 @@ export function mergeBackupData(current: StoreData, backup: BackupFile): { data:
     ...current,
     words: migrateCardPool(words, Math.max(current.cardRound, imported.cardRound ?? 0)),
     sentenceDataByLanguage,
+    explanations: mergeExplanations(current.explanations, imported.explanations),
     cardRound: Math.max(current.cardRound, imported.cardRound ?? 0),
     roundCompletions: [...rounds.values()].sort((a, b) => a.round - b.round),
     onboardingComplete: current.onboardingComplete || imported.onboardingComplete,
