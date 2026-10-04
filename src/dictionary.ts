@@ -5,7 +5,7 @@ import type { ImportedWord } from "./types";
 
 export type Dictionary = Map<string, ImportedWord>;
 const ASSET_BYTES: Record<AppLanguage, number> = {
-  en: 8_854_286,
+  en: 8_733_196,
   ru: 410_405,
   th: 278_114,
 };

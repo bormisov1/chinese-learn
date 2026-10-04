@@ -12,6 +12,7 @@ import {
 const CEDICT_URL = "https://cc-cedict.org/editor/editor_export_cedict.php?c=gz";
 const OUTPUT = new URL("../public/dictionaries/hsk-en.json", import.meta.url);
 const RUSSIAN = new URL("../public/dictionaries/hsk-ru.json", import.meta.url);
+const CARD_GLOSSES = new URL("../src/data/hsk-english-card-glosses.json", import.meta.url);
 const METADATA_GLOSS = /^(?:CL:|(?:also |Taiwan )?pr\.|(?:old )?variant of |see |abbr\. for )/i;
 
 const cleanMeanings = (values) => {
@@ -52,6 +53,7 @@ const markPinyin = (value) => value.split(/\s+/).map(markedSyllable).join(" ");
 const hsk = await downloadHsk();
 const cedict = gunzipSync(await download(CEDICT_URL)).toString("utf8");
 const russian = JSON.parse(await readFile(RUSSIAN, "utf8"));
+const cardGlosses = JSON.parse(await readFile(CARD_GLOSSES, "utf8"));
 const entries = new Map();
 const hskByPinyin = new Map();
 const cedictTraditional = new Map();
@@ -80,6 +82,11 @@ for (const line of cedict.split(/\r?\n/)) {
   if (!entries.has(hanzi)) entries.set(hanzi, [hanzi, markPinyin(numericPinyin), meanings.slice(0, 12).join("; ").slice(0, 1800)]);
   if (traditional !== hanzi) cedictTraditional.set(traditional, hanzi);
 }
+
+// Reviewed HSK readings and short meanings override the uncurated source forms.
+for (const [hanzi, pinyin, meaning] of cardGlosses) entries.set(hanzi, [hanzi, pinyin, meaning]);
+// Common standalone character used outside the 4,991 HSK 2.0 card list.
+entries.set("打", ["打", "dǎ", "to hit; to play"]);
 
 // Preserve malformed spacing used by the legacy Russian HSK identifiers.
 for (const [legacyHanzi, legacyPinyin] of russian) {

@@ -10,6 +10,8 @@
     "build:hsk-data": "node scripts/build-hsk-levels.mjs && node scripts/build-russian-dictionary.mjs && node scripts/build-english-dictionary.mjs && node scripts/validate-hsk-data.mjs",
     "build:hsk-levels": "node scripts/build-hsk-levels.mjs",
     "build:dictionary": "node scripts/build-english-dictionary.mjs",
+    "build:dictionary:en-cards": "node scripts/build-english-card-glosses.mjs",
+    "apply:dictionary:en-cards": "node scripts/apply-english-card-glosses.mjs",
     "build:dictionary:ru": "node scripts/build-russian-dictionary.mjs",
     "build:dictionary:th": "node scripts/build-thai-dictionary.mjs",
     "validate:hsk-data": "node scripts/validate-hsk-data.mjs",

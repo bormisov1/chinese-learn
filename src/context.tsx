@@ -26,6 +26,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   dataRef.current = data;
   languageRef.current = data.settings.language;
   const dictionary = loadedDictionary?.language === data.settings.language ? loadedDictionary.value : null;
+  const refreshSyncedWords = (merged: StoreData): StoreData => {
+    const loaded = dictionaryRef.current;
+    return loaded?.language === merged.settings.language
+      ? { ...merged, words: refreshWords(merged.words, merged.settings.language, loaded.value) }
+      : merged;
+  };
   useEffect(() => { loadStore().then(value => { setData(value); setReady(true); void initializeTelemetry(); }); }, []);
   const redirectUri = () => Platform.OS === "web" && typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : "hanzideck://auth/callback";
   const completeAuth = async (url: string) => {
@@ -41,7 +47,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setAccount(remoteAccount);
       const merged = await bootstrapStore(dataRef.current);
       syncedSnapshot.current = JSON.stringify(syncableSnapshot(merged));
-      setData(merged);
+      setData(refreshSyncedWords(merged));
       handledAuthCodes.current.add(code);
       void track("login_succeeded", { provider: tokens.authProfile?.provider ?? "oauth", chatId: tokens.authProfile?.chatId, fullName: tokens.authProfile?.fullName, username: tokens.authProfile?.username });
     } catch (reason) { setAuthError(reason instanceof Error ? reason.message : "Authentication failed"); void track("login_failed", { provider: "oauth" }); }
@@ -67,7 +73,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       syncTimer.current = null;
       void bootstrapStore(dataRef.current).then(merged => {
         syncedSnapshot.current = JSON.stringify(syncableSnapshot(merged));
-        setData(merged);
+        setData(refreshSyncedWords(merged));
       }).catch(() => {
         // Local-first behavior: leave the local store intact and retry on the next change.
       });
