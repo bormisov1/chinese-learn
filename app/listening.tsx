@@ -20,6 +20,7 @@ import {
   resolveWordPronunciation,
 } from "@/pronunciation";
 import { track } from "@/telemetry";
+import { ExplanationButton } from "@/explanation-button";
 
 type ListeningItem =
   | { kind: "word"; id: string; pronunciation: ResolvedPronunciation; word: Word }
@@ -107,12 +108,14 @@ export default function Listening() {
         onPress={() => setRevealed((value) => !value)}
         style={styles.card}
       >
+        {item.kind === "sentence" && <ExplanationButton kind="sentence" text={item.sentence.chinese} />}
         <SpeakerButton pronunciation={item.pronunciation} settings={data.settings} size={42} accessibilityLabel="Play listening prompt" />
       </Pressable>
 
       {item.kind === "word" && revealed && (
         <View style={styles.answer}>
           <View style={styles.wordHeading}>
+            <ExplanationButton kind="word" text={item.pronunciation.hanzi} />
             <Text style={styles.chinese}>{item.pronunciation.hanzi}</Text>
             <HskBadge hanzi={item.pronunciation.hanzi} />
           </View>
@@ -160,6 +163,7 @@ export default function Listening() {
           {explanation.words.map((word, index) => {
             const pronunciation = resolveExplainedPronunciation(word, data.words);
             return <View key={`${word.word}-${index}`} style={styles.wordRow}>
+              <ExplanationButton kind="word" text={pronunciation.hanzi} size={19} />
               <Text style={styles.word}><Text style={styles.wordHanzi}>{pronunciation.hanzi}</Text> · {pronunciation.meaning}</Text>
               <SpeakerButton pronunciation={pronunciation} settings={data.settings} />
             </View>;

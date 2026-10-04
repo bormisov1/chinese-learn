@@ -25,6 +25,7 @@ import { Button } from "@/ui";
 import { router } from "expo-router";
 import { Settings as SettingsData, Word } from "@/types";
 import { validateApiKey } from "@/deepseek";
+import { ExplanationButton } from "@/explanation-button";
 import { getActivePoolQueue } from "@/card-srs";
 import { ImportedWord } from "@/types";
 import hskLevels from "@/data/hsk-levels.json";
@@ -408,7 +409,10 @@ export default function Settings() {
             onPress={() => setSelectedWord(word)}
             style={({ pressed }) => [styles.activeWord, pressed && styles.pressed]}
           >
-            <Text style={styles.activeHanzi}>{word.hanzi}</Text>
+            <View style={styles.activeWordLabel}>
+              <ExplanationButton kind="word" text={word.hanzi} size={18} />
+              <Text style={styles.activeHanzi}>{word.hanzi}</Text>
+            </View>
             <Text style={styles.activeStep}>step {Math.min(3, word.cardSrsLevel + 1)}/3</Text>
           </Pressable>
         ))}
@@ -432,6 +436,7 @@ export default function Settings() {
               ]}
             >
               <Text style={styles.queuePosition}>{index + 1}</Text>
+              <ExplanationButton kind="word" text={word.hanzi} size={18} />
               <Text style={styles.queueHanzi}>{word.hanzi}</Text>
               <View style={styles.wordCell}>
                 <Text style={styles.queuePinyin}>{word.pinyin}</Text>
@@ -481,6 +486,7 @@ export default function Settings() {
                 pressed && styles.pressed,
               ]}
             >
+              <ExplanationButton kind="word" text={word.hanzi} size={18} />
               <View style={styles.wordCell}>
                 <Text style={styles.hanzi}>{word.hanzi}</Text>
                 <Text numberOfLines={1} style={styles.wordMeta}>
@@ -564,6 +570,7 @@ function WordDetailsModal({
             <>
               <Text style={styles.detailsLabel}>WORD DETAILS</Text>
               <View style={styles.detailsHanziRow}>
+                <ExplanationButton kind="word" text={pronunciation.hanzi} onOpen={onClose} />
                 <Text style={styles.detailsHanzi}>{pronunciation.hanzi}</Text>
                 <SpeakerButton
                   pronunciation={pronunciation}
@@ -997,6 +1004,7 @@ const styles = StyleSheet.create({
   sectionTitle: { color: colors.ink, fontSize: 21, fontWeight: "800" },
   activeSet: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   activeWord: { backgroundColor: colors.pale, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 },
+  activeWordLabel: { flexDirection: "row", alignItems: "center", gap: 3 },
   activeHanzi: { color: colors.ink, fontSize: 19, fontWeight: "800" },
   activeStep: { color: colors.green, fontSize: 10, marginTop: 2 },
   queue: {

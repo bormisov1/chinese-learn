@@ -53,6 +53,14 @@ export type Explanation = {
   }[];
   grammar: string;
 };
+export type WordExplanation = {
+  pinyin: string;
+  translation: string;
+  summary: string;
+  parts: { text: string; pinyin: string; meaning: string; characters: { hanzi: string; pinyin: string; meaning: string }[] }[];
+  grammar: string;
+};
+export type CachedExplanation = { language: AppLanguage; kind: "word" | "sentence"; text: string; explanation: WordExplanation; updatedAt: number };
 export type Settings = {
   language: AppLanguage;
   apiKey: string;
@@ -91,6 +99,7 @@ export type StoreData = {
   wordSentenceIndex: Record<string, string[]>;
   attempts: SentenceAttempt[];
   sentenceDataByLanguage: Partial<Record<AppLanguage, LanguageSentenceData>>;
+  explanations: Record<string, CachedExplanation>;
   cardRound: number;
   roundCompletions: RoundCompletion[];
   mixQueue: string[];
