@@ -362,7 +362,7 @@ export default function Cards() {
       >
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={flipped ? "Answer revealed" : "Reveal answer"}
+          accessibilityLabel={flipped ? "Hide answer" : "Reveal answer"}
           accessibilityActions={flipped ? [
             { name: "decrement", label: "Mark wrong" },
             { name: "increment", label: "Mark correct" },
@@ -372,9 +372,7 @@ export default function Cards() {
             if (event.nativeEvent.actionName === "increment") finishSwipe(true);
           }}
           style={[styles.card, !flipped && styles.promptCard, flipped && styles.back]}
-          onPress={() => {
-            if (!flipped) flipCard(true);
-          }}
+          onPress={() => flipCard(!flipped)}
         >
           <Animated.View
             pointerEvents="none"
