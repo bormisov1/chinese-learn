@@ -70,11 +70,13 @@ export function SpeakerButton({
   settings,
   size = 18,
   accessibilityLabel,
+  inverted = false,
 }: {
   pronunciation: ResolvedPronunciation;
   settings: Settings;
   size?: number;
   accessibilityLabel?: string;
+  inverted?: boolean;
 }) {
   const disabled = !pronunciation.hanzi || !pronunciation.pinyin || !getTtsProvider(settings).supported();
   const buttonSize = Math.max(34, size + 16);
@@ -90,11 +92,12 @@ export function SpeakerButton({
       }}
       style={({ pressed }) => [
         s.speaker,
+        inverted && s.speakerInverted,
         { width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2 },
         (pressed || disabled) && { opacity: 0.4 },
       ]}
     >
-      <Ionicons name="volume-high-outline" size={size} color={colors.green} />
+      <Ionicons name="volume-high-outline" size={size} color={inverted ? colors.white : colors.green} />
     </Pressable>
   );
 }
@@ -232,11 +235,13 @@ const s = StyleSheet.create({
   },
   buttonText: { color: colors.white, fontWeight: "700", fontSize: 15 },
   speaker: {
-    backgroundColor: colors.pale,
+    borderWidth: 1,
+    borderColor: '#CCDCD1',
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
   },
+  speakerInverted: { borderColor: '#CBDDD5' },
   hskBadge: {
     paddingHorizontal: 6,
     paddingVertical: 2,

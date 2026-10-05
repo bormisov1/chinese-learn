@@ -224,19 +224,22 @@ export default function Practice() {
         style={styles.sentence}
       >
         <View style={styles.sentenceContent}>
-          <ExplanationButton kind="sentence" text={sentence.chinese} inverted />
-          <Text style={chineseFirst ? styles.chinese : styles.russian}>
+          <Text style={[chineseFirst ? styles.chinese : styles.russian, styles.sentenceText]}>
             {chineseFirst
               ? pronunciation.hanzi
               : pronunciation.meaning}
           </Text>
-          {chineseFirst && (
-            <SpeakerButton
-              pronunciation={pronunciation}
-              settings={data.settings}
-              size={22}
-            />
-          )}
+          <View style={styles.sentenceControls}>
+            {chineseFirst && (
+              <SpeakerButton
+                pronunciation={pronunciation}
+                settings={data.settings}
+                size={22}
+                inverted
+              />
+            )}
+            <ExplanationButton kind="sentence" text={sentence.chinese} size={22} inverted />
+          </View>
         </View>
       </Pressable>
       {!evaluation && !explanation && (
@@ -343,7 +346,9 @@ export default function Practice() {
 }
 
 const styles = StyleSheet.create({
-  sentenceContent: { flexDirection: "row", alignItems: "center", justifyContent: "center", flexWrap: "wrap", gap: 10 },
+  sentenceContent: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10 },
+  sentenceControls: { alignItems: "center", gap: 6 },
+  sentenceText: { flexShrink: 1 },
   audioRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   direction: { flexDirection: "row", gap: 8, marginBottom: 14 },
   sentence: {
