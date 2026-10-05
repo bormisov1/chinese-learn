@@ -14,12 +14,34 @@ function WebShellStyles() {
   useEffect(() => {
     if (typeof document === 'undefined') return;
     const viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
-    viewport?.setAttribute('content', 'width=device-width, initial-scale=1, viewport-fit=cover');
-    if (document.getElementById('hanzi-app-shell')) return;
-    const style = document.createElement('style');
-    style.id = 'hanzi-app-shell';
-    style.textContent = 'html,body,#root{width:100%;max-width:100%;height:100%;overflow:hidden;overscroll-behavior:none}body{margin:0;background:#F7F5EE;touch-action:pan-x pan-y;-webkit-tap-highlight-color:transparent}';
-    document.head.appendChild(style);
+    viewport?.setAttribute('content', 'width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover');
+    if (!document.getElementById('hanzi-app-shell')) {
+      const style = document.createElement('style');
+      style.id = 'hanzi-app-shell';
+      style.textContent = 'html,body,#root{width:100%;max-width:100%;height:100%;overflow:hidden;overscroll-behavior:none}body{margin:0;background:#F7F5EE;touch-action:pan-x pan-y;-webkit-tap-highlight-color:transparent}';
+      document.head.appendChild(style);
+    }
+
+    // Safari can ignore viewport zoom limits; trackpads report pinch as Ctrl+wheel.
+    const stopMultiTouch = (event: TouchEvent) => {
+      if (event.touches.length > 1) event.preventDefault();
+    };
+    const stopGesture = (event: Event) => event.preventDefault();
+    const stopTrackpadPinch = (event: WheelEvent) => {
+      if (event.ctrlKey) event.preventDefault();
+    };
+    document.addEventListener('touchstart', stopMultiTouch, { passive: false });
+    document.addEventListener('touchmove', stopMultiTouch, { passive: false });
+    document.addEventListener('gesturestart', stopGesture, { passive: false });
+    document.addEventListener('gesturechange', stopGesture, { passive: false });
+    document.addEventListener('wheel', stopTrackpadPinch, { passive: false });
+    return () => {
+      document.removeEventListener('touchstart', stopMultiTouch);
+      document.removeEventListener('touchmove', stopMultiTouch);
+      document.removeEventListener('gesturestart', stopGesture);
+      document.removeEventListener('gesturechange', stopGesture);
+      document.removeEventListener('wheel', stopTrackpadPinch);
+    };
   }, []);
   return null;
 }
