@@ -9,6 +9,7 @@ import { Dictionary, loadDictionary } from './dictionary';
 import { refreshWords, switchStoreLanguage } from './language';
 import { Account, authUrl, clearTokens, exchangeCode, getAccount, getTokens } from './backend';
 import { bootstrapStore, syncableSnapshot } from './sync';
+import { commitBootstrapResponse, createBootstrapCoordinator } from './sync-coordinator';
 import { initializeTelemetry, track } from './telemetry';
 import { createBackup, mergeBackupData, type BackupFile, type BackupMergeSummary } from './backup';
 
@@ -23,7 +24,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [dictionaryLoading, setDictionaryLoading] = useState(false), [dictionaryError, setDictionaryError] = useState(''), [dictionaryProgress, setDictionaryProgress] = useState<number | null>(null), [switchingLanguage, setSwitchingLanguage] = useState<AppLanguage | null>(null), [dictionaryReload, setDictionaryReload] = useState(0);
   const dictionaryRef = useRef<{ language: AppLanguage; value: Dictionary } | null>(null), switchRequest = useRef(0), languageRef = useRef<AppLanguage>(data.settings.language);
   const dataRef = useRef(data), authCodeInFlight = useRef<string | null>(null), handledAuthCodes = useRef(new Set<string>()), syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null), syncedSnapshot = useRef<string | null>(null);
+  const accountRef = useRef(account), authBusyRef = useRef(authBusy);
   dataRef.current = data;
+  accountRef.current = account;
+  authBusyRef.current = authBusy;
   languageRef.current = data.settings.language;
   const dictionary = loadedDictionary?.language === data.settings.language ? loadedDictionary.value : null;
   const refreshSyncedWords = (merged: StoreData): StoreData => {
@@ -32,6 +36,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       ? { ...merged, words: refreshWords(merged.words, merged.settings.language, loaded.value) }
       : merged;
   };
+  const syncNow = useRef<(() => void) | null>(null);
+  if (!syncNow.current) syncNow.current = createBootstrapCoordinator(
+    () => {
+      const current = dataRef.current;
+      return accountRef.current && !authBusyRef.current && syncedSnapshot.current !== JSON.stringify(syncableSnapshot(current)) ? current : null;
+    },
+    bootstrapStore,
+    (submitted, merged) => commitBootstrapResponse(setData, submitted, merged, accepted => {
+      syncedSnapshot.current = JSON.stringify(syncableSnapshot(accepted));
+      return refreshSyncedWords(accepted);
+    }),
+  );
   useEffect(() => { loadStore().then(value => { setData(value); setReady(true); void initializeTelemetry(); }); }, []);
   const redirectUri = () => Platform.OS === "web" && typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : "hanzideck://auth/callback";
   const completeAuth = async (url: string) => {
@@ -45,9 +61,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const tokens = await exchangeCode(code, redirectUri());
       const remoteAccount = await getAccount();
       setAccount(remoteAccount);
-      const merged = await bootstrapStore(dataRef.current);
-      syncedSnapshot.current = JSON.stringify(syncableSnapshot(merged));
-      setData(refreshSyncedWords(merged));
+      const submitted = dataRef.current;
+      const merged = await bootstrapStore(submitted);
+      commitBootstrapResponse(setData, submitted, merged, accepted => {
+        syncedSnapshot.current = JSON.stringify(syncableSnapshot(accepted));
+        return refreshSyncedWords(accepted);
+      });
       handledAuthCodes.current.add(code);
       void track("login_succeeded", { provider: tokens.authProfile?.provider ?? "oauth", chatId: tokens.authProfile?.chatId, fullName: tokens.authProfile?.fullName, username: tokens.authProfile?.username });
     } catch (reason) { setAuthError(reason instanceof Error ? reason.message : "Authentication failed"); void track("login_failed", { provider: "oauth" }); }
@@ -71,12 +90,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (syncTimer.current) clearTimeout(syncTimer.current);
     syncTimer.current = setTimeout(() => {
       syncTimer.current = null;
-      void bootstrapStore(dataRef.current).then(merged => {
-        syncedSnapshot.current = JSON.stringify(syncableSnapshot(merged));
-        setData(refreshSyncedWords(merged));
-      }).catch(() => {
-        // Local-first behavior: leave the local store intact and retry on the next change.
-      });
+      syncNow.current?.();
     }, 750);
     return () => { if (syncTimer.current) { clearTimeout(syncTimer.current); syncTimer.current = null; } };
   }, [account, authBusy, data, ready]);
