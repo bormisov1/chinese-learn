@@ -16,11 +16,13 @@ function hasStudyData(data: Partial<StoreData>) {
 export function applyBootstrapSnapshot(local: StoreData, remote: Partial<StoreData>): StoreData {
   // A transient empty response must never erase an already-used local client.
   if (hasStudyData(local) && !hasStudyData(remote)) return local;
+  // These settings are device-local and are deliberately excluded from sync requests.
+  const { apiKey: _apiKey, apiKeyValidated: _validated, apiUrl: _apiUrl, model: _model, ...remoteSettings } = remote.settings ?? {};
   return {
     ...local,
     ...remote,
     explanations: mergeExplanations(local.explanations, remote.explanations),
-    settings: { ...local.settings, ...(remote.settings ?? {}) },
+    settings: { ...local.settings, ...remoteSettings },
     mixQueue: local.mixQueue,
     mixPosition: local.mixPosition,
     storageVersion: local.storageVersion,
