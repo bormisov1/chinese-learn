@@ -1,34 +1,54 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useStore } from '@/context';
 import { explainWordOrSentence } from '@/deepseek';
+import { requestExplanation } from '@/explanation-loading';
 import { Text, useTranslation } from '@/i18n';
 import { colors } from '@/theme';
-import { explanationKey, normalizeExplanationText } from '@/word-explanations';
+import { explanationKey, normalizeExplanationText, type ExplanationKind } from '@/word-explanations';
 
 export default function ExplanationPage() {
   const params = useLocalSearchParams<{ kind?: string; text?: string }>();
   const kind = params.kind === 'sentence' ? 'sentence' : 'word';
   const text = normalizeExplanationText(typeof params.text === 'string' ? params.text : '');
-  const { data, patch } = useStore();
+  const { data } = useStore();
+  const key = explanationKey(kind, text, data.settings.language);
+  return <ExplanationDetail key={key} kind={kind} text={text} cacheKey={key} />;
+}
+
+function ExplanationDetail({ kind, text, cacheKey }: { kind: ExplanationKind; text: string; cacheKey: string }) {
+  const { data, patch, ready } = useStore();
   const t = useTranslation();
   const language = data.settings.language;
-  const key = explanationKey(kind, text, language);
-  const cached = data.explanations?.[key];
+  const cached = data.explanations?.[cacheKey];
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const fetchExplanation = async () => {
     if (!text || busy) return;
     setBusy(true); setError('');
     try {
-      const explanation = await explainWordOrSentence(data.settings, kind, text);
+      const explanation = await requestExplanation(cacheKey, () => explainWordOrSentence(data.settings, kind, text));
       const updatedAt = Date.now();
-      patch(current => ({ ...current, explanations: { ...current.explanations, [key]: { language, kind, text, explanation, updatedAt } } }));
+      patch(current => ({ ...current, explanations: { ...current.explanations, [cacheKey]: { language, kind, text, explanation, updatedAt } } }));
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not get explanation.'); }
     finally { setBusy(false); }
   };
+  useEffect(() => {
+    if (!ready || !text || cached) return;
+    let active = true;
+    setBusy(true); setError('');
+    void requestExplanation(cacheKey, () => explainWordOrSentence(data.settings, kind, text))
+      .then(explanation => {
+        if (!active) return;
+        const updatedAt = Date.now();
+        patch(current => ({ ...current, explanations: { ...current.explanations, [cacheKey]: { language, kind, text, explanation, updatedAt } } }));
+      })
+      .catch(reason => { if (active) setError(reason instanceof Error ? reason.message : 'Could not get explanation.'); })
+      .finally(() => { if (active) setBusy(false); });
+    return () => { active = false; };
+  }, [cacheKey, ready, !!cached]);
   return <View style={styles.page}>
     <View style={styles.header}>
       <Pressable accessibilityRole="button" accessibilityLabel={t('Back')} onPress={() => router.back()} style={styles.icon}><Ionicons name="arrow-back" size={25} color={colors.green} /></Pressable>
@@ -50,9 +70,10 @@ export default function ExplanationPage() {
           </View>)}
         </View>)}
         {!!cached.explanation.grammar && <Text style={styles.summary}>{cached.explanation.grammar}</Text>}
-      </> : <View style={styles.empty}><Text style={styles.summary}>No cached explanation yet.</Text><Pressable accessibilityRole="button" accessibilityLabel={t('Get explanation')} onPress={fetchExplanation} disabled={busy} style={styles.fetchButton}><Text style={styles.fetchLabel}>Get explanation</Text></Pressable></View>}
-      {busy && <ActivityIndicator color={colors.green} style={{ marginTop: 20 }} />}
-      {!!error && <Text style={styles.error}>{error}</Text>}
+      </> : null}
+      {!cached && !error && ready && <ActivityIndicator accessibilityLabel={t('Loading explanation')} color={colors.green} style={{ marginTop: 20 }} />}
+      {cached && busy && <ActivityIndicator accessibilityLabel={t('Refreshing explanation')} color={colors.green} style={{ marginTop: 20 }} />}
+      {!!error && <Text style={styles.error}>{error} {t('Use Refresh to try again.')}</Text>}
     </ScrollView>
   </View>;
 }
@@ -73,8 +94,5 @@ const styles = StyleSheet.create({
   characterRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 9 },
   character: { fontSize: 26, fontWeight: '700', color: colors.green },
   characterMeaning: { fontSize: 15, flex: 1, color: '#444' },
-  empty: { alignItems: 'center', marginTop: 30, gap: 18 },
-  fetchButton: { backgroundColor: colors.green, borderRadius: 12, paddingHorizontal: 22, paddingVertical: 14 },
-  fetchLabel: { color: '#fff', fontSize: 16, fontWeight: '700' },
   error: { color: '#B54747', fontSize: 15 },
 });

@@ -841,11 +841,13 @@ function ExampleRow({
       style={styles.exampleRow}
     >
       <View style={styles.exampleChinese}>
-        <ExplanationButton kind="sentence" text={sentence.chinese} size={19} />
         <Text style={styles.example}>
           {pronunciation.hanzi}
         </Text>
-        <SpeakerButton pronunciation={pronunciation} settings={settings} />
+        <View style={styles.exampleSentenceControls}>
+          <SpeakerButton pronunciation={pronunciation} settings={settings} />
+          <ExplanationButton kind="sentence" text={sentence.chinese} size={18} />
+        </View>
       </View>
       <View style={styles.exampleHelp}>
         <View style={styles.exampleCoveredLine}>
@@ -1050,6 +1052,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     gap: 8,
   },
+  exampleSentenceControls: { alignItems: 'center', gap: 5 },
   roundPanel: {
     minHeight: 280,
     marginBottom: 16,
@@ -1178,8 +1181,8 @@ const styles = StyleSheet.create({
     marginVertical: 27,
   },
   exampleCarousel: { width: "100%", flexDirection: "row", alignItems: "center", gap: 10 },
-  exampleViewport: { flex: 1, minHeight: 76, overflow: "hidden", position: "relative" },
-  exampleSlide: { width: "100%", minHeight: 76, justifyContent: "center" },
+  exampleViewport: { flex: 1, minHeight: 86, overflow: "hidden", position: "relative" },
+  exampleSlide: { width: "100%", minHeight: 86, justifyContent: "center" },
   exampleIncoming: { position: "absolute", left: 0, top: 0 },
   exampleControls: { width: 34, gap: 7 },
   exampleButton: { width: 34, height: 30, borderRadius: 8, backgroundColor: colors.pale, alignItems: "center", justifyContent: "center" },
