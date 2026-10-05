@@ -137,7 +137,10 @@ export default function Mix() {
       </View>}
       <Pressable accessibilityRole={word || (listening && !sentence) ? "button" : undefined} accessibilityLabel={word || (listening && !sentence) ? revealed ? "Hide answer" : "Reveal answer" : undefined} disabled={Boolean(sentence)} onPress={() => setRevealed((value) => !value)} style={[styles.card, sentence && !listening && styles.sentenceCard]}>
         <Text style={styles.side}>{item.mode.toUpperCase()}</Text>
-        {listening ? <><ExplanationButton kind={sentence ? "sentence" : "word"} text={chinese} /><SpeakerButton pronunciation={pronunciation} settings={data.settings} size={42} accessibilityLabel="Play listening prompt" /></> : <View style={sentence ? styles.sentenceContent : styles.centered}>
+        {listening ? sentence ? <View style={styles.listeningSentenceControls}>
+          <SpeakerButton pronunciation={pronunciation} settings={data.settings} size={42} accessibilityLabel="Play listening prompt" />
+          <ExplanationButton kind="sentence" text={chinese} size={42} />
+        </View> : <><ExplanationButton kind="word" text={chinese} /><SpeakerButton pronunciation={pronunciation} settings={data.settings} size={42} accessibilityLabel="Play listening prompt" /></> : <View style={sentence ? styles.sentenceContent : styles.centered}>
           <Pressable style={sentence && styles.sentenceText} onPress={() => copyText(sentence && chineseFirst ? chinese : russian)}><Text style={sentence && chineseFirst ? styles.sentenceChinese : styles.prompt}>{sentence && chineseFirst ? chinese : russian}</Text></Pressable>
           {sentence && <View style={styles.sentenceControls}>
             {chineseFirst && <SpeakerButton pronunciation={pronunciation} settings={data.settings} size={22} inverted />}
@@ -160,7 +163,7 @@ export default function Mix() {
 
 const styles = StyleSheet.create({
   card: { minHeight: 230, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: 22, padding: 24, marginBottom: 18, alignItems: "center", justifyContent: "center" },
-  sentenceCard: { minHeight: 180, backgroundColor: colors.green, borderWidth: 0 }, centered: { alignItems: "center", gap: 10 }, sentenceContent: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10 }, sentenceText: { flexShrink: 1 }, sentenceControls: { alignItems: "center", gap: 6 }, direction: { flexDirection: "row", gap: 8, marginBottom: 14 },
+  sentenceCard: { minHeight: 180, backgroundColor: colors.green, borderWidth: 0 }, centered: { alignItems: "center", gap: 10 }, sentenceContent: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10 }, sentenceText: { flexShrink: 1 }, sentenceControls: { alignItems: "center", gap: 6 }, listeningSentenceControls: { alignSelf: "flex-end", alignItems: "center", gap: 6 }, direction: { flexDirection: "row", gap: 8, marginBottom: 14 },
   side: { color: colors.coral, fontSize: 11, fontWeight: "800", letterSpacing: 1.6, marginBottom: 20 }, prompt: { color: colors.ink, fontSize: 27, lineHeight: 38, fontWeight: "700", textAlign: "center" }, sentenceChinese: { color: colors.white, fontSize: 35, lineHeight: 50, fontWeight: "600", textAlign: "center" },
   chinese: { color: colors.ink, fontSize: 34, lineHeight: 46, fontWeight: "800", textAlign: "center" }, wordHeading: { flexDirection: "row", alignItems: "center", gap: 8 }, answer: { width: "100%", borderTopWidth: 1, borderTopColor: colors.line, marginTop: 26, paddingTop: 22, alignItems: "center", gap: 8 }, pinyin: { color: colors.green, fontSize: 20, fontWeight: "700", textAlign: "center" }, translation: { color: colors.ink, fontSize: 20, lineHeight: 28, textAlign: "center" },
   label: { color: colors.muted, fontSize: 11, fontWeight: "800", letterSpacing: 1.4, marginTop: 6, marginBottom: 9 }, input: { minHeight: 115, borderRadius: 15, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.card, padding: 15, fontSize: 18, color: colors.ink, textAlignVertical: "top" }, actions: { flexDirection: "row", gap: 8, marginTop: 14 }, busy: { margin: 18 }, error: { color: colors.red, marginTop: 12 },

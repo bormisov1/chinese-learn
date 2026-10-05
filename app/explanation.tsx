@@ -72,7 +72,6 @@ function ExplanationDetail({ kind, text, cacheKey }: { kind: ExplanationKind; te
         {!!cached.explanation.grammar && <Text style={styles.summary}>{cached.explanation.grammar}</Text>}
       </> : null}
       {!cached && !error && ready && <ActivityIndicator accessibilityLabel={t('Loading explanation')} color={colors.green} style={{ marginTop: 20 }} />}
-      {cached && busy && <ActivityIndicator accessibilityLabel={t('Refreshing explanation')} color={colors.green} style={{ marginTop: 20 }} />}
       {!!error && <Text style={styles.error}>{error} {t('Use Refresh to try again.')}</Text>}
     </ScrollView>
   </View>;

@@ -108,8 +108,10 @@ export default function Listening() {
         onPress={() => setRevealed((value) => !value)}
         style={styles.card}
       >
-        {item.kind === "sentence" && <ExplanationButton kind="sentence" text={item.sentence.chinese} />}
-        <SpeakerButton pronunciation={item.pronunciation} settings={data.settings} size={42} accessibilityLabel="Play listening prompt" />
+        {item.kind === "sentence" ? <View style={styles.sentenceControls}>
+          <SpeakerButton pronunciation={item.pronunciation} settings={data.settings} size={42} accessibilityLabel="Play listening prompt" />
+          <ExplanationButton kind="sentence" text={item.sentence.chinese} size={42} />
+        </View> : <SpeakerButton pronunciation={item.pronunciation} settings={data.settings} size={42} accessibilityLabel="Play listening prompt" />}
       </Pressable>
 
       {item.kind === "word" && revealed && (
@@ -187,6 +189,7 @@ export default function Listening() {
 
 const styles = StyleSheet.create({
   card: { minHeight: 230, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: 22, padding: 24, marginBottom: 18, alignItems: "center", justifyContent: "center" },
+  sentenceControls: { alignSelf: "flex-end", alignItems: "center", gap: 6 },
   answer: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: 18, padding: 22, marginBottom: 18, alignItems: "center", gap: 8 },
   wordHeading: { flexDirection: "row", alignItems: "center", gap: 8 },
   chinese: { color: colors.ink, fontSize: 34, lineHeight: 46, fontWeight: "800", textAlign: "center" },
