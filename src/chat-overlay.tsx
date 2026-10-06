@@ -1,61 +1,119 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from './context';
 import { Text } from './i18n';
-import { CHAT_PRESETS, ChatPreset, ChatReply, ChatTurn, requestChatReply } from './chat';
+import { CHAT_PRESETS, ChatPreset, ChatTurn, fallbackChatTitle, requestChatReply } from './chat';
+import { ChatMessage, Conversation, loadChatHistory, saveChatHistory } from './chat-history';
 import { colors } from './theme';
-
-type Message = { role: 'user'; text: string } | { role: 'assistant'; text: string; reply: ChatReply };
 
 export function ChatOverlay() {
   const { data, dictionary, importWords } = useStore();
   const insets = useSafeAreaInsets();
   const scroll = useRef<ScrollView>(null);
   const [open, setOpen] = useState(false);
-  const [preset, setPreset] = useState<ChatPreset>('words');
+  const [hovered, setHovered] = useState(false);
+  const [clicked, setClicked] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [conversations, setConversations] = useState<Conversation[]>(loadChatHistory);
+  const [activeId, setActiveId] = useState<string | null>(() => loadChatHistory()[0]?.id ?? null);
+  const [draftPreset, setDraftPreset] = useState<ChatPreset>('words');
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<Message[]>([]);
   const [selectedWords, setSelectedWords] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const conversationsRef = useRef(conversations);
+  conversationsRef.current = conversations;
+  const active = conversations.find(item => item.id === activeId);
+  const messages = active?.messages ?? [];
+  const preset = active?.preset ?? draftPreset;
   const saved = new Set(data.words.map(word => word.hanzi));
+
+  useEffect(() => {
+    const timer = setTimeout(() => { try { saveChatHistory(conversations); } catch { /* Storage can be disabled by the browser. */ } }, 300);
+    return () => clearTimeout(timer);
+  }, [conversations]);
+  useEffect(() => {
+    const flush = () => { try { saveChatHistory(conversationsRef.current); } catch { /* Storage can be disabled by the browser. */ } };
+    window.addEventListener('beforeunload', flush);
+    return () => { window.removeEventListener('beforeunload', flush); flush(); };
+  }, []);
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = '@keyframes chat-dot-flash { 0%, 20%, 100% { opacity: .22; } 50% { opacity: 1; } } .chat-typing { color: #326448; font-family: cursive; font-size: 18px; } .chat-typing-dot { display: inline-block; animation: chat-dot-flash 1.8s ease-in-out infinite; } .chat-typing-dot:nth-child(2) { animation-delay: .3s; } .chat-typing-dot:nth-child(3) { animation-delay: .6s; }';
+    document.head.appendChild(style);
+    return () => { style.remove(); };
+  }, []);
+
+  const updateConversation = (id: string, change: (conversation: Conversation) => Conversation) => {
+    setConversations(current => current.map(item => item.id === id ? change(item) : item).sort((a, b) => b.updatedAt - a.updatedAt));
+  };
+
+  const newChat = () => { if (busy) return; setActiveId(null); setInput(''); setError(''); setDraftPreset('words'); setShowHistory(false); };
+  const selectChat = (id: string) => { if (busy) return; setActiveId(id); setInput(''); setError(''); setShowHistory(false); };
+  const selectPreset = (next: ChatPreset) => {
+    if (activeId) updateConversation(activeId, conversation => ({ ...conversation, preset: next }));
+    else setDraftPreset(next);
+  };
 
   const send = async () => {
     const question = input.trim();
     if (!question || busy) return;
-    const next: Message[] = [...messages, { role: 'user', text: question }];
-    const assistantIndex = next.length;
-    setMessages([...next, { role: 'assistant', text: '', reply: { answer: '', words: [] } }]);
+    const id = activeId ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    const next: ChatMessage[] = [...messages, { role: 'user', text: question }];
+    if (!activeId) {
+      setActiveId(id);
+      setConversations(current => [{ id, title: 'New chat', preset, messages: next, updatedAt: Date.now() }, ...current]);
+    } else updateConversation(id, conversation => ({ ...conversation, messages: next, updatedAt: Date.now() }));
     setInput(''); setBusy(true); setError('');
     try {
       const history: ChatTurn[] = next.map(item => ({ role: item.role, content: item.text }));
       const reply = await requestChatReply(data.settings, preset, history, answer => {
-        setMessages(current => current[assistantIndex]?.text === answer ? current : current.map((item, index) => index === assistantIndex && item.role === 'assistant' ? { ...item, text: answer } : item));
+        if (!answer) return;
+        updateConversation(id, conversation => {
+          const last = conversation.messages.at(-1);
+          const streamed: ChatMessage = { role: 'assistant', text: answer, reply: { answer, words: [] } };
+          return { ...conversation, messages: last?.role === 'assistant' ? [...conversation.messages.slice(0, -1), streamed] : [...conversation.messages, streamed] };
+        });
       });
-      setMessages(current => current.map((item, index) => index === assistantIndex ? { role: 'assistant', text: reply.answer, reply } : item));
+      updateConversation(id, conversation => {
+        const last = conversation.messages.at(-1);
+        const completed: ChatMessage = { role: 'assistant', text: reply.answer, reply };
+        return { ...conversation, title: conversation.title === 'New chat' ? reply.title ?? fallbackChatTitle(question) : conversation.title,
+          messages: last?.role === 'assistant' ? [...conversation.messages.slice(0, -1), completed] : [...conversation.messages, completed], updatedAt: Date.now() };
+      });
     } catch (reason) {
-      setMessages(current => current.filter((_, index) => index !== assistantIndex || current[index].text));
       setError(reason instanceof Error ? reason.message : 'Chat request failed.');
     }
     finally { setBusy(false); }
   };
 
   return <>
-    <Pressable accessibilityRole="button" accessibilityLabel="Open DeepSeek chat" onPress={() => setOpen(true)} style={styles.launcher}>
+    <Pressable accessibilityRole="button" accessibilityLabel="Open DeepSeek chat" onHoverIn={() => setHovered(true)} onHoverOut={() => setHovered(false)} onPressIn={() => setClicked(true)} onPress={() => { setClicked(true); setOpen(true); }} style={[styles.launcher, (hovered || clicked) && styles.launcherOpaque]}>
       <View style={styles.launcherRing}><Ionicons name="hardware-chip-outline" size={25} color="#D9FFF4" /></View>
       <View style={styles.orbitDot} />
     </Pressable>
-    <Modal visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
+    <Modal visible={open} animationType="slide" onRequestClose={() => { setOpen(false); setClicked(false); }}>
       <View style={[styles.page, { paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, 12) }]}>
         <View style={styles.header}>
-          <View><Text style={styles.eyebrow}>DEEPSEEK</Text><Text style={styles.title}>Chat</Text></View>
-          <Pressable accessibilityRole="button" accessibilityLabel="Close chat" onPress={() => setOpen(false)} style={styles.close}><Ionicons name="close" size={25} color={colors.ink} /></Pressable>
+          <View style={styles.headerTitle}><Text style={styles.eyebrow}>DEEPSEEK</Text><Text numberOfLines={1} style={styles.title}>{showHistory ? 'Previous chats' : active?.title ?? 'New chat'}</Text></View>
+          <View style={styles.headerActions}>
+            <Pressable accessibilityRole="button" accessibilityLabel="New chat" accessibilityState={{ disabled: busy }} disabled={busy} onPress={newChat} style={styles.headerButton}><Ionicons name="add" size={24} color={colors.green} /></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={showHistory ? 'Back to chat' : 'Previous chats'} onPress={() => setShowHistory(value => !value)} style={styles.headerButton}><Ionicons name={showHistory ? 'chatbubble-outline' : 'time-outline'} size={22} color={colors.green} /></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Close chat" onPress={() => { setOpen(false); setClicked(false); }} style={styles.close}><Ionicons name="close" size={25} color={colors.ink} /></Pressable>
+          </View>
         </View>
+        {showHistory ? <ScrollView style={styles.history} contentContainerStyle={styles.historyList}>
+          {!conversations.length && <Text style={styles.empty}>No previous chats yet.</Text>}
+          {conversations.map(conversation => <Pressable key={conversation.id} accessibilityRole="button" accessibilityLabel={`Open ${conversation.title}`} accessibilityState={{ disabled: busy, selected: conversation.id === activeId }} disabled={busy} onPress={() => selectChat(conversation.id)} style={[styles.historyItem, conversation.id === activeId && styles.historyItemActive]}>
+            <Text numberOfLines={1} style={styles.historyItemTitle}>{conversation.title}</Text>
+            <Text numberOfLines={1} style={styles.historyItemPreview}>{conversation.messages.find(item => item.role === 'user')?.text ?? ''}</Text>
+          </Pressable>)}
+        </ScrollView> : <>
         <ScrollView ref={scroll} style={styles.history} contentContainerStyle={styles.historyContent} keyboardShouldPersistTaps="handled" onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: true })}>
           {!messages.length && <Text style={styles.empty}>Ask about Chinese words, a Hanzi, or a message you want to answer.</Text>}
-          {messages.map((item, index) => <View key={index} style={[styles.bubble, item.role === 'user' ? styles.userBubble : styles.assistantBubble]}>
+          {messages.filter(item => item.role === 'user' || !!item.text || !!item.reply.words.length).map((item, index) => <View key={index} style={[styles.bubble, item.role === 'user' ? styles.userBubble : styles.assistantBubble]}>
             {!!item.text && <Text style={[styles.messageText, item.role === 'user' && styles.userText]}>{item.text}</Text>}
             {item.role === 'assistant' && !!item.reply.words.length && <View style={styles.wordsSection}>
               <Text style={styles.wordsTitle}>BREAKDOWN · TAP TO ADD</Text>
@@ -69,17 +127,18 @@ export function ChatOverlay() {
               })}
             </View>}
           </View>)}
-          {busy && <ActivityIndicator accessibilityLabel="Waiting for DeepSeek" color={colors.green} style={styles.loading} />}
+          {busy && <View accessibilityLabel="DeepSeek is typing" style={styles.loading}><span className="chat-typing">typing<span className="chat-typing-dot">.</span><span className="chat-typing-dot">.</span><span className="chat-typing-dot">.</span></span></View>}
           {!!error && <Text style={styles.error}>{error}</Text>}
         </ScrollView>
         <View style={styles.promptArea}>
           <Text style={styles.promptLabel}>CHOOSE A PROMPT</Text>
-          <View style={styles.promptButtons}>{CHAT_PRESETS.map(item => <Pressable key={item.id} accessibilityRole="button" accessibilityState={{ selected: item.id === preset }} onPress={() => setPreset(item.id)} style={[styles.promptButton, item.id === preset && styles.promptSelected]}><Text style={[styles.promptText, item.id === preset && styles.promptTextSelected]}>{item.label}</Text></Pressable>)}</View>
+          <View style={styles.promptButtons}>{CHAT_PRESETS.map(item => <Pressable key={item.id} accessibilityRole="button" accessibilityState={{ selected: item.id === preset }} onPress={() => selectPreset(item.id)} style={[styles.promptButton, item.id === preset && styles.promptSelected]}><Text style={[styles.promptText, item.id === preset && styles.promptTextSelected]}>{item.label}</Text></Pressable>)}</View>
         </View>
         <View style={styles.composer}>
           <TextInput accessibilityLabel="Chat message" multiline value={input} onChangeText={setInput} placeholder="Type a message…" placeholderTextColor={colors.muted} style={styles.input} />
           <Pressable accessibilityRole="button" accessibilityLabel="Send message" accessibilityState={{ disabled: !input.trim() || busy }} disabled={!input.trim() || busy} onPress={() => void send()} style={[styles.send, (!input.trim() || busy) && styles.sendDisabled]}><Ionicons name="arrow-up" size={23} color={colors.white} /></Pressable>
         </View>
+        </>}
       </View>
     </Modal>
   </>;
@@ -87,22 +146,31 @@ export function ChatOverlay() {
 
 const styles = StyleSheet.create({
   launcher: { position: 'absolute', left: 15, bottom: 83, zIndex: 20, width: 51, height: 51, borderRadius: 26, opacity: 0.85, backgroundColor: 'rgba(16, 73, 72, 0.72)', borderWidth: 1, borderColor: 'rgba(157, 255, 226, 0.65)', alignItems: 'center', justifyContent: 'center', shadowColor: '#25E6BD', shadowOpacity: 0.35, shadowRadius: 10, elevation: 8 },
+  launcherOpaque: { opacity: 1, backgroundColor: '#104948' },
   launcherRing: { width: 38, height: 38, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(206, 255, 242, 0.45)', alignItems: 'center', justifyContent: 'center' },
   orbitDot: { position: 'absolute', right: 4, top: 6, width: 6, height: 6, borderRadius: 3, backgroundColor: '#9FFFE0' },
   page: { flex: 1, backgroundColor: colors.paper },
   header: { minHeight: 70, paddingHorizontal: 19, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderColor: colors.line, backgroundColor: colors.card },
+  headerTitle: { flex: 1, minWidth: 0, marginRight: 8 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  headerButton: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19, backgroundColor: colors.pale },
   eyebrow: { fontSize: 10, letterSpacing: 2.2, fontWeight: '800', color: colors.green },
   title: { fontSize: 25, fontWeight: '800', color: colors.ink },
   close: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.pale },
-  promptArea: { padding: 15, borderTopWidth: 1, borderColor: colors.line, backgroundColor: colors.card },
-  promptLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 1.3, color: colors.muted, marginBottom: 10 },
-  promptButtons: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  promptButton: { borderRadius: 10, borderWidth: 1, borderColor: '#8AAE99', paddingHorizontal: 13, paddingVertical: 9, backgroundColor: '#E4F2E7' },
+  promptArea: { paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: 1, borderColor: colors.line, backgroundColor: colors.card },
+  promptLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 1.3, color: colors.muted, marginBottom: 5 },
+  promptButtons: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  promptButton: { borderRadius: 9, borderWidth: 1, borderColor: '#8AAE99', paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#E4F2E7' },
   promptSelected: { backgroundColor: colors.green, borderColor: colors.green },
   promptText: { fontSize: 13, fontWeight: '700', color: colors.green },
   promptTextSelected: { color: colors.white },
   history: { flex: 1 },
   historyContent: { padding: 16, paddingBottom: 28, gap: 15 },
+  historyList: { padding: 16, gap: 9 },
+  historyItem: { padding: 14, borderRadius: 13, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, gap: 4 },
+  historyItemActive: { borderColor: colors.green },
+  historyItemTitle: { color: colors.ink, fontSize: 16, fontWeight: '700' },
+  historyItemPreview: { color: colors.muted, fontSize: 13 },
   empty: { color: colors.muted, fontSize: 15, lineHeight: 23, textAlign: 'center', marginTop: 48, paddingHorizontal: 20 },
   bubble: { maxWidth: '94%', padding: 15, borderRadius: 17 },
   userBubble: { alignSelf: 'flex-end', backgroundColor: colors.green, borderBottomRightRadius: 4 },

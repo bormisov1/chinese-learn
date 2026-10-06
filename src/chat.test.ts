@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { CHAT_PRESETS, parseChatReply, partialChatAnswer, requestChatReply } from './chat';
+import { CHAT_PRESETS, fallbackChatTitle, parseChatReply, partialChatAnswer, requestChatReply } from './chat';
+import { loadChatHistory, saveChatHistory } from './chat-history';
 import type { Settings } from './types';
 
 test('chat keeps only valid, unique, clickable Chinese words', () => {
@@ -40,7 +41,7 @@ test('chat progressively decodes JSON answer text and completes an SSE response'
   } finally { globalThis.fetch = originalFetch; }
 });
 
-test('chat sends the selected prompt and allows a truly empty system prompt', async () => {
+test('first chat request asks for a 2–5 word title with the selected prompt', async () => {
   const originalFetch = globalThis.fetch;
   const requests: { messages: { role: string; content: string }[] }[] = [];
   globalThis.fetch = async (_input, init) => {
@@ -54,7 +55,25 @@ test('chat sends the selected prompt and allows a truly empty system prompt', as
     assert.equal(result.words[0].hanzi, '你好');
     assert.equal(requests[0].messages[0].role, 'system');
     assert.match(requests[0].messages[0].content, new RegExp(CHAT_PRESETS[1].prompt));
+    assert.match(requests[0].messages[0].content, /2–5 word title/);
     await requestChatReply(settings, 'none', history);
-    assert.deepEqual(requests[1].messages.map(message => message.role), ['user']);
+    assert.deepEqual(requests[1].messages.map(message => message.role), ['system', 'user']);
+    assert.match(requests[1].messages[0].content, /2–5 word title/);
+    await requestChatReply(settings, 'none', [...history, { role: 'assistant', content: 'Hello' }, { role: 'user', content: 'Next' }]);
+    assert.deepEqual(requests[2].messages.map(message => message.role), ['user', 'assistant', 'user']);
   } finally { globalThis.fetch = originalFetch; }
+});
+
+test('chat title accepts only a short summary and history survives reload', () => {
+  assert.equal(parseChatReply({ answer: 'Hi', words: [], title: '  Chinese   greeting  ' }).title, 'Chinese greeting');
+  assert.equal(parseChatReply({ answer: 'Hi', words: [], title: 'Greeting' }).title, undefined);
+  assert.equal(fallbackChatTitle('你好'), 'About 你好');
+  const values = new Map<string, string>();
+  const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); } };
+  const conversations = [{ id: 'a', title: 'Chinese greeting', preset: 'words' as const, updatedAt: 2, messages: [
+    { role: 'user' as const, text: '你好' },
+    { role: 'assistant' as const, text: 'Hello', reply: { answer: 'Hello', words: [] } },
+  ] }];
+  saveChatHistory(conversations, storage);
+  assert.deepEqual(loadChatHistory(storage), conversations);
 });
