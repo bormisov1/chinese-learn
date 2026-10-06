@@ -61,7 +61,8 @@ export default function Cards() {
     [mistakeIds, setMistakeIds] = useState<string[]>([]),
     [graduations, setGraduations] = useState<Graduation[]>([]),
     [roundEndsAfterCelebration, setRoundEndsAfterCelebration] = useState(false),
-    [cardHeights, setCardHeights] = useState<Record<string, number>>({});
+    [cardHeights, setCardHeights] = useState<Record<string, number>>({}),
+    [roundTilts, setRoundTilts] = useState<Record<string, number>>({});
   const swipe = useRef(new Animated.ValueXY()).current;
   const cardSpin = useRef(new Animated.Value(0)).current;
   const total = data.words.length;
@@ -112,6 +113,9 @@ export default function Cards() {
     setStudyRound(round);
     patch((d) => ({ ...d, cardRound: Math.max(d.cardRound, round) }));
     setRoundIds(words.map((w) => w.id));
+    setRoundTilts(Object.fromEntries(words.map((item, index) => [
+      item.id, index === 0 ? 0 : Math.random() * 60 - 30,
+    ])));
     setCardHeights({});
     setPosition(0);
     setMistakeIds([]);
@@ -363,6 +367,7 @@ export default function Cards() {
             word={stackWord}
             depth={index}
             roundIndex={position + index}
+            initialTilt={roundTilts[stackWord.id] ?? 0}
             active={index === 0}
             height={cardHeights[stackWord.id] ?? 300}
             settings={data.settings}
@@ -387,13 +392,14 @@ export default function Cards() {
   );
 }
 
-function StackCard({ word, depth, roundIndex, active, height, settings, translationLanguage,
+function StackCard({ word, depth, roundIndex, initialTilt, active, height, settings, translationLanguage,
   examples, flipped, exampleIndex, onExampleIndexChange, swipe, cardSpin,
   panHandlers, onFlip, onGrade, onHeightChange,
 }: {
   word: Word;
   depth: number;
   roundIndex: number;
+  initialTilt: number;
   active: boolean;
   height: number;
   settings: Settings;
@@ -421,7 +427,7 @@ function StackCard({ word, depth, roundIndex, active, height, settings, translat
   }, [frontHeight, backHeight]);
   const showingBack = active && flipped;
   const offset = waveOffset(depth);
-  const tiltDirection = roundIndex % 2 === 0 ? 1 : -1;
+  const tilt = roundIndex === 0 ? 0 : initialTilt * depth / roundIndex;
   return (
     <View
       accessible={active}
@@ -433,8 +439,8 @@ function StackCard({ word, depth, roundIndex, active, height, settings, translat
         left: offset.x,
         right: -offset.x,
         zIndex: 10 - depth,
-        transformOrigin: tiltDirection === 1 ? "left top" : "right top",
-        transform: [{ rotate: `${tiltDirection * Math.min(depth * 6, 30)}deg` }],
+        transformOrigin: initialTilt >= 0 ? "left top" : "right top",
+        transform: [{ rotate: `${tilt}deg` }],
       }, webStackOffsetTransition, Platform.OS === "web" && ({ transitionDelay: `${depth * 25}ms` } as any)]}
     >
       <Animated.View
