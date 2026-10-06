@@ -33,7 +33,7 @@ export const emptyStore: StoreData = {
     apiKey: "",
     apiKeyValidated: false,
     apiUrl: "https://api.deepseek.com/chat/completions",
-    model: "deepseek-v4-pro",
+    model: "deepseek-v4-flash",
     ttsProvider: "browser",
     ttsVoiceURI: "",
     ttsRate: 0.85,
@@ -96,6 +96,7 @@ export async function loadStore(): Promise<StoreData> {
         ...emptyStore.settings,
         ...parsed.settings,
         language,
+        model: emptyStore.settings.model,
       },
     };
   } catch {
