@@ -352,7 +352,6 @@ export default function Cards() {
         />
       </View>
       <View style={[styles.studyStack, {
-        marginTop: (roundWords.length - 1) * CARD_STACK_STEP,
         height: (cardHeights[word.id] ?? 300) + (roundWords.length - 1) * CARD_STACK_STEP,
       }]}>
         {roundWords.slice(position).map((stackWord, index) => (
@@ -1199,7 +1198,7 @@ const styles = StyleSheet.create({
     height: 5,
     backgroundColor: colors.line,
     borderRadius: 4,
-    marginBottom: 20,
+    marginBottom: 24,
     overflow: "hidden",
   },
   fill: { height: 5, backgroundColor: colors.coral },
