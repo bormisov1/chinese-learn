@@ -4,6 +4,7 @@ import type { ImportedWord } from './types';
 import { evaluateChinesePrompt, evaluatePrompt, explainPrompt, generatePrompt, translateWordsPrompt, wordExplanationPrompt } from './prompts';
 import { resolveContextualPinyin, resolveSentencePronunciation } from './pronunciation';
 import { validateWordExplanation } from './word-explanations';
+import { readExplanationStream } from './explanation-stream';
 
 const DEEPSEEK_FLASH_MODEL = 'deepseek-v4-flash';
 
@@ -51,8 +52,21 @@ export const evaluateChinese = (settings: Settings, sentence: Sentence, answer: 
   return call<Evaluation>(settings, 'Evaluate a translation into Mandarin. JSON only.', evaluateChinesePrompt(settings.language, sentence.chinese, pronunciation.pinyin, pronunciation.meaning, answer));
 };
 export const explain = (settings: Settings, sentence: Sentence, words: Word[]) => call<Explanation>(settings, 'Explain Mandarin to the learner in their selected language. JSON only.', explainPrompt(settings.language, sentence.chinese, words.filter(w => sentence.wordIds.includes(w.id))));
-export async function explainWordOrSentence(settings: Settings, kind: 'word' | 'sentence', text: string): Promise<WordExplanation> {
-  const result = await call<WordExplanation>(settings, 'You are a precise Mandarin teacher. Follow the JSON schema and respond in the learner language. JSON only.', wordExplanationPrompt(settings.language, kind, text), 0.2);
+export async function explainWordOrSentence(settings: Settings, kind: 'word' | 'sentence', text: string, onPartial?: (partial: Partial<WordExplanation>) => void): Promise<WordExplanation> {
+  if (!settings.apiKey) throw new Error('Add your DeepSeek API key in Settings.');
+  let response: Response;
+  try {
+    response = await fetch(settings.apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settings.apiKey}` },
+      body: JSON.stringify({ model: DEEPSEEK_FLASH_MODEL, response_format: { type: 'json_object' }, stream: true,
+        messages: [{ role: 'system', content: 'You are a precise Mandarin teacher. Follow the JSON schema and respond in the learner language. JSON only.' }, { role: 'user', content: wordExplanationPrompt(settings.language, kind, text) }], temperature: 0.2 }),
+    });
+  } catch { throw new Error('Could not reach DeepSeek. Check the API endpoint, network, and browser console.'); }
+  if (!response.ok) throw new Error(`DeepSeek error ${response.status}`);
+  const result = response.headers.get('content-type')?.includes('text/event-stream')
+    ? await readExplanationStream(response, onPartial)
+    : JSON.parse((await response.json()).choices?.[0]?.message?.content ?? '{}');
   return validateWordExplanation(result, text);
 }
 export async function translateWords(settings: Settings, words: string[], language: AppLanguage): Promise<ImportedWord[]> {
