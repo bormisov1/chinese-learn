@@ -43,7 +43,7 @@ const waveOffset = (depth: number) => ({
 });
 const webStackOffsetTransition = Platform.OS === "web"
   ? ({
-      transitionProperty: "left, right, top",
+      transitionProperty: "left, right, top, transform",
       transitionDuration: "460ms",
       transitionTimingFunction: "cubic-bezier(0.75, -0.06, 0, 1)",
     } as any)
@@ -362,6 +362,7 @@ export default function Cards() {
             key={stackWord.id}
             word={stackWord}
             depth={index}
+            roundIndex={position + index}
             active={index === 0}
             height={cardHeights[stackWord.id] ?? 300}
             settings={data.settings}
@@ -386,12 +387,13 @@ export default function Cards() {
   );
 }
 
-function StackCard({ word, depth, active, height, settings, translationLanguage,
+function StackCard({ word, depth, roundIndex, active, height, settings, translationLanguage,
   examples, flipped, exampleIndex, onExampleIndexChange, swipe, cardSpin,
   panHandlers, onFlip, onGrade, onHeightChange,
 }: {
   word: Word;
   depth: number;
+  roundIndex: number;
   active: boolean;
   height: number;
   settings: Settings;
@@ -419,6 +421,7 @@ function StackCard({ word, depth, active, height, settings, translationLanguage,
   }, [frontHeight, backHeight]);
   const showingBack = active && flipped;
   const offset = waveOffset(depth);
+  const tiltDirection = roundIndex % 2 === 0 ? 1 : -1;
   return (
     <View
       accessible={active}
@@ -430,6 +433,8 @@ function StackCard({ word, depth, active, height, settings, translationLanguage,
         left: offset.x,
         right: -offset.x,
         zIndex: 10 - depth,
+        transformOrigin: tiltDirection === 1 ? "left top" : "right top",
+        transform: [{ rotate: `${tiltDirection * Math.min(depth * 6, 30)}deg` }],
       }, webStackOffsetTransition, Platform.OS === "web" && ({ transitionDelay: `${depth * 25}ms` } as any)]}
     >
       <Animated.View
