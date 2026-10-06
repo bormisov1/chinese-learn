@@ -33,11 +33,32 @@ export function parseChatReply(value: unknown): ChatReply {
   return { answer: result.answer.trim(), words };
 }
 
-export async function requestChatReply(settings: Settings, preset: ChatPreset, history: ChatTurn[]): Promise<ChatReply> {
+// JSON is still being streamed while the answer field is arriving. Decode only
+// complete string escapes; the finished payload is parsed normally below.
+export function partialChatAnswer(content: string): string {
+  const start = /"answer"\s*:\s*"/.exec(content);
+  if (!start) return '';
+  const from = start.index + start[0].length;
+  let end = from;
+  let escaped = false;
+  for (; end < content.length; end++) {
+    const char = content[end];
+    if (!escaped && char === '"') break;
+    if (!escaped && char === '\\') escaped = true;
+    else escaped = false;
+  }
+  let fragment = content.slice(from, end);
+  if (escaped) fragment = fragment.slice(0, -1);
+  // An incomplete unicode escape may span chunks.
+  fragment = fragment.replace(/\\u[0-9a-fA-F]{0,3}$/, '');
+  try { return JSON.parse(`"${fragment}"`); } catch { return ''; }
+}
+
+export async function requestChatReply(settings: Settings, preset: ChatPreset, history: ChatTurn[], onPartial?: (answer: string) => void): Promise<ChatReply> {
   if (!settings.apiKey.trim()) throw new Error('Add your DeepSeek API key in Settings.');
   const language = ({ en: 'English', ru: 'Russian', th: 'Thai' } satisfies Record<AppLanguage, string>)[settings.language];
   const prompt = CHAT_PRESETS.find(item => item.id === preset)?.prompt ?? '';
-  const format = `Respond in ${language}. Return JSON only: {"answer":"Your explanation or suggested reply, with clear formatting and pinyin where useful","words":[{"hanzi":"你好","pinyin":"nǐ hǎo","translation":"hello"}]}. The words array is a list of each useful Chinese word from the user's text and your answer; include characters as separate entries when explaining Hanzi. Use ${language} for translations. Use an empty array if there are no Chinese words.`;
+  const format = `Respond in ${language}. Return JSON only: {"answer":"Your explanation or suggested reply, with clear formatting and pinyin where useful","words":[{"hanzi":"你好","pinyin":"nǐ hǎo","translation":"hello"}]}. Put the word-by-word breakdown in the words array only; do not repeat that list in answer. The words array lists each useful Chinese word from the user's text and your answer once; include characters as separate entries when explaining Hanzi. Use ${language} for translations. Use an empty array if there are no Chinese words.`;
   const messages = [
     ...(prompt ? [{ role: 'system', content: `${prompt}. ${format}` }] : []),
     ...history.map((turn, index) => ({ role: turn.role, content: index === history.length - 1 && turn.role === 'user' ? `${turn.content}\n\n${format}` : turn.content })),
@@ -47,11 +68,38 @@ export async function requestChatReply(settings: Settings, preset: ChatPreset, h
     response = await fetch(settings.apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settings.apiKey}` },
-      body: JSON.stringify({ model: 'deepseek-v4-flash', response_format: { type: 'json_object' }, messages, temperature: 0.3 }),
+      body: JSON.stringify({ model: 'deepseek-v4-flash', response_format: { type: 'json_object' }, messages, temperature: 0.3, stream: true }),
     });
   } catch { throw new Error('Could not reach DeepSeek. Check your connection and API endpoint.'); }
   if (!response.ok) throw new Error(`DeepSeek error ${response.status}`);
-  const data = await response.json();
-  try { return parseChatReply(JSON.parse(data.choices?.[0]?.message?.content ?? '{}')); }
+  let content = '';
+  if (response.body && response.headers.get('content-type')?.includes('text/event-stream')) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    const consume = (line: string) => {
+      if (!line.startsWith('data:')) return;
+      const payload = line.slice(5).trim();
+      if (!payload || payload === '[DONE]') return;
+      const chunk = JSON.parse(payload);
+      const delta = chunk.choices?.[0]?.delta?.content;
+      if (typeof delta === 'string') {
+        content += delta;
+        onPartial?.(partialChatAnswer(content));
+      }
+    };
+    while (true) {
+      const { done, value } = await reader.read();
+      buffer += decoder.decode(value, { stream: !done });
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() ?? '';
+      for (const line of lines) consume(line);
+      if (done) { if (buffer) consume(buffer); break; }
+    }
+  } else {
+    const data = await response.json();
+    content = data.choices?.[0]?.message?.content ?? '';
+  }
+  try { return parseChatReply(JSON.parse(content || '{}')); }
   catch (error) { throw error instanceof Error ? error : new Error('DeepSeek returned invalid JSON.'); }
 }
