@@ -4,7 +4,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from './context';
 import { Text } from './i18n';
-import { CHAT_PRESETS, ChatPreset, ChatTurn, ChatWord, fallbackChatTitle, requestChatReply } from './chat';
+import { CHAT_PRESETS, ChatPreset, ChatTurn, ChatWord, chatTitleForQuestion, requestChatReply } from './chat';
 import { ChatMessage, Conversation, loadChatHistory, saveChatHistory } from './chat-history';
 import { colors } from './theme';
 import { removeVocabularyWord } from './vocabulary-selection';
@@ -86,7 +86,7 @@ export function ChatOverlay() {
       updateConversation(id, conversation => {
         const last = conversation.messages.at(-1);
         const completed: ChatMessage = { role: 'assistant', text: reply.answer, reply };
-        return { ...conversation, title: conversation.title === 'New chat' ? reply.title ?? fallbackChatTitle(question) : conversation.title,
+        return { ...conversation, title: conversation.title === 'New chat' ? chatTitleForQuestion(reply.title, question) : conversation.title,
           messages: last?.role === 'assistant' ? [...conversation.messages.slice(0, -1), completed] : [...conversation.messages, completed], updatedAt: Date.now() };
       });
     } catch (reason) {

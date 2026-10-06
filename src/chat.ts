@@ -9,6 +9,15 @@ export function fallbackChatTitle(question: string): string {
   return `About ${question.trim().replace(/\s+/g, ' ').split(' ').slice(0, 4).join(' ').slice(0, 60)}`;
 }
 
+export function chatTitleForQuestion(title: string | undefined, question: string): string {
+  const words = (title ?? fallbackChatTitle(question)).trim().split(/\s+/).filter(Boolean);
+  const firstChinese = question.match(/[\p{Script=Han}]+/u)?.[0];
+  const includesQuestionChinese = words.flatMap(word => word.match(/[\p{Script=Han}]+/gu) ?? [])
+    .some(fragment => question.includes(fragment));
+  if (firstChinese && !includesQuestionChinese) words.unshift([...firstChinese].slice(0, 8).join(''));
+  return words.slice(0, 5).join(' ');
+}
+
 export const CHAT_PRESETS: { id: ChatPreset; label: string; prompt: string }[] = [
   { id: 'none', label: 'No prompt', prompt: '' },
   { id: 'words', label: 'Explain words', prompt: 'Explain each word and hanzi in following with pinyin' },
@@ -64,7 +73,7 @@ export async function requestChatReply(settings: Settings, preset: ChatPreset, h
   const language = ({ en: 'English', ru: 'Russian', th: 'Thai' } satisfies Record<AppLanguage, string>)[settings.language];
   const prompt = CHAT_PRESETS.find(item => item.id === preset)?.prompt ?? '';
   const firstQuestion = history.filter(turn => turn.role === 'user').length === 1 && !history.some(turn => turn.role === 'assistant');
-  const titleInstruction = firstQuestion ? ` Also return "title": a short 2–5 word title in ${language} summarizing the user's first question.` : '';
+  const titleInstruction = firstQuestion ? ` Also return "title": a short 2–5 word title in ${language} about the user's actual first question, not the selected system prompt. If the question contains Chinese text, include a relevant Chinese word or phrase from it in the title.` : '';
   const format = `Respond in ${language}. Return JSON only: {"answer":"Your explanation or suggested reply, with clear formatting and pinyin where useful","words":[{"hanzi":"你好","pinyin":"nǐ hǎo","translation":"hello"}]${firstQuestion ? ',"title":"Short question summary"' : ''}}. Put the word-by-word breakdown in the words array only; do not repeat that list in answer. The words array lists each useful Chinese word from the user's text and your answer once; include characters as separate entries when explaining Hanzi. Use ${language} for translations. Use an empty array if there are no Chinese words.${titleInstruction}`;
   const messages = [
     ...(prompt || firstQuestion ? [{ role: 'system', content: `${prompt ? `${prompt}. ` : ''}${format}` }] : []),
