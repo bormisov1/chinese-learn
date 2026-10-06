@@ -37,14 +37,18 @@ const webDragSurface = Platform.OS === "web"
   ? ({ touchAction: "none" } as any)
   : undefined;
 const CARD_STACK_STEP = 12;
+const waveOffset = (depth: number) => ({
+  x: Math.round(Math.sin(depth * 1.65) * depth * CARD_STACK_STEP),
+  y: Math.round(Math.cos(depth * 1.65) * depth * CARD_STACK_STEP),
+});
+// The axes use different timing curves, so each card arcs between wave positions.
 const webStackOffsetTransition = Platform.OS === "web"
-  ? ({ transition: "top 260ms ease-out, left 260ms ease-out, right 260ms ease-out" } as any)
+  ? ({ transition: "left 460ms cubic-bezier(.25,.85,.2,1.12), right 460ms cubic-bezier(.25,.85,.2,1.12), top 540ms cubic-bezier(.65,-.18,.24,1.14)" } as any)
   : undefined;
 
 export default function Cards() {
   const { data, patch, generateBatch } = useStore();
   const t = useTranslation();
-  const { width: screenWidth } = useWindowDimensions();
   const [studyRound, setStudyRound] = useState(data.cardRound + 1),
     [roundIds, setRoundIds] = useState<string[]>([]),
     [position, setPosition] = useState(0),
@@ -67,8 +71,6 @@ export default function Cards() {
   const roundWords = roundIds
     .map((id) => data.words.find((w) => w.id === id))
     .filter(Boolean) as typeof data.words;
-  const stackStep = Math.min(CARD_STACK_STEP, Math.max(3,
-    (screenWidth - 294) / (2 * Math.max(1, roundWords.length - 1))));
   const word = roundWords[position];
   const examples = useMemo(
     () =>
@@ -350,18 +352,16 @@ export default function Cards() {
         />
       </View>
       <View style={[styles.studyStack, {
-        marginTop: (roundWords.length - 1) * stackStep,
-        marginHorizontal: (roundWords.length - 1) * stackStep,
-        height: cardHeights[word.id] ?? 300,
+        marginTop: (roundWords.length - 1) * CARD_STACK_STEP,
+        height: (cardHeights[word.id] ?? 300) + (roundWords.length - 1) * CARD_STACK_STEP,
       }]}>
         {roundWords.slice(position).map((stackWord, index) => (
           <StackCard
             key={stackWord.id}
             word={stackWord}
             depth={index}
-            step={stackStep}
             active={index === 0}
-            height={cardHeights[word.id] ?? 300}
+            height={cardHeights[stackWord.id] ?? 300}
             settings={data.settings}
             translationLanguage={translationLanguage}
             examples={(data.wordSentenceIndex[stackWord.id] ?? [])
@@ -384,13 +384,12 @@ export default function Cards() {
   );
 }
 
-function StackCard({ word, depth, step, active, height, settings, translationLanguage,
+function StackCard({ word, depth, active, height, settings, translationLanguage,
   examples, flipped, exampleIndex, onExampleIndexChange, swipe, cardSpin,
   panHandlers, onFlip, onGrade, onHeightChange,
 }: {
   word: Word;
   depth: number;
-  step: number;
   active: boolean;
   height: number;
   settings: Settings;
@@ -407,13 +406,17 @@ function StackCard({ word, depth, step, active, height, settings, translationLan
   onHeightChange: (height: number) => void;
 }) {
   const t = useTranslation();
+  const { width: screenWidth } = useWindowDimensions();
   const pronunciation = resolveWordPronunciation(word, displayTranslation(word.russian, settings.language));
+  const hanziWidth = Math.min(200, Math.max(120, screenWidth - 100));
+  const hanziSize = Math.min(66, Math.floor(hanziWidth / Math.max(1, Array.from(pronunciation.hanzi).length)));
   const [frontHeight, setFrontHeight] = useState(0);
   const [backHeight, setBackHeight] = useState(0);
   useEffect(() => {
     onHeightChange(Math.max(300, Math.ceil(frontHeight + 84), Math.ceil(backHeight + 52)));
   }, [frontHeight, backHeight]);
   const showingBack = active && flipped;
+  const offset = waveOffset(depth);
   return (
     <View
       accessible={active}
@@ -421,11 +424,11 @@ function StackCard({ word, depth, step, active, height, settings, translationLan
       importantForAccessibility={active ? "auto" : "no-hide-descendants"}
       pointerEvents={active ? "auto" : "none"}
       style={[styles.stackCard, {
-        top: -depth * step,
-        left: -depth * step,
-        right: depth * step,
+        top: offset.y,
+        left: offset.x,
+        right: -offset.x,
         zIndex: 10 - depth,
-      }, webStackOffsetTransition]}
+      }, webStackOffsetTransition, Platform.OS === "web" && ({ transitionDelay: `${depth * 25}ms` } as any)]}
     >
       <Animated.View
         {...(active ? panHandlers : {})}
@@ -488,14 +491,19 @@ function StackCard({ word, depth, step, active, height, settings, translationLan
               <Animated.Text pointerEvents="none" style={[styles.swipeBadge, styles.rightBadge, {
                 opacity: swipe.x.interpolate({ inputRange: [35, 100], outputRange: [0, 1], extrapolate: "clamp" }),
               }]}>{t("RIGHT")}</Animated.Text>
-              <View style={styles.hanziRow}>
+              <View style={styles.cardControls}>
                 <ExplanationButton kind="word" text={pronunciation.hanzi} />
-                <Pressable onPress={() => copyText(pronunciation.hanzi)}>
-                  <Text style={styles.hanzi}>{pronunciation.hanzi}</Text>
-                </Pressable>
                 <HskBadge hanzi={pronunciation.hanzi} />
                 <SpeakerButton pronunciation={pronunciation} settings={settings} size={22} />
               </View>
+              <Pressable style={styles.hanziPressable} onPress={(event) => {
+                event.stopPropagation();
+                copyText(pronunciation.hanzi);
+              }}>
+                <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.hanzi, { fontSize: hanziSize }]}>
+                  {pronunciation.hanzi}
+                </Text>
+              </Pressable>
               <Text style={styles.pinyin}>{pronunciation.pinyin}</Text>
               <View style={styles.rule} />
               {examples.length ? <ExampleCarousel examples={examples} settings={settings}
@@ -1118,14 +1126,6 @@ const styles = StyleSheet.create({
   },
   deckComplete: { color: colors.muted, textAlign: "center", marginTop: 20 },
   guessStats: { color: colors.muted, fontSize: 9, marginTop: 4 },
-  hanziRow: {
-    width: "100%",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    flexWrap: "wrap",
-    gap: 10,
-  },
   exampleChinese: {
     flex: 1,
     flexDirection: "row",
@@ -1263,7 +1263,15 @@ const styles = StyleSheet.create({
   },
   wrongBadge: { right: 20, color: colors.red, borderColor: colors.red },
   rightBadge: { left: 20, color: colors.green, borderColor: colors.green },
-  hanzi: { fontSize: 66, fontWeight: "700", color: colors.ink },
+  cardControls: {
+    width: "100%",
+    height: 38,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  hanziPressable: { width: "100%", alignItems: "center", marginTop: 8 },
+  hanzi: { fontSize: 66, fontWeight: "700", color: colors.ink, textAlign: "center" },
   pinyin: { fontSize: 20, color: colors.green, marginTop: 6 },
   rule: {
     height: 1,
