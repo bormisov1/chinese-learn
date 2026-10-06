@@ -9,7 +9,6 @@
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "com.bormisov.hanzideck",
-      "newArchEnabled": false,
       "supportsTablet": false,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
