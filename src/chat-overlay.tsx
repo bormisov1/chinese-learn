@@ -4,12 +4,13 @@ import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from './context';
 import { Text } from './i18n';
-import { CHAT_PRESETS, ChatPreset, ChatTurn, fallbackChatTitle, requestChatReply } from './chat';
+import { CHAT_PRESETS, ChatPreset, ChatTurn, ChatWord, chatTitleForQuestion, requestChatReply } from './chat';
 import { ChatMessage, Conversation, loadChatHistory, saveChatHistory } from './chat-history';
 import { colors } from './theme';
+import { removeVocabularyWord } from './vocabulary-selection';
 
 export function ChatOverlay() {
-  const { data, dictionary, importWords } = useStore();
+  const { data, dictionary, importWords, patch } = useStore();
   const insets = useSafeAreaInsets();
   const scroll = useRef<ScrollView>(null);
   const [open, setOpen] = useState(false);
@@ -20,7 +21,7 @@ export function ChatOverlay() {
   const [activeId, setActiveId] = useState<string | null>(() => loadChatHistory()[0]?.id ?? null);
   const [draftPreset, setDraftPreset] = useState<ChatPreset>('words');
   const [input, setInput] = useState('');
-  const [selectedWords, setSelectedWords] = useState<Set<string>>(new Set());
+  const [pendingRemoval, setPendingRemoval] = useState<ChatWord | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const conversationsRef = useRef(conversations);
@@ -41,7 +42,7 @@ export function ChatOverlay() {
   }, []);
   useEffect(() => {
     const style = document.createElement('style');
-    style.textContent = '@keyframes chat-dot-flash { 0%, 20%, 100% { opacity: .22; } 50% { opacity: 1; } } .chat-typing { color: #326448; font-family: cursive; font-size: 18px; } .chat-typing-dot { display: inline-block; animation: chat-dot-flash 1.8s ease-in-out infinite; } .chat-typing-dot:nth-child(2) { animation-delay: .3s; } .chat-typing-dot:nth-child(3) { animation-delay: .6s; }';
+    style.textContent = '@keyframes chat-dot-flash { 0%, 20%, 100% { opacity: .22; } 50% { opacity: 1; } } .chat-typing { color: #326448; font-style: italic; font-size: 18px; } .chat-typing-dot { display: inline-block; animation: chat-dot-flash 1.8s ease-in-out infinite; } .chat-typing-dot:nth-child(2) { animation-delay: .3s; } .chat-typing-dot:nth-child(3) { animation-delay: .6s; }';
     document.head.appendChild(style);
     return () => { style.remove(); };
   }, []);
@@ -55,6 +56,11 @@ export function ChatOverlay() {
   const selectPreset = (next: ChatPreset) => {
     if (activeId) updateConversation(activeId, conversation => ({ ...conversation, preset: next }));
     else setDraftPreset(next);
+  };
+  const confirmRemoval = () => {
+    if (!pendingRemoval) return;
+    patch(current => removeVocabularyWord(current, pendingRemoval.hanzi));
+    setPendingRemoval(null);
   };
 
   const send = async () => {
@@ -80,7 +86,7 @@ export function ChatOverlay() {
       updateConversation(id, conversation => {
         const last = conversation.messages.at(-1);
         const completed: ChatMessage = { role: 'assistant', text: reply.answer, reply };
-        return { ...conversation, title: conversation.title === 'New chat' ? reply.title ?? fallbackChatTitle(question) : conversation.title,
+        return { ...conversation, title: conversation.title === 'New chat' ? chatTitleForQuestion(reply.title, question) : conversation.title,
           messages: last?.role === 'assistant' ? [...conversation.messages.slice(0, -1), completed] : [...conversation.messages, completed], updatedAt: Date.now() };
       });
     } catch (reason) {
@@ -95,7 +101,7 @@ export function ChatOverlay() {
       <View style={styles.orbitDot} />
     </Pressable>
     <Modal visible={open} animationType="slide" onRequestClose={() => { setOpen(false); setClicked(false); }}>
-      <View style={[styles.page, { paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, 12) }]}>
+      <View style={[styles.page, { paddingTop: insets.top }]}>
         <View style={styles.header}>
           <View style={styles.headerTitle}><Text style={styles.eyebrow}>DEEPSEEK</Text><Text numberOfLines={1} style={styles.title}>{showHistory ? 'Previous chats' : active?.title ?? 'New chat'}</Text></View>
           <View style={styles.headerActions}>
@@ -111,15 +117,16 @@ export function ChatOverlay() {
             <Text numberOfLines={1} style={styles.historyItemPreview}>{conversation.messages.find(item => item.role === 'user')?.text ?? ''}</Text>
           </Pressable>)}
         </ScrollView> : <>
-        <ScrollView ref={scroll} style={styles.history} contentContainerStyle={styles.historyContent} keyboardShouldPersistTaps="handled" onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: true })}>
+        <View style={styles.historyFrame}>
+        <ScrollView ref={scroll} style={styles.history} contentContainerStyle={[styles.historyContent, busy && styles.historyContentWhileTyping]} keyboardShouldPersistTaps="handled" onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: true })}>
           {!messages.length && <Text style={styles.empty}>Ask about Chinese words, a Hanzi, or a message you want to answer.</Text>}
           {messages.filter(item => item.role === 'user' || !!item.text || !!item.reply.words.length).map((item, index) => <View key={index} style={[styles.bubble, item.role === 'user' ? styles.userBubble : styles.assistantBubble]}>
             {!!item.text && <Text style={[styles.messageText, item.role === 'user' && styles.userText]}>{item.text}</Text>}
             {item.role === 'assistant' && !!item.reply.words.length && <View style={styles.wordsSection}>
               <Text style={styles.wordsTitle}>BREAKDOWN · TAP TO ADD</Text>
               {item.reply.words.map(word => {
-                const added = saved.has(word.hanzi) || selectedWords.has(word.hanzi);
-                return <Pressable key={word.hanzi} accessibilityRole="button" accessibilityLabel={`${added ? 'Added' : 'Add'} ${word.hanzi} to vocabulary`} accessibilityState={{ disabled: added }} disabled={added} onPress={() => { setSelectedWords(current => new Set(current).add(word.hanzi)); importWords([dictionary?.get(word.hanzi) ?? { hanzi: word.hanzi, pinyin: word.pinyin, russian: word.translation }]); }} style={[styles.wordRow, added && styles.wordAdded]}>
+                const added = saved.has(word.hanzi);
+                return <Pressable key={word.hanzi} accessibilityRole="button" accessibilityLabel={`${added ? 'Remove' : 'Add'} ${word.hanzi} ${added ? 'from' : 'to'} vocabulary`} accessibilityState={{ selected: added }} onPress={() => { if (added) setPendingRemoval(word); else importWords([dictionary?.get(word.hanzi) ?? { hanzi: word.hanzi, pinyin: word.pinyin, russian: word.translation }]); }} style={[styles.wordRow, added && styles.wordAdded]}>
                   <Text style={[styles.hanzi, added && styles.wordTextAdded]}>{word.hanzi}</Text>
                   <View style={styles.wordDetail}><Text style={[styles.pinyin, added && styles.wordTextAdded]}>{word.pinyin}</Text><Text style={[styles.translation, added && styles.wordTextAdded]}>{word.translation}</Text></View>
                   <Ionicons name={added ? 'checkmark' : 'add'} size={16} color={added ? colors.green : colors.white} />
@@ -127,18 +134,30 @@ export function ChatOverlay() {
               })}
             </View>}
           </View>)}
-          {busy && <View accessibilityLabel="DeepSeek is typing" style={styles.loading}><span className="chat-typing">typing<span className="chat-typing-dot">.</span><span className="chat-typing-dot">.</span><span className="chat-typing-dot">.</span></span></View>}
           {!!error && <Text style={styles.error}>{error}</Text>}
         </ScrollView>
+        {busy && <View accessibilityLabel="DeepSeek is typing" style={styles.typingIndicator}><span className="chat-typing">typing<span className="chat-typing-dot">.</span><span className="chat-typing-dot">.</span><span className="chat-typing-dot">.</span></span></View>}
+        </View>
         <View style={styles.promptArea}>
           <Text style={styles.promptLabel}>CHOOSE A PROMPT</Text>
           <View style={styles.promptButtons}>{CHAT_PRESETS.map(item => <Pressable key={item.id} accessibilityRole="button" accessibilityState={{ selected: item.id === preset }} onPress={() => selectPreset(item.id)} style={[styles.promptButton, item.id === preset && styles.promptSelected]}><Text style={[styles.promptText, item.id === preset && styles.promptTextSelected]}>{item.label}</Text></Pressable>)}</View>
         </View>
-        <View style={styles.composer}>
+        <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
           <TextInput accessibilityLabel="Chat message" multiline value={input} onChangeText={setInput} placeholder="Type a message…" placeholderTextColor={colors.muted} style={styles.input} />
           <Pressable accessibilityRole="button" accessibilityLabel="Send message" accessibilityState={{ disabled: !input.trim() || busy }} disabled={!input.trim() || busy} onPress={() => void send()} style={[styles.send, (!input.trim() || busy) && styles.sendDisabled]}><Ionicons name="arrow-up" size={23} color={colors.white} /></Pressable>
         </View>
         </>}
+        {pendingRemoval && <View style={styles.confirmOverlay} accessibilityViewIsModal>
+          <Pressable accessibilityRole="button" accessibilityLabel="Cancel removing word" onPress={() => setPendingRemoval(null)} style={StyleSheet.absoluteFillObject} />
+          <View style={styles.confirmDialog}>
+            <Text style={styles.confirmTitle}>Remove {pendingRemoval.hanzi}?</Text>
+            <Text style={styles.confirmMessage}>Do you really want to remove this word from your vocabulary?</Text>
+            <View style={styles.confirmActions}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Cancel" onPress={() => setPendingRemoval(null)} style={styles.confirmAction}><Text style={styles.confirmCancel}>Cancel</Text></Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel={`Remove ${pendingRemoval.hanzi} from vocabulary`} onPress={confirmRemoval} style={styles.confirmAction}><Text style={styles.confirmRemove}>Remove</Text></Pressable>
+            </View>
+          </View>
+        </View>}
       </View>
     </Modal>
   </>;
@@ -165,7 +184,9 @@ const styles = StyleSheet.create({
   promptText: { fontSize: 13, fontWeight: '700', color: colors.green },
   promptTextSelected: { color: colors.white },
   history: { flex: 1 },
+  historyFrame: { flex: 1, position: 'relative' },
   historyContent: { padding: 16, paddingBottom: 28, gap: 15 },
+  historyContentWhileTyping: { paddingBottom: 55 },
   historyList: { padding: 16, gap: 9 },
   historyItem: { padding: 14, borderRadius: 13, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, gap: 4 },
   historyItemActive: { borderColor: colors.green },
@@ -186,10 +207,18 @@ const styles = StyleSheet.create({
   wordDetail: { flex: 1 },
   pinyin: { fontSize: 16, fontWeight: '700', color: colors.white },
   translation: { fontSize: 16, color: colors.white },
-  loading: { alignSelf: 'flex-start', margin: 12 },
+  typingIndicator: { position: 'absolute', left: 16, bottom: 7, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: colors.paper },
   error: { color: colors.red, fontSize: 14, lineHeight: 21 },
-  composer: { flexDirection: 'row', gap: 10, alignItems: 'flex-end', paddingHorizontal: 12, paddingTop: 10, borderTopWidth: 1, borderColor: colors.line, backgroundColor: colors.card },
+  composer: { flexDirection: 'row', gap: 10, alignItems: 'center', paddingHorizontal: 12, paddingTop: 10, borderTopWidth: 1, borderColor: colors.line, backgroundColor: colors.card },
   input: { flex: 1, maxHeight: 120, minHeight: 44, borderWidth: 1, borderColor: '#C5D8CD', borderRadius: 20, paddingHorizontal: 15, paddingVertical: 10, color: colors.ink, fontSize: 16, backgroundColor: colors.paper },
   send: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.green },
   sendDisabled: { opacity: 0.4 },
+  confirmOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 30, backgroundColor: 'rgba(0, 0, 0, 0.32)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28 },
+  confirmDialog: { width: '100%', maxWidth: 300, borderRadius: 14, backgroundColor: '#F8F8F8', overflow: 'hidden', alignItems: 'center', paddingTop: 22 },
+  confirmTitle: { color: '#111', fontSize: 17, fontWeight: '700', textAlign: 'center', paddingHorizontal: 18 },
+  confirmMessage: { color: '#333', fontSize: 13, lineHeight: 18, textAlign: 'center', paddingHorizontal: 20, marginTop: 6, marginBottom: 20 },
+  confirmActions: { alignSelf: 'stretch', flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#D3D3D6' },
+  confirmAction: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRightWidth: 1, borderRightColor: '#D3D3D6' },
+  confirmCancel: { color: '#007AFF', fontSize: 17 },
+  confirmRemove: { color: '#FF3B30', fontSize: 17, fontWeight: '600' },
 });

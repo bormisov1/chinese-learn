@@ -3,7 +3,8 @@ import { bootstrap } from "./backend";
 import { applyBootstrapSnapshot } from "./sync-merge";
 export function syncableSnapshot(data: StoreData) {
   const { apiKey: _apiKey, apiKeyValidated: _validated, apiUrl: _apiUrl, model: _model, ...settings } = data.settings;
-  return { ...data, settings, mixQueue: [], mixPosition: 0 };
+  const { removedWordHanzi: _removedWordHanzi, ...sharedData } = data;
+  return { ...sharedData, settings, mixQueue: [], mixPosition: 0 };
 }
 
 export async function bootstrapStore(data: StoreData): Promise<StoreData> {

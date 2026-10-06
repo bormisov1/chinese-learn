@@ -1,5 +1,6 @@
 import { StoreData } from "./types";
 import { mergeExplanations } from "./word-explanations";
+import { keepRemovedWordsOut } from "./vocabulary-selection";
 
 function hasStudyData(data: Partial<StoreData>) {
   return Boolean(
@@ -18,7 +19,7 @@ export function applyBootstrapSnapshot(local: StoreData, remote: Partial<StoreDa
   if (hasStudyData(local) && !hasStudyData(remote)) return local;
   // These settings are device-local and are deliberately excluded from sync requests.
   const { apiKey: _apiKey, apiKeyValidated: _validated, apiUrl: _apiUrl, model: _model, ...remoteSettings } = remote.settings ?? {};
-  return {
+  return keepRemovedWordsOut({
     ...local,
     ...remote,
     explanations: mergeExplanations(local.explanations, remote.explanations),
@@ -26,5 +27,6 @@ export function applyBootstrapSnapshot(local: StoreData, remote: Partial<StoreDa
     mixQueue: local.mixQueue,
     mixPosition: local.mixPosition,
     storageVersion: local.storageVersion,
-  };
+    removedWordHanzi: local.removedWordHanzi,
+  }, local.removedWordHanzi ?? []);
 }

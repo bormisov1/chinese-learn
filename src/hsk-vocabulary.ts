@@ -34,6 +34,7 @@ export function replenishAutomaticWords(
   dictionary: Dictionary,
   at = Date.now(),
   round?: number,
+  excludedHanzi: ReadonlySet<string> = new Set(),
 ): Word[] {
   const learningCount = words.filter(
     (word) => word.cardSrsLevel < CARD_GRADUATION_LEVEL,
@@ -43,7 +44,7 @@ export function replenishAutomaticWords(
 
   const existing = new Set(words.map((word) => word.hanzi));
   const additions = orderedHskWords
-    .filter((hanzi) => !existing.has(hanzi) && dictionary.has(hanzi))
+    .filter((hanzi) => !existing.has(hanzi) && !excludedHanzi.has(hanzi) && dictionary.has(hanzi))
     .slice(0, needed)
     .map((hanzi, index): Word => ({
       ...dictionary.get(hanzi)!,

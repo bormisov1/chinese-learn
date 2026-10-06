@@ -112,7 +112,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!ready || !dictionary || !data.onboardingComplete || !data.settings.automaticWordAddition) return;
     setData(current => {
-      const words = replenishAutomaticWords(current.words, dictionary, Date.now(), current.cardRound);
+      const words = replenishAutomaticWords(current.words, dictionary, Date.now(), current.cardRound, new Set(current.removedWordHanzi));
       return words === current.words ? current : { ...current, words };
     });
   }, [ready, dictionary, data.onboardingComplete, data.settings.automaticWordAddition, data.words]);
@@ -161,13 +161,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       ...current,
       onboardingComplete: completeOnboarding || current.onboardingComplete,
       settings: { ...current.settings, automaticWordAddition: enabled },
-      words: enabled && dictionary ? replenishAutomaticWords(current.words, dictionary, Date.now(), current.cardRound) : current.words,
+      words: enabled && dictionary ? replenishAutomaticWords(current.words, dictionary, Date.now(), current.cardRound, new Set(current.removedWordHanzi)) : current.words,
     }));
   };
   const importWords = (items: ImportedWord[]) => {
     const existing = new Set(data.words.map(w => w.hanzi));
     const fresh = items.filter(w => !existing.has(w.hanzi));
-    if (fresh.length) setData(d => ({ ...d, words: fillActivePool([...d.words, ...fresh.map(w => ({ ...w, translationByLanguage: { [d.settings.language]: w.russian }, id: id(), exampleCount: 0, wordShownCount: 0, createdAt: Date.now(), srsLevel: 0, srsCorrect: 0, srsIncorrect: 0, srsDueAt: 0, cardSrsLevel: 0, cardSrsCorrect: 0, cardSrsIncorrect: 0, cardSrsDueAt: 0, cardLapses: 0 }))], Date.now(), d.cardRound) }));
+    if (fresh.length) setData(d => ({ ...d, removedWordHanzi: d.removedWordHanzi?.filter(hanzi => !fresh.some(word => word.hanzi === hanzi)), words: fillActivePool([...d.words, ...fresh.map(w => ({ ...w, translationByLanguage: { [d.settings.language]: w.russian }, id: id(), exampleCount: 0, wordShownCount: 0, createdAt: Date.now(), srsLevel: 0, srsCorrect: 0, srsIncorrect: 0, srsDueAt: 0, cardSrsLevel: 0, cardSrsCorrect: 0, cardSrsIncorrect: 0, cardSrsDueAt: 0, cardLapses: 0 }))], Date.now(), d.cardRound) }));
     if (fresh.length) void track("words_added", { count: fresh.length });
     return fresh.length;
   };

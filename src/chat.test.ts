@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { CHAT_PRESETS, fallbackChatTitle, parseChatReply, partialChatAnswer, requestChatReply } from './chat';
+import { CHAT_PRESETS, chatTitleForQuestion, fallbackChatTitle, parseChatReply, partialChatAnswer, requestChatReply } from './chat';
 import { loadChatHistory, saveChatHistory } from './chat-history';
 import type { Settings } from './types';
 
@@ -56,6 +56,8 @@ test('first chat request asks for a 2–5 word title with the selected prompt', 
     assert.equal(requests[0].messages[0].role, 'system');
     assert.match(requests[0].messages[0].content, new RegExp(CHAT_PRESETS[1].prompt));
     assert.match(requests[0].messages[0].content, /2–5 word title/);
+    assert.match(requests[0].messages[0].content, /actual first question, not the selected system prompt/);
+    assert.match(requests[0].messages[0].content, /include a relevant Chinese word or phrase/);
     await requestChatReply(settings, 'none', history);
     assert.deepEqual(requests[1].messages.map(message => message.role), ['system', 'user']);
     assert.match(requests[1].messages[0].content, /2–5 word title/);
@@ -68,6 +70,9 @@ test('chat title accepts only a short summary and history survives reload', () =
   assert.equal(parseChatReply({ answer: 'Hi', words: [], title: '  Chinese   greeting  ' }).title, 'Chinese greeting');
   assert.equal(parseChatReply({ answer: 'Hi', words: [], title: 'Greeting' }).title, undefined);
   assert.equal(fallbackChatTitle('你好'), 'About 你好');
+  assert.equal(chatTitleForQuestion('Chinese greeting', 'What does 你好 mean?'), '你好 Chinese greeting');
+  assert.equal(chatTitleForQuestion('你好 Greeting', 'What does 你好 mean?'), '你好 Greeting');
+  assert.equal(chatTitleForQuestion('Meaning of Chinese greeting', 'Explain 打篮球'), '打篮球 Meaning of Chinese greeting');
   const values = new Map<string, string>();
   const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); } };
   const conversations = [{ id: 'a', title: 'Chinese greeting', preset: 'words' as const, updatedAt: 2, messages: [
