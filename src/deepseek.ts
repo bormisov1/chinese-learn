@@ -5,7 +5,6 @@ import { evaluateChinesePrompt, evaluatePrompt, explainPrompt, generatePrompt, t
 import { resolveContextualPinyin, resolveSentencePronunciation } from './pronunciation';
 import { validateWordExplanation } from './word-explanations';
 
-const DEEPSEEK_PRO_MODEL = 'deepseek-v4-pro';
 const DEEPSEEK_FLASH_MODEL = 'deepseek-v4-flash';
 
 export async function validateApiKey(apiKey: string, signal?: AbortSignal) {
@@ -17,10 +16,10 @@ export async function validateApiKey(apiKey: string, signal?: AbortSignal) {
   if (!response.ok) throw new Error(`DeepSeek validation error ${response.status}.`);
 }
 
-async function call<T>(settings: Settings, model: string, system: string, user: string, temperature = 0.8): Promise<T> {
+async function call<T>(settings: Settings, system: string, user: string, temperature = 0.8): Promise<T> {
   if (!settings.apiKey) throw new Error('Add your DeepSeek API key in Settings.');
   let response: Response;
-  try { response = await fetch(settings.apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settings.apiKey}` }, body: JSON.stringify({ model, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], temperature }) }); }
+  try { response = await fetch(settings.apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settings.apiKey}` }, body: JSON.stringify({ model: DEEPSEEK_FLASH_MODEL, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], temperature }) }); }
   catch { throw new Error('Could not reach DeepSeek. Check the API endpoint, network, and browser console.'); }
   if (!response.ok) throw new Error(`DeepSeek error ${response.status}`);
   const json = await response.json();
@@ -35,7 +34,7 @@ export async function generate(settings: Settings, words: Word[], targets: Word[
   const vocabulary = words.map(({ hanzi, pinyin, russian }) => ({ hanzi, pinyin, russian }));
   const perCall = Math.ceil(size / 4);
   const responses: { sentences?: { chinese: string; pinyin: string; russian: string; grammarPattern: string }[] }[] = [];
-  for (let request = 0; request < 4; request++) responses.push(await call(settings, DEEPSEEK_PRO_MODEL, 'Generate natural, semantically coherent Mandarin practice sentences. Follow every vocabulary and formatting constraint exactly. JSON only.', generatePrompt(settings.language, perCall, shuffle(vocabulary), shuffle(targets.map(w => w.hanzi)))));
+  for (let request = 0; request < 4; request++) responses.push(await call(settings, 'Generate natural, semantically coherent Mandarin practice sentences. Follow every vocabulary and formatting constraint exactly. JSON only.', generatePrompt(settings.language, perCall, shuffle(vocabulary), shuffle(targets.map(w => w.hanzi)))));
   const candidates = responses.flatMap(data => data.sentences ?? []);
   const allowed = new Set(words.map(w => w.hanzi));
   return candidates.filter((s, i, all) => typeof s.chinese === 'string' && s.chinese.trim().split(/ +/).every(t => allowed.has(t)) && !!s.pinyin?.trim() && !!s.russian?.trim() && !!s.grammarPattern?.trim() && all.findIndex(x => x.chinese === s.chinese) === i).slice(0, size).map(sentence => ({
@@ -45,15 +44,15 @@ export async function generate(settings: Settings, words: Word[], targets: Word[
 }
 export const evaluate = (settings: Settings, sentence: Sentence, answer: string) => {
   const pronunciation = resolveSentencePronunciation(sentence);
-  return call<Evaluation>(settings, DEEPSEEK_FLASH_MODEL, 'Evaluate a Mandarin translation exercise. JSON only.', evaluatePrompt(settings.language, sentence.chinese, pronunciation.pinyin, pronunciation.meaning, answer));
+  return call<Evaluation>(settings, 'Evaluate a Mandarin translation exercise. JSON only.', evaluatePrompt(settings.language, sentence.chinese, pronunciation.pinyin, pronunciation.meaning, answer));
 };
 export const evaluateChinese = (settings: Settings, sentence: Sentence, answer: string) => {
   const pronunciation = resolveSentencePronunciation(sentence);
-  return call<Evaluation>(settings, DEEPSEEK_FLASH_MODEL, 'Evaluate a translation into Mandarin. JSON only.', evaluateChinesePrompt(settings.language, sentence.chinese, pronunciation.pinyin, pronunciation.meaning, answer));
+  return call<Evaluation>(settings, 'Evaluate a translation into Mandarin. JSON only.', evaluateChinesePrompt(settings.language, sentence.chinese, pronunciation.pinyin, pronunciation.meaning, answer));
 };
-export const explain = (settings: Settings, sentence: Sentence, words: Word[]) => call<Explanation>(settings, DEEPSEEK_PRO_MODEL, 'Explain Mandarin to the learner in their selected language. JSON only.', explainPrompt(settings.language, sentence.chinese, words.filter(w => sentence.wordIds.includes(w.id))));
+export const explain = (settings: Settings, sentence: Sentence, words: Word[]) => call<Explanation>(settings, 'Explain Mandarin to the learner in their selected language. JSON only.', explainPrompt(settings.language, sentence.chinese, words.filter(w => sentence.wordIds.includes(w.id))));
 export async function explainWordOrSentence(settings: Settings, kind: 'word' | 'sentence', text: string): Promise<WordExplanation> {
-  const result = await call<WordExplanation>(settings, DEEPSEEK_PRO_MODEL, 'You are a precise Mandarin teacher. Follow the JSON schema and respond in the learner language. JSON only.', wordExplanationPrompt(settings.language, kind, text), 0.2);
+  const result = await call<WordExplanation>(settings, 'You are a precise Mandarin teacher. Follow the JSON schema and respond in the learner language. JSON only.', wordExplanationPrompt(settings.language, kind, text), 0.2);
   return validateWordExplanation(result, text);
 }
 export async function translateWords(settings: Settings, words: string[], language: AppLanguage): Promise<ImportedWord[]> {
@@ -63,7 +62,6 @@ export async function translateWords(settings: Settings, words: string[], langua
     const allowed = new Set(requested);
     const response = await call<{ words?: { hanzi?: unknown; pinyin?: unknown; translation?: unknown }[] }>(
       settings,
-      DEEPSEEK_FLASH_MODEL,
       'Translate Mandarin vocabulary accurately and concisely. JSON only.',
       translateWordsPrompt(language, requested),
     );
