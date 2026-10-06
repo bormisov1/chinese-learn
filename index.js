@@ -26,4 +26,4 @@ if (!__DEV__ && typeof navigator !== 'undefined' && navigator.product === 'React
   };
 }
 
-require('expo-router/entry');
+import 'expo-router/entry';
