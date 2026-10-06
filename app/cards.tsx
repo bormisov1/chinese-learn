@@ -45,7 +45,7 @@ const webStackOffsetTransition = Platform.OS === "web"
   ? ({
       transitionProperty: "left, right, top",
       transitionDuration: "460ms",
-      transitionTimingFunction: "cubic-bezier(.25,.8,.25,1)",
+      transitionTimingFunction: "cubic-bezier(0.75, -0.06, 0, 1)",
     } as any)
   : undefined;
 
