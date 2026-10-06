@@ -54,6 +54,7 @@ export default function Settings() {
   const [selectedWord, setSelectedWord] = useState<Word | null>(null);
   const [backupBusy, setBackupBusy] = useState(false);
   const [backupMessage, setBackupMessage] = useState("");
+  const [avatarFailed, setAvatarFailed] = useState(false);
   const indicatorPosition = useRef(new Animated.Value(0)).current;
   const [keyValidation, setKeyValidation] = useState<
     "idle" | "checking" | "valid" | "invalid" | "error"
@@ -136,6 +137,7 @@ export default function Settings() {
     .filter((word) => word.cardActive)
     .sort((a, b) => (a.cardIntroducedAt ?? 0) - (b.cardIntroducedAt ?? 0));
   const queuedWords = getActivePoolQueue(data.words, data.cardRound);
+  useEffect(() => setAvatarFailed(false), [account?.picture]);
   const stat = (
     level: number,
     correct: number,
@@ -255,7 +257,7 @@ export default function Settings() {
         <View style={[shell.panel, styles.accountPanel]}>
           <Text style={styles.label}>ACCOUNT</Text>
           {account ? <View style={styles.accountProfile}>
-            {account.picture ? <Image source={{ uri: account.picture }} style={styles.accountAvatar} accessibilityLabel={`${account.name || "Account"} avatar`} /> : <View style={[styles.accountAvatar, styles.accountAvatarFallback]}><Text style={styles.accountInitial}>{(account.name || account.email || "?").trim().charAt(0).toUpperCase()}</Text></View>}
+            {account.picture && !avatarFailed ? <Image source={{ uri: account.picture }} style={styles.accountAvatar} accessibilityLabel={`${account.name || "Account"} avatar`} onError={() => setAvatarFailed(true)} /> : <View style={[styles.accountAvatar, styles.accountAvatarFallback]}><Text style={styles.accountInitial}>{(account.name || account.email || "?").trim().charAt(0).toUpperCase()}</Text></View>}
             <Text style={styles.accountName}>{account.name || account.email || account.id}</Text>
             <Button secondary label="Sign out" onPress={() => void signOut()} />
           </View> : <View style={styles.authButtons}><Button label="Continue with Google / Gmail" disabled={authBusy} onPress={() => void signIn("google")} /><Button secondary label="Continue with Telegram" disabled={authBusy} onPress={() => void signIn("telegram")} /></View>}
