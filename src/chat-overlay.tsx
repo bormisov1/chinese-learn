@@ -41,7 +41,7 @@ export function ChatOverlay() {
   }, []);
   useEffect(() => {
     const style = document.createElement('style');
-    style.textContent = '@keyframes chat-dot-flash { 0%, 20%, 100% { opacity: .22; } 50% { opacity: 1; } } .chat-typing { color: #326448; font-family: cursive; font-size: 18px; } .chat-typing-dot { display: inline-block; animation: chat-dot-flash 1.8s ease-in-out infinite; } .chat-typing-dot:nth-child(2) { animation-delay: .3s; } .chat-typing-dot:nth-child(3) { animation-delay: .6s; }';
+    style.textContent = '@keyframes chat-dot-flash { 0%, 20%, 100% { opacity: .22; } 50% { opacity: 1; } } .chat-typing { color: #326448; font-style: italic; font-size: 18px; } .chat-typing-dot { display: inline-block; animation: chat-dot-flash 1.8s ease-in-out infinite; } .chat-typing-dot:nth-child(2) { animation-delay: .3s; } .chat-typing-dot:nth-child(3) { animation-delay: .6s; }';
     document.head.appendChild(style);
     return () => { style.remove(); };
   }, []);
@@ -95,7 +95,7 @@ export function ChatOverlay() {
       <View style={styles.orbitDot} />
     </Pressable>
     <Modal visible={open} animationType="slide" onRequestClose={() => { setOpen(false); setClicked(false); }}>
-      <View style={[styles.page, { paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, 12) }]}>
+      <View style={[styles.page, { paddingTop: insets.top }]}>
         <View style={styles.header}>
           <View style={styles.headerTitle}><Text style={styles.eyebrow}>DEEPSEEK</Text><Text numberOfLines={1} style={styles.title}>{showHistory ? 'Previous chats' : active?.title ?? 'New chat'}</Text></View>
           <View style={styles.headerActions}>
@@ -111,7 +111,8 @@ export function ChatOverlay() {
             <Text numberOfLines={1} style={styles.historyItemPreview}>{conversation.messages.find(item => item.role === 'user')?.text ?? ''}</Text>
           </Pressable>)}
         </ScrollView> : <>
-        <ScrollView ref={scroll} style={styles.history} contentContainerStyle={styles.historyContent} keyboardShouldPersistTaps="handled" onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: true })}>
+        <View style={styles.historyFrame}>
+        <ScrollView ref={scroll} style={styles.history} contentContainerStyle={[styles.historyContent, busy && styles.historyContentWhileTyping]} keyboardShouldPersistTaps="handled" onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: true })}>
           {!messages.length && <Text style={styles.empty}>Ask about Chinese words, a Hanzi, or a message you want to answer.</Text>}
           {messages.filter(item => item.role === 'user' || !!item.text || !!item.reply.words.length).map((item, index) => <View key={index} style={[styles.bubble, item.role === 'user' ? styles.userBubble : styles.assistantBubble]}>
             {!!item.text && <Text style={[styles.messageText, item.role === 'user' && styles.userText]}>{item.text}</Text>}
@@ -127,14 +128,15 @@ export function ChatOverlay() {
               })}
             </View>}
           </View>)}
-          {busy && <View accessibilityLabel="DeepSeek is typing" style={styles.loading}><span className="chat-typing">typing<span className="chat-typing-dot">.</span><span className="chat-typing-dot">.</span><span className="chat-typing-dot">.</span></span></View>}
           {!!error && <Text style={styles.error}>{error}</Text>}
         </ScrollView>
+        {busy && <View accessibilityLabel="DeepSeek is typing" style={styles.typingIndicator}><span className="chat-typing">typing<span className="chat-typing-dot">.</span><span className="chat-typing-dot">.</span><span className="chat-typing-dot">.</span></span></View>}
+        </View>
         <View style={styles.promptArea}>
           <Text style={styles.promptLabel}>CHOOSE A PROMPT</Text>
           <View style={styles.promptButtons}>{CHAT_PRESETS.map(item => <Pressable key={item.id} accessibilityRole="button" accessibilityState={{ selected: item.id === preset }} onPress={() => selectPreset(item.id)} style={[styles.promptButton, item.id === preset && styles.promptSelected]}><Text style={[styles.promptText, item.id === preset && styles.promptTextSelected]}>{item.label}</Text></Pressable>)}</View>
         </View>
-        <View style={styles.composer}>
+        <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
           <TextInput accessibilityLabel="Chat message" multiline value={input} onChangeText={setInput} placeholder="Type a message…" placeholderTextColor={colors.muted} style={styles.input} />
           <Pressable accessibilityRole="button" accessibilityLabel="Send message" accessibilityState={{ disabled: !input.trim() || busy }} disabled={!input.trim() || busy} onPress={() => void send()} style={[styles.send, (!input.trim() || busy) && styles.sendDisabled]}><Ionicons name="arrow-up" size={23} color={colors.white} /></Pressable>
         </View>
@@ -165,7 +167,9 @@ const styles = StyleSheet.create({
   promptText: { fontSize: 13, fontWeight: '700', color: colors.green },
   promptTextSelected: { color: colors.white },
   history: { flex: 1 },
+  historyFrame: { flex: 1, position: 'relative' },
   historyContent: { padding: 16, paddingBottom: 28, gap: 15 },
+  historyContentWhileTyping: { paddingBottom: 55 },
   historyList: { padding: 16, gap: 9 },
   historyItem: { padding: 14, borderRadius: 13, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, gap: 4 },
   historyItemActive: { borderColor: colors.green },
@@ -186,9 +190,9 @@ const styles = StyleSheet.create({
   wordDetail: { flex: 1 },
   pinyin: { fontSize: 16, fontWeight: '700', color: colors.white },
   translation: { fontSize: 16, color: colors.white },
-  loading: { alignSelf: 'flex-start', margin: 12 },
+  typingIndicator: { position: 'absolute', left: 16, bottom: 7, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: colors.paper },
   error: { color: colors.red, fontSize: 14, lineHeight: 21 },
-  composer: { flexDirection: 'row', gap: 10, alignItems: 'flex-end', paddingHorizontal: 12, paddingTop: 10, borderTopWidth: 1, borderColor: colors.line, backgroundColor: colors.card },
+  composer: { flexDirection: 'row', gap: 10, alignItems: 'center', paddingHorizontal: 12, paddingTop: 10, borderTopWidth: 1, borderColor: colors.line, backgroundColor: colors.card },
   input: { flex: 1, maxHeight: 120, minHeight: 44, borderWidth: 1, borderColor: '#C5D8CD', borderRadius: 20, paddingHorizontal: 15, paddingVertical: 10, color: colors.ink, fontSize: 16, backgroundColor: colors.paper },
   send: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.green },
   sendDisabled: { opacity: 0.4 },
