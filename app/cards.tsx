@@ -37,10 +37,14 @@ const webDragSurface = Platform.OS === "web"
   ? ({ touchAction: "none" } as any)
   : undefined;
 const CARD_STACK_STEP = 12;
+const webStackOffsetTransition = Platform.OS === "web"
+  ? ({ transition: "top 260ms ease-out, left 260ms ease-out, right 260ms ease-out" } as any)
+  : undefined;
 
 export default function Cards() {
   const { data, patch, generateBatch } = useStore();
   const t = useTranslation();
+  const { width: screenWidth } = useWindowDimensions();
   const [studyRound, setStudyRound] = useState(data.cardRound + 1),
     [roundIds, setRoundIds] = useState<string[]>([]),
     [position, setPosition] = useState(0),
@@ -49,7 +53,8 @@ export default function Cards() {
     [exampleIndex, setExampleIndex] = useState(0),
     [mistakeIds, setMistakeIds] = useState<string[]>([]),
     [graduations, setGraduations] = useState<Graduation[]>([]),
-    [roundEndsAfterCelebration, setRoundEndsAfterCelebration] = useState(false);
+    [roundEndsAfterCelebration, setRoundEndsAfterCelebration] = useState(false),
+    [cardHeights, setCardHeights] = useState<Record<string, number>>({});
   const swipe = useRef(new Animated.ValueXY()).current;
   const cardSpin = useRef(new Animated.Value(0)).current;
   const total = data.words.length;
@@ -62,11 +67,9 @@ export default function Cards() {
   const roundWords = roundIds
     .map((id) => data.words.find((w) => w.id === id))
     .filter(Boolean) as typeof data.words;
+  const stackStep = Math.min(CARD_STACK_STEP, Math.max(3,
+    (screenWidth - 294) / (2 * Math.max(1, roundWords.length - 1))));
   const word = roundWords[position];
-  const remainingWords = roundWords.slice(position + 1);
-  const wordPronunciation = word
-    ? resolveWordPronunciation(word, displayTranslation(word.russian, data.settings.language))
-    : undefined;
   const examples = useMemo(
     () =>
       word
@@ -104,6 +107,7 @@ export default function Cards() {
     setStudyRound(round);
     patch((d) => ({ ...d, cardRound: Math.max(d.cardRound, round) }));
     setRoundIds(words.map((w) => w.id));
+    setCardHeights({});
     setPosition(0);
     setMistakeIds([]);
     setGraduations([]);
@@ -345,170 +349,164 @@ export default function Cards() {
           ]}
         />
       </View>
-      <View
-        style={[
-          styles.studyStack,
-          { paddingBottom: remainingWords.length * CARD_STACK_STEP },
-        ]}
-      >
-        {remainingWords.map((remainingWord, index) => (
-          <RemainingCard
-            key={remainingWord.id}
-            depth={index + 1}
-            total={remainingWords.length}
+      <View style={[styles.studyStack, {
+        marginTop: (roundWords.length - 1) * stackStep,
+        marginHorizontal: (roundWords.length - 1) * stackStep,
+        height: cardHeights[word.id] ?? 300,
+      }]}>
+        {roundWords.slice(position).map((stackWord, index) => (
+          <StackCard
+            key={stackWord.id}
+            word={stackWord}
+            depth={index}
+            step={stackStep}
+            active={index === 0}
+            height={cardHeights[word.id] ?? 300}
+            settings={data.settings}
+            translationLanguage={translationLanguage}
+            examples={(data.wordSentenceIndex[stackWord.id] ?? [])
+              .map((id) => data.sentences.find((sentence) => sentence.id === id))
+              .filter(Boolean).slice(0, 3) as Sentence[]}
+            flipped={flipped}
+            exampleIndex={exampleIndex}
+            onExampleIndexChange={setExampleIndex}
+            swipe={swipe}
+            cardSpin={cardSpin}
+            panHandlers={panResponder.panHandlers}
+            onFlip={flipCard}
+            onGrade={finishSwipe}
+            onHeightChange={(height) => setCardHeights((current) =>
+              current[stackWord.id] === height ? current : { ...current, [stackWord.id]: height })}
           />
         ))}
-        <Animated.View
-          {...panResponder.panHandlers}
-          style={[
-            webDragSurface,
-            { zIndex: remainingWords.length + 1 },
-            {
-              transform: [
-                { translateX: flipped ? swipe.x : 0 },
-                { translateY: flipped ? swipe.y : 0 },
-                {
-                  rotateY: cardSpin.interpolate({
-                    inputRange: [0, 0.5, 1],
-                    outputRange: ["0deg", "90deg", "0deg"],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={flipped ? "Hide answer" : "Reveal answer"}
-            accessibilityActions={flipped ? [
-              { name: "decrement", label: "Mark wrong" },
-              { name: "increment", label: "Mark correct" },
-            ] : undefined}
-            onAccessibilityAction={(event) => {
-              if (event.nativeEvent.actionName === "decrement") finishSwipe(false);
-              if (event.nativeEvent.actionName === "increment") finishSwipe(true);
-            }}
-            style={[styles.card, !flipped && styles.promptCard, flipped && styles.back]}
-            onPress={() => flipCard(!flipped)}
-          >
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.correctSwipeTint,
-                {
-                  opacity: swipe.x.interpolate({
-                    inputRange: [0, 60, 110, 170, 240],
-                    outputRange: [0, 0.04, 0.16, 0.48, 1],
-                    extrapolate: "clamp",
-                  }),
-                },
-              ]}
-            />
-            <View style={styles.cardContent}>
-            {!flipped ? (
-              <>
-                <Text style={styles.side}>{translationLanguage}</Text>
-                <FittedTranslation
-                  text={maskTranslatedHanzi(
-                    wordPronunciation!.meaning,
-                    wordPronunciation!.hanzi,
-                  )}
-                />
-                <WordGuessStats word={word} />
-              </>
-            ) : (
-              <>
-                <Animated.Text
-                  pointerEvents="none"
-                  style={[
-                    styles.swipeBadge,
-                    styles.wrongBadge,
-                    {
-                      opacity: swipe.x.interpolate({
-                        inputRange: [-100, -35],
-                        outputRange: [1, 0],
-                        extrapolate: "clamp",
-                      }),
-                    },
-                  ]}
-                >
-                  {t("WRONG")}
-                </Animated.Text>
-                <Animated.Text
-                  pointerEvents="none"
-                  style={[
-                    styles.swipeBadge,
-                    styles.rightBadge,
-                    {
-                      opacity: swipe.x.interpolate({
-                        inputRange: [35, 100],
-                        outputRange: [0, 1],
-                        extrapolate: "clamp",
-                      }),
-                    },
-                  ]}
-                >
-                  {t("RIGHT")}
-                </Animated.Text>
-                <View style={styles.hanziRow}>
-                  <ExplanationButton kind="word" text={wordPronunciation!.hanzi} />
-                  <Pressable onPress={() => copyText(wordPronunciation!.hanzi)}>
-                    <Text style={styles.hanzi}>{wordPronunciation!.hanzi}</Text>
-                  </Pressable>
-                  <HskBadge hanzi={wordPronunciation!.hanzi} />
-                  <SpeakerButton
-                    pronunciation={wordPronunciation!}
-                    settings={data.settings}
-                    size={22}
-                  />
-                </View>
-                <Text style={styles.pinyin}>{wordPronunciation!.pinyin}</Text>
-                <View style={styles.rule} />
-                {examples.length ? (
-                  <ExampleCarousel
-                    examples={examples as Sentence[]}
-                    settings={data.settings}
-                    index={exampleIndex}
-                    onIndexChange={setExampleIndex}
-                  />
-                ) : null}
-                <Text style={styles.swipeHint}>← Wrong · Right →</Text>
-              </>
-            )}
-            </View>
-            {!flipped ? <Text style={styles.hint}>Tap to reveal</Text> : null}
-          </Pressable>
-        </Animated.View>
       </View>
     </ScrollView>
   );
 }
 
-function RemainingCard({ depth, total }: { depth: number; total: number }) {
-  const offset = useRef(new Animated.Value(depth * CARD_STACK_STEP)).current;
+function StackCard({ word, depth, step, active, height, settings, translationLanguage,
+  examples, flipped, exampleIndex, onExampleIndexChange, swipe, cardSpin,
+  panHandlers, onFlip, onGrade, onHeightChange,
+}: {
+  word: Word;
+  depth: number;
+  step: number;
+  active: boolean;
+  height: number;
+  settings: Settings;
+  translationLanguage: string;
+  examples: Sentence[];
+  flipped: boolean;
+  exampleIndex: number;
+  onExampleIndexChange: (index: number) => void;
+  swipe: Animated.ValueXY;
+  cardSpin: Animated.Value;
+  panHandlers: ReturnType<typeof PanResponder.create>["panHandlers"];
+  onFlip: (flipped: boolean) => void;
+  onGrade: (correct: boolean) => void;
+  onHeightChange: (height: number) => void;
+}) {
+  const t = useTranslation();
+  const pronunciation = resolveWordPronunciation(word, displayTranslation(word.russian, settings.language));
+  const [frontHeight, setFrontHeight] = useState(0);
+  const [backHeight, setBackHeight] = useState(0);
   useEffect(() => {
-    Animated.timing(offset, {
-      toValue: depth * CARD_STACK_STEP,
-      duration: 240,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-  }, [depth]);
+    onHeightChange(Math.max(300, Math.ceil(frontHeight + 84), Math.ceil(backHeight + 52)));
+  }, [frontHeight, backHeight]);
+  const showingBack = active && flipped;
   return (
-    <Animated.View
-      accessible={false}
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      pointerEvents="none"
-      style={[
-        styles.remainingCard,
-        {
-          bottom: total * CARD_STACK_STEP,
-          zIndex: total - depth,
-          transform: [{ translateY: offset }],
-        },
-      ]}
-    />
+    <View
+      accessible={active}
+      accessibilityElementsHidden={!active}
+      importantForAccessibility={active ? "auto" : "no-hide-descendants"}
+      pointerEvents={active ? "auto" : "none"}
+      style={[styles.stackCard, {
+        top: -depth * step,
+        left: -depth * step,
+        right: depth * step,
+        zIndex: 10 - depth,
+      }, webStackOffsetTransition]}
+    >
+      <Animated.View
+        {...(active ? panHandlers : {})}
+        style={[active && webDragSurface, active && {
+          transform: [
+            { translateX: flipped ? swipe.x : 0 },
+            { translateY: flipped ? swipe.y : 0 },
+            { rotateY: cardSpin.interpolate({
+              inputRange: [0, 0.5, 1],
+              outputRange: ["0deg", "90deg", "0deg"],
+            }) },
+          ],
+        }]}
+      >
+        <Pressable
+          disabled={!active}
+          accessibilityRole={active ? "button" : undefined}
+          accessibilityLabel={active ? showingBack ? "Hide answer" : "Reveal answer" : undefined}
+          accessibilityActions={showingBack ? [
+            { name: "decrement", label: "Mark wrong" },
+            { name: "increment", label: "Mark correct" },
+          ] : undefined}
+          onAccessibilityAction={(event) => {
+            if (event.nativeEvent.actionName === "decrement") onGrade(false);
+            if (event.nativeEvent.actionName === "increment") onGrade(true);
+          }}
+          onPress={() => onFlip(!flipped)}
+          style={[styles.card, { height }]}
+        >
+          {active && <Animated.View pointerEvents="none" style={[
+            styles.correctSwipeTint,
+            { opacity: swipe.x.interpolate({
+              inputRange: [0, 60, 110, 170, 240],
+              outputRange: [0, 0.04, 0.16, 0.48, 1],
+              extrapolate: "clamp",
+            }) },
+          ]} />}
+          <View
+            pointerEvents={showingBack ? "none" : "auto"}
+            accessibilityElementsHidden={showingBack}
+            importantForAccessibility={showingBack ? "no-hide-descendants" : "auto"}
+            style={[styles.frontFace, { opacity: showingBack ? 0 : 1 }]}
+          >
+            <View onLayout={(event) => setFrontHeight(event.nativeEvent.layout.height)} style={styles.cardContent}>
+              <Text style={styles.side}>{translationLanguage}</Text>
+              <FittedTranslation text={maskTranslatedHanzi(pronunciation.meaning, pronunciation.hanzi)} />
+              <WordGuessStats word={word} />
+            </View>
+          </View>
+          <View
+            pointerEvents={showingBack ? "auto" : "none"}
+            accessibilityElementsHidden={!showingBack}
+            importantForAccessibility={showingBack ? "auto" : "no-hide-descendants"}
+            style={[styles.backFace, { opacity: showingBack ? 1 : 0 }]}
+          >
+            <View onLayout={(event) => setBackHeight(event.nativeEvent.layout.height)} style={styles.cardContent}>
+              <Animated.Text pointerEvents="none" style={[styles.swipeBadge, styles.wrongBadge, {
+                opacity: swipe.x.interpolate({ inputRange: [-100, -35], outputRange: [1, 0], extrapolate: "clamp" }),
+              }]}>{t("WRONG")}</Animated.Text>
+              <Animated.Text pointerEvents="none" style={[styles.swipeBadge, styles.rightBadge, {
+                opacity: swipe.x.interpolate({ inputRange: [35, 100], outputRange: [0, 1], extrapolate: "clamp" }),
+              }]}>{t("RIGHT")}</Animated.Text>
+              <View style={styles.hanziRow}>
+                <ExplanationButton kind="word" text={pronunciation.hanzi} />
+                <Pressable onPress={() => copyText(pronunciation.hanzi)}>
+                  <Text style={styles.hanzi}>{pronunciation.hanzi}</Text>
+                </Pressable>
+                <HskBadge hanzi={pronunciation.hanzi} />
+                <SpeakerButton pronunciation={pronunciation} settings={settings} size={22} />
+              </View>
+              <Text style={styles.pinyin}>{pronunciation.pinyin}</Text>
+              <View style={styles.rule} />
+              {examples.length ? <ExampleCarousel examples={examples} settings={settings}
+                index={active ? exampleIndex : 0} onIndexChange={onExampleIndexChange} /> : null}
+              <Text style={styles.swipeHint}>← Wrong · Right →</Text>
+            </View>
+          </View>
+          {!showingBack && <Text style={styles.hint}>Tap to reveal</Text>}
+        </Pressable>
+      </Animated.View>
+    </View>
   );
 }
 
@@ -1206,19 +1204,8 @@ const styles = StyleSheet.create({
   },
   fill: { height: 5, backgroundColor: colors.coral },
   studyStack: { position: "relative" },
-  remainingCard: {
+  stackCard: {
     position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    borderRadius: 25,
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.pale,
-    shadowColor: "#36392F",
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 5 },
   },
   card: {
     position: "relative",
@@ -1227,7 +1214,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.line,
-    padding: 28,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#36392F",
@@ -1236,9 +1222,16 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     backfaceVisibility: "hidden",
   },
-  promptCard: { minHeight: 300 },
+  frontFace: {
+    position: "absolute",
+    top: 28,
+    left: 28,
+    right: 28,
+    bottom: 55,
+    justifyContent: "center",
+  },
+  backFace: { position: "absolute", top: 32, left: 28, right: 28 },
   cardContent: { width: "100%", alignItems: "center" },
-  back: { justifyContent: "flex-start", paddingTop: 32, paddingBottom: 20 },
   correctSwipeTint: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: colors.green,
