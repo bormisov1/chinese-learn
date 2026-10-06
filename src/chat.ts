@@ -3,7 +3,11 @@ import type { AppLanguage, Settings } from './types';
 export type ChatPreset = 'none' | 'words' | 'hanzi' | 'reply';
 export type ChatTurn = { role: 'user' | 'assistant'; content: string };
 export type ChatWord = { hanzi: string; pinyin: string; translation: string };
-export type ChatReply = { answer: string; words: ChatWord[] };
+export type ChatReply = { answer: string; words: ChatWord[]; title?: string };
+
+export function fallbackChatTitle(question: string): string {
+  return `About ${question.trim().replace(/\s+/g, ' ').split(' ').slice(0, 4).join(' ').slice(0, 60)}`;
+}
 
 export const CHAT_PRESETS: { id: ChatPreset; label: string; prompt: string }[] = [
   { id: 'none', label: 'No prompt', prompt: '' },
@@ -14,7 +18,7 @@ export const CHAT_PRESETS: { id: ChatPreset; label: string; prompt: string }[] =
 
 export function parseChatReply(value: unknown): ChatReply {
   if (!value || typeof value !== 'object') throw new Error('DeepSeek returned an invalid reply.');
-  const result = value as { answer?: unknown; words?: unknown };
+  const result = value as { answer?: unknown; words?: unknown; title?: unknown };
   if (typeof result.answer !== 'string' || !Array.isArray(result.words)) throw new Error('DeepSeek returned an invalid word list.');
   const seen = new Set<string>();
   const words: ChatWord[] = [];
@@ -30,7 +34,8 @@ export function parseChatReply(value: unknown): ChatReply {
     words.push({ hanzi, pinyin: word.pinyin.trim(), translation: word.translation.trim() });
     if (words.length >= 40) break;
   }
-  return { answer: result.answer.trim(), words };
+  const title = typeof result.title === 'string' ? result.title.trim().replace(/\s+/g, ' ') : '';
+  return { answer: result.answer.trim(), words, ...(title && title.split(' ').length >= 2 && title.split(' ').length <= 5 ? { title } : {}) };
 }
 
 // JSON is still being streamed while the answer field is arriving. Decode only
@@ -58,9 +63,11 @@ export async function requestChatReply(settings: Settings, preset: ChatPreset, h
   if (!settings.apiKey.trim()) throw new Error('Add your DeepSeek API key in Settings.');
   const language = ({ en: 'English', ru: 'Russian', th: 'Thai' } satisfies Record<AppLanguage, string>)[settings.language];
   const prompt = CHAT_PRESETS.find(item => item.id === preset)?.prompt ?? '';
-  const format = `Respond in ${language}. Return JSON only: {"answer":"Your explanation or suggested reply, with clear formatting and pinyin where useful","words":[{"hanzi":"你好","pinyin":"nǐ hǎo","translation":"hello"}]}. Put the word-by-word breakdown in the words array only; do not repeat that list in answer. The words array lists each useful Chinese word from the user's text and your answer once; include characters as separate entries when explaining Hanzi. Use ${language} for translations. Use an empty array if there are no Chinese words.`;
+  const firstQuestion = history.filter(turn => turn.role === 'user').length === 1 && !history.some(turn => turn.role === 'assistant');
+  const titleInstruction = firstQuestion ? ` Also return "title": a short 2–5 word title in ${language} summarizing the user's first question.` : '';
+  const format = `Respond in ${language}. Return JSON only: {"answer":"Your explanation or suggested reply, with clear formatting and pinyin where useful","words":[{"hanzi":"你好","pinyin":"nǐ hǎo","translation":"hello"}]${firstQuestion ? ',"title":"Short question summary"' : ''}}. Put the word-by-word breakdown in the words array only; do not repeat that list in answer. The words array lists each useful Chinese word from the user's text and your answer once; include characters as separate entries when explaining Hanzi. Use ${language} for translations. Use an empty array if there are no Chinese words.${titleInstruction}`;
   const messages = [
-    ...(prompt ? [{ role: 'system', content: `${prompt}. ${format}` }] : []),
+    ...(prompt || firstQuestion ? [{ role: 'system', content: `${prompt ? `${prompt}. ` : ''}${format}` }] : []),
     ...history.map((turn, index) => ({ role: turn.role, content: index === history.length - 1 && turn.role === 'user' ? `${turn.content}\n\n${format}` : turn.content })),
   ];
   let response: Response;
