@@ -5,6 +5,7 @@ import { useEffect,
 import {
   ActivityIndicator,
   Animated,
+  Image,
   LayoutChangeEvent,
   Modal,
   NativeScrollEvent,
@@ -253,7 +254,11 @@ export default function Settings() {
         />
         <View style={[shell.panel, styles.accountPanel]}>
           <Text style={styles.label}>ACCOUNT</Text>
-          {account ? <><Text style={styles.help}>{account.name || account.email || account.id}</Text><Button secondary label="Sign out" onPress={() => void signOut()} /></> : <View style={styles.authButtons}><Button label="Continue with Google / Gmail" disabled={authBusy} onPress={() => void signIn("google")} /><Button secondary label="Continue with Telegram" disabled={authBusy} onPress={() => void signIn("telegram")} /></View>}
+          {account ? <View style={styles.accountProfile}>
+            {account.picture ? <Image source={{ uri: account.picture }} style={styles.accountAvatar} accessibilityLabel={`${account.name || "Account"} avatar`} /> : <View style={[styles.accountAvatar, styles.accountAvatarFallback]}><Text style={styles.accountInitial}>{(account.name || account.email || "?").trim().charAt(0).toUpperCase()}</Text></View>}
+            <Text style={styles.accountName}>{account.name || account.email || account.id}</Text>
+            <Button secondary label="Sign out" onPress={() => void signOut()} />
+          </View> : <View style={styles.authButtons}><Button label="Continue with Google / Gmail" disabled={authBusy} onPress={() => void signIn("google")} /><Button secondary label="Continue with Telegram" disabled={authBusy} onPress={() => void signIn("telegram")} /></View>}
           {authError ? <Text style={styles.error}>{authError}</Text> : null}
         </View>
         <View
@@ -804,6 +809,11 @@ function Field(props: {
 const styles = StyleSheet.create({
   settingsContent: { paddingTop: 32 },
   accountPanel: { marginBottom: 14 },
+  accountProfile: { alignItems: "center", gap: 12, paddingVertical: 8 },
+  accountAvatar: { width: 88, height: 88, borderRadius: 44, borderWidth: 2, borderColor: colors.green },
+  accountAvatarFallback: { backgroundColor: colors.pale, alignItems: "center", justifyContent: "center" },
+  accountInitial: { color: colors.green, fontSize: 38, fontWeight: "700" },
+  accountName: { color: colors.ink, fontSize: 23, fontWeight: "800", textAlign: "center" },
   settingsScroll: { marginLeft: SIDEBAR_WIDTH },
   sideMenu: {
     position: "absolute",
