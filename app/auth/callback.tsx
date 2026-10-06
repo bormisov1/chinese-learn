@@ -1,4 +1,4 @@
-import { ActivityIndicator, Text as NativeText, View } from "react-native";
+import { ActivityIndicator, Platform, Text as NativeText, View } from "react-native";
 import { useEffect, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useStore } from "@/context";
@@ -11,7 +11,7 @@ export default function AuthCallback() {
   const [started, setStarted] = useState(false);
   const sawBusy = useRef(false);
   useEffect(() => {
-    if (typeof window === "undefined" || !params.code) return;
+    if (Platform.OS !== "web" || typeof window === "undefined" || !params.code) return;
     window.dispatchEvent(new CustomEvent("hanzideck-auth", { detail: `${window.location.origin}/auth/callback?code=${encodeURIComponent(params.code)}` }));
     setStarted(true);
   }, [params.code]);

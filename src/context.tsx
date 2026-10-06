@@ -74,11 +74,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   };
   useEffect(() => {
     const subscription = Linking.addEventListener("url", event => { void completeAuth(event.url); });
-    const webSubscription = typeof window !== "undefined" ? ((event: Event) => { const detail = (event as CustomEvent<string>).detail; if (detail) void completeAuth(detail); }) : null;
-    if (webSubscription && typeof window !== "undefined") window.addEventListener("hanzideck-auth", webSubscription);
+    const webSubscription = Platform.OS === "web" && typeof window !== "undefined" ? ((event: Event) => { const detail = (event as CustomEvent<string>).detail; if (detail) void completeAuth(detail); }) : null;
+    if (webSubscription) window.addEventListener("hanzideck-auth", webSubscription);
     Linking.getInitialURL().then(value => { if (value) void completeAuth(value); });
     getTokens().then(tokens => { if (!tokens) return; getAccount().then(setAccount).catch(() => clearTokens()); });
-    return () => { subscription.remove(); if (webSubscription && typeof window !== "undefined") window.removeEventListener("hanzideck-auth", webSubscription); };
+    return () => { subscription.remove(); if (webSubscription) window.removeEventListener("hanzideck-auth", webSubscription); };
   }, [ready]);
   const signIn = async (provider: "google" | "telegram") => { setAuthError(''); void track("login_started", { provider }); await Linking.openURL(authUrl(provider, redirectUri())); };
   const signOut = async () => { await clearTokens(); setAccount(null); };
