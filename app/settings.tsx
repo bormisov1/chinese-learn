@@ -378,10 +378,10 @@ export default function Settings() {
           onAdd={importWords}
         />
         <View style={styles.settingsAction}>
-          <View style={{ flex: 1 }}>
+          <View>
             <Text style={styles.privacyTitle}>Other import options</Text>
             <Text style={styles.help}>
-              Add words from screenshots or Chinese text.
+              Paste Chinese text to add words from the dictionary.
             </Text>
           </View>
           <Button
@@ -911,8 +911,7 @@ const styles = StyleSheet.create({
   },
   apiKeyGuideText: { color: colors.green, fontWeight: "700" },
   settingsAction: {
-    flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 12,
     marginTop: 12,
     padding: 17,

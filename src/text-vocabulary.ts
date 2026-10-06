@@ -60,7 +60,11 @@ export function parseTextVocabulary(text: string, dictionary: Dictionary | null)
   if (!dictionary) return { words: [], unmatchedCharacters: 0 };
   const normalizedText = toSimplifiedChinese(text);
   const runs = normalizedText.match(/[\p{Script=Han}]+/gu) ?? [];
-  const maximumWordLength = Math.max(1, ...[...dictionary.keys()].map((word) => [...word].length));
+  if (!runs.length) return { words: [], unmatchedCharacters: 0 };
+  let maximumWordLength = 1;
+  for (const word of dictionary.keys()) {
+    maximumWordLength = Math.max(maximumWordLength, [...word].length);
+  }
   const words = new Map<string, ImportedWord>();
   let hanziCount = 0;
   let matchedCharacters = 0;
