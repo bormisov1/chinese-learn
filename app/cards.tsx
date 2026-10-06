@@ -36,14 +36,23 @@ type Graduation = { learned: Word; replacement?: Word };
 const webDragSurface = Platform.OS === "web"
   ? ({ touchAction: "none" } as any)
   : undefined;
+// Tune these values to change the stack's resting wave and its motion.
 const CARD_STACK_STEP = 12;
+const CARD_STACK_DROP = 10;
+const CARD_STACK_WAVE_FREQUENCY = 1.65;
+const CARD_STACK_X_DURATION_MS = 460;
+const CARD_STACK_Y_DURATION_MS = 540;
+const CARD_STACK_X_EASING = "cubic-bezier(.25,.85,.2,1.12)";
+const CARD_STACK_Y_EASING = "cubic-bezier(.65,0,.24,1)";
+const CARD_STACK_STAGGER_MS = 25;
 const waveOffset = (depth: number) => ({
-  x: Math.round(Math.sin(depth * 1.65) * depth * CARD_STACK_STEP),
-  y: Math.round(Math.cos(depth * 1.65) * depth * CARD_STACK_STEP),
+  x: Math.round(Math.sin(depth * CARD_STACK_WAVE_FREQUENCY) * depth * CARD_STACK_STEP),
+  y: depth * CARD_STACK_DROP,
 });
-// The axes use different timing curves, so each card arcs between wave positions.
+// The axes use different timing curves for an arc; vertical easing stays within
+// its endpoints so no card rises above the front card during the transition.
 const webStackOffsetTransition = Platform.OS === "web"
-  ? ({ transition: "left 460ms cubic-bezier(.25,.85,.2,1.12), right 460ms cubic-bezier(.25,.85,.2,1.12), top 540ms cubic-bezier(.65,-.18,.24,1.14)" } as any)
+  ? ({ transition: `left ${CARD_STACK_X_DURATION_MS}ms ${CARD_STACK_X_EASING}, right ${CARD_STACK_X_DURATION_MS}ms ${CARD_STACK_X_EASING}, top ${CARD_STACK_Y_DURATION_MS}ms ${CARD_STACK_Y_EASING}` } as any)
   : undefined;
 
 export default function Cards() {
@@ -427,7 +436,7 @@ function StackCard({ word, depth, active, height, settings, translationLanguage,
         left: offset.x,
         right: -offset.x,
         zIndex: 10 - depth,
-      }, webStackOffsetTransition, Platform.OS === "web" && ({ transitionDelay: `${depth * 25}ms` } as any)]}
+      }, webStackOffsetTransition, Platform.OS === "web" && ({ transitionDelay: `${depth * CARD_STACK_STAGGER_MS}ms` } as any)]}
     >
       <Animated.View
         {...(active ? panHandlers : {})}
