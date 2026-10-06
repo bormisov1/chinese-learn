@@ -3,6 +3,8 @@ import { Platform, Text as NativeText, TextInput as NativeTextInput } from "reac
 import type { ComponentProps } from "react";
 import type { AppLanguage } from "./types";
 import translations from "./data/ui-translations.json";
+import { LANGUAGES } from "./languages";
+export { LANGUAGES } from "./languages";
 
 const contextualTranslations: Partial<Record<AppLanguage, Record<string, string>>> = {
   ru: {
@@ -20,7 +22,7 @@ const contextualTranslations: Partial<Record<AppLanguage, Record<string, string>
     "1 of 6 cards · 1 of 12 active": "1 из 6 карточек · 1 из 12 активных",
     "Correct cards skip the next round. Three correct appearances move a word to retention review and bring in another deck word.": "Правильные карточки пропускают следующий раунд. Три правильных ответа переводят слово в повторение и добавляют другое слово из колоды.",
     "Start 1-card round": "Начать раунд из 1 карточки",
-    "Sentence generation and explanations use DeepSeek V4 Pro. Translation checks use DeepSeek V4 Flash.": "Генерация предложений и объяснения используют DeepSeek V4 Pro. Проверка переводов использует DeepSeek V4 Flash.",
+    "All AI requests use DeepSeek V4 Flash.": "Все запросы к ИИ используют DeepSeek V4 Flash.",
     "Vocabulary, generated sentences, indexes, SRS counters, and attempts remain on device. Only AI requests go to DeepSeek.": "Словарь, созданные предложения, индексы, счётчики СРС и попытки остаются на устройстве. Только запросы к ИИ отправляются в ДипСик.",
     "Build your deck from an HSK level or another source.": "Соберите колоду из уровня ХСК или другого источника.",
     "Keep 20 learning words ready, adding them in order from HSK 1 onward.": "Поддерживайте 20 слов для изучения, добавляя их по порядку начиная с ХСК 1.",
@@ -67,7 +69,7 @@ const contextualTranslations: Partial<Record<AppLanguage, Record<string, string>
     "1 of 6 cards · 1 of 12 active": "1 จาก 6 บัตรคำ · 1 จาก 12 ที่กำลังเรียน",
     "Correct cards skip the next round. Three correct appearances move a word to retention review and bring in another deck word.": "บัตรคำที่ตอบถูกจะข้ามรอบถัดไป ตอบถูกสามครั้งจะย้ายคำไปทบทวนและนำคำอื่นจากชุดคำศัพท์มาแทน",
     "Start 1-card round": "เริ่มรอบ 1 บัตรคำ",
-    "Sentence generation and explanations use DeepSeek V4 Pro. Translation checks use DeepSeek V4 Flash.": "การสร้างประโยคและคำอธิบายใช้ DeepSeek V4 Pro การตรวจคำแปลใช้ DeepSeek V4 Flash",
+    "All AI requests use DeepSeek V4 Flash.": "คำขอ AI ทั้งหมดใช้ DeepSeek V4 Flash",
     "Vocabulary, generated sentences, indexes, SRS counters, and attempts remain on device. Only AI requests go to DeepSeek.": "คลังคำศัพท์ ประโยคที่สร้าง ดัชนี ตัวนับเอสอาร์เอส และความพยายามอยู่ในอุปกรณ์ คำขอจากเอไอเท่านั้นที่ส่งไปดีปซีค",
     "Build your deck from an HSK level or another source.": "สร้างชุดคำศัพท์จากระดับเอชเอสเคหรือแหล่งอื่น",
     "Keep 20 learning words ready, adding them in order from HSK 1 onward.": "เตรียมคำสำหรับเรียนรู้ 20 คำ โดยเพิ่มตามลำดับเริ่มจากเอชเอสเค 1",
@@ -101,11 +103,6 @@ const contextualTranslations: Partial<Record<AppLanguage, Record<string, string>
   },
 };
 
-export const LANGUAGES: { code: AppLanguage; label: string; nativeLabel: string }[] = [
-  { code: "en", label: "English", nativeLabel: "English" },
-  { code: "ru", label: "Russian", nativeLabel: "Русский" },
-  { code: "th", label: "Thai", nativeLabel: "ไทย" },
-];
 export const isAppLanguage = (value: unknown): value is AppLanguage => LANGUAGES.some(item => item.code === value);
 
 function keepProductTermsInEnglish(language: AppLanguage, value: string): string {

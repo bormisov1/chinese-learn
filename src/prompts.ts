@@ -1,4 +1,4 @@
-import { LANGUAGES } from "./i18n";
+import { LANGUAGES } from "./languages";
 import type { AppLanguage } from "./types";
 
 const languageName = (language: AppLanguage) => LANGUAGES.find(item => item.code === language)?.label ?? "English";

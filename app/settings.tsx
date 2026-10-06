@@ -307,8 +307,7 @@ export default function Settings() {
           onChangeText={(v) => update("apiUrl", v)}
         />
         <Text style={styles.modelRouting}>
-          Sentence generation and explanations use DeepSeek V4 Pro. Translation
-          checks use DeepSeek V4 Flash.
+          All AI requests use DeepSeek V4 Flash.
         </Text>
         {data.settings.apiKey ? (
           <Text
