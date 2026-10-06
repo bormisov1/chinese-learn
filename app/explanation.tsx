@@ -8,17 +8,18 @@ import { requestExplanation } from '@/explanation-loading';
 import { Text, useTranslation } from '@/i18n';
 import { colors } from '@/theme';
 import { explanationKey, normalizeExplanationText, type ExplanationKind } from '@/word-explanations';
+import { explanationReturnPath } from '@/explanation-navigation';
 
 export default function ExplanationPage() {
-  const params = useLocalSearchParams<{ kind?: string; text?: string }>();
+  const params = useLocalSearchParams<{ kind?: string; text?: string; from?: string }>();
   const kind = params.kind === 'sentence' ? 'sentence' : 'word';
   const text = normalizeExplanationText(typeof params.text === 'string' ? params.text : '');
   const { data } = useStore();
   const key = explanationKey(kind, text, data.settings.language);
-  return <ExplanationDetail key={key} kind={kind} text={text} cacheKey={key} />;
+  return <ExplanationDetail key={key} kind={kind} text={text} cacheKey={key} returnPath={explanationReturnPath(params.from)} />;
 }
 
-function ExplanationDetail({ kind, text, cacheKey }: { kind: ExplanationKind; text: string; cacheKey: string }) {
+function ExplanationDetail({ kind, text, cacheKey, returnPath }: { kind: ExplanationKind; text: string; cacheKey: string; returnPath: string }) {
   const { data, patch, ready } = useStore();
   const t = useTranslation();
   const language = data.settings.language;
@@ -51,7 +52,7 @@ function ExplanationDetail({ kind, text, cacheKey }: { kind: ExplanationKind; te
   }, [cacheKey, ready, !!cached]);
   return <View style={styles.page}>
     <View style={styles.header}>
-      <Pressable accessibilityRole="button" accessibilityLabel={t('Back')} onPress={() => router.back()} style={styles.icon}><Ionicons name="arrow-back" size={25} color={colors.green} /></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel={t('Back')} onPress={() => router.navigate(returnPath)} style={styles.icon}><Ionicons name="arrow-back" size={25} color={colors.green} /></Pressable>
       <Text style={styles.headerTitle}>Explanation</Text>
       <Pressable accessibilityRole="button" accessibilityLabel={t('Refresh explanation')} disabled={busy || !text} onPress={fetchExplanation} style={styles.icon}><Ionicons name="refresh" size={24} color={busy ? '#9A9D95' : colors.green} /></Pressable>
     </View>
