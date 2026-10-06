@@ -95,6 +95,8 @@ export type RoundCompletion = {
 export type StoreData = {
   storageVersion: number;
   words: Word[];
+  /** Vocabulary removed on this device; the current account sync endpoint merges words by union. */
+  removedWordHanzi?: string[];
   sentences: Sentence[];
   wordSentenceIndex: Record<string, string[]>;
   attempts: SentenceAttempt[];
