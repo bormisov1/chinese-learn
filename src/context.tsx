@@ -13,13 +13,13 @@ import { commitBootstrapResponse, createBootstrapCoordinator } from './sync-coor
 import { initializeTelemetry, track } from './telemetry';
 import { createBackup, mergeBackupData, type BackupFile, type BackupMergeSummary } from './backup';
 
-type Context = { data: StoreData; ready: boolean; generating: boolean; error: string; dictionary: Dictionary | null; dictionaryLoading: boolean; dictionaryError: string; dictionaryProgress: number | null; switchingLanguage: AppLanguage | null; account: Account | null; authBusy: boolean; authError: string; selectLanguage: (language: AppLanguage) => Promise<boolean>; retryDictionary: () => void; importWords: (items: ImportedWord[]) => number; patch: (fn: (data: StoreData) => StoreData) => void; createBackup: () => BackupFile; mergeBackup: (backup: BackupFile) => BackupMergeSummary; setAutomaticWordAddition: (enabled: boolean, completeOnboarding?: boolean) => void; generateBatch: (mandatory?: Word) => Promise<void>; signIn: (provider: "google" | "telegram") => Promise<void>; signOut: () => Promise<void> };
+type Context = { data: StoreData; ready: boolean; generating: boolean; error: string; dictionary: Dictionary | null; dictionaryLoading: boolean; dictionaryError: string; dictionaryProgress: number | null; switchingLanguage: AppLanguage | null; account: Account | null; authBusy: boolean; authError: string; authCompletedCode: string | null; selectLanguage: (language: AppLanguage) => Promise<boolean>; retryDictionary: () => void; importWords: (items: ImportedWord[]) => number; patch: (fn: (data: StoreData) => StoreData) => void; createBackup: () => BackupFile; mergeBackup: (backup: BackupFile) => BackupMergeSummary; setAutomaticWordAddition: (enabled: boolean, completeOnboarding?: boolean) => void; generateBatch: (mandatory?: Word) => Promise<void>; signIn: (provider: "google" | "telegram") => Promise<void>; signOut: () => Promise<void> };
 const StoreContext = createContext<Context>(null as never);
 const id = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [data, setData] = useState<StoreData>(emptyStore), [ready, setReady] = useState(false), [generating, setGenerating] = useState(false), [error, setError] = useState('');
-  const [account, setAccount] = useState<Account | null>(null), [authBusy, setAuthBusy] = useState(false), [authError, setAuthError] = useState('');
+  const [account, setAccount] = useState<Account | null>(null), [authBusy, setAuthBusy] = useState(false), [authError, setAuthError] = useState(''), [authCompletedCode, setAuthCompletedCode] = useState<string | null>(null);
   const [loadedDictionary, setLoadedDictionary] = useState<{ language: AppLanguage; value: Dictionary } | null>(null);
   const [dictionaryLoading, setDictionaryLoading] = useState(false), [dictionaryError, setDictionaryError] = useState(''), [dictionaryProgress, setDictionaryProgress] = useState<number | null>(null), [switchingLanguage, setSwitchingLanguage] = useState<AppLanguage | null>(null), [dictionaryReload, setDictionaryReload] = useState(0);
   const dictionaryRef = useRef<{ language: AppLanguage; value: Dictionary } | null>(null), switchRequest = useRef(0), languageRef = useRef<AppLanguage>(data.settings.language);
@@ -68,20 +68,21 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         return refreshSyncedWords(accepted);
       });
       handledAuthCodes.current.add(code);
+      setAuthCompletedCode(code);
       void track("login_succeeded", { provider: tokens.authProfile?.provider ?? "oauth", chatId: tokens.authProfile?.chatId, fullName: tokens.authProfile?.fullName, username: tokens.authProfile?.username });
     } catch (reason) { setAuthError(reason instanceof Error ? reason.message : "Authentication failed"); void track("login_failed", { provider: "oauth" }); }
     finally { if (authCodeInFlight.current === code) authCodeInFlight.current = null; setAuthBusy(false); }
   };
   useEffect(() => {
     const subscription = Linking.addEventListener("url", event => { void completeAuth(event.url); });
-    const webSubscription = typeof window !== "undefined" ? ((event: Event) => { const detail = (event as CustomEvent<string>).detail; if (detail) void completeAuth(detail); }) : null;
-    if (webSubscription && typeof window !== "undefined") window.addEventListener("hanzideck-auth", webSubscription);
+    const webSubscription = Platform.OS === "web" && typeof window !== "undefined" ? ((event: Event) => { const detail = (event as CustomEvent<string>).detail; if (detail) void completeAuth(detail); }) : null;
+    if (webSubscription) window.addEventListener("hanzideck-auth", webSubscription);
     Linking.getInitialURL().then(value => { if (value) void completeAuth(value); });
     getTokens().then(tokens => { if (!tokens) return; getAccount().then(setAccount).catch(() => clearTokens()); });
-    return () => { subscription.remove(); if (webSubscription && typeof window !== "undefined") window.removeEventListener("hanzideck-auth", webSubscription); };
+    return () => { subscription.remove(); if (webSubscription) window.removeEventListener("hanzideck-auth", webSubscription); };
   }, [ready]);
-  const signIn = async (provider: "google" | "telegram") => { setAuthError(''); void track("login_started", { provider }); await Linking.openURL(authUrl(provider, redirectUri())); };
-  const signOut = async () => { await clearTokens(); setAccount(null); };
+  const signIn = async (provider: "google" | "telegram") => { setAuthError(''); setAuthCompletedCode(null); void track("login_started", { provider }); await Linking.openURL(authUrl(provider, redirectUri())); };
+  const signOut = async () => { await clearTokens(); setAccount(null); setAuthCompletedCode(null); };
   useEffect(() => { if (ready) saveStore(data); }, [data, ready]);
   useEffect(() => {
     if (!ready || !account || authBusy) return;
@@ -198,7 +199,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       });
     } catch (e) { if (languageRef.current === language) setError(e instanceof Error ? e.message : 'Generation failed'); } finally { setGenerating(false); }
   };
-  const value = useMemo(() => ({ data, ready, generating, error, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, account, authBusy, authError, selectLanguage, retryDictionary, importWords, patch, createBackup: makeBackup, mergeBackup, setAutomaticWordAddition, generateBatch, signIn, signOut }), [data, ready, generating, error, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, account, authBusy, authError]);
+  const value = useMemo(() => ({ data, ready, generating, error, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, account, authBusy, authError, authCompletedCode, selectLanguage, retryDictionary, importWords, patch, createBackup: makeBackup, mergeBackup, setAutomaticWordAddition, generateBatch, signIn, signOut }), [data, ready, generating, error, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, account, authBusy, authError, authCompletedCode]);
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
 export const useStore = () => useContext(StoreContext);
