@@ -49,3 +49,15 @@ test("does not sacrifice balanced words for the longest first word", () => {
   assert.deepEqual(parsed.words.map((word) => word.hanzi), ["研究", "生命"]);
   assert.equal(parsed.unmatchedCharacters, 0);
 });
+
+test("parses text with a dictionary larger than JavaScript argument limits", () => {
+  const largeDictionary = dictionary("喜欢");
+  for (let index = 0; index < 130_000; index++) {
+    const word = `词${index}`;
+    largeDictionary.set(word, entry(word));
+  }
+
+  const parsed = parseTextVocabulary("喜欢", largeDictionary);
+  assert.deepEqual(parsed.words.map((word) => word.hanzi), ["喜欢"]);
+  assert.equal(parsed.unmatchedCharacters, 0);
+});
