@@ -28,14 +28,14 @@ import {
 } from "@/card-srs";
 import { finishExercise } from "@/exercise-progress";
 import { resolveSentencePronunciation, resolveWordPronunciation } from "@/pronunciation";
-import { recordRoundCompletion } from "@/round-history";
+import { recordRoundCompletion, undoRoundCompletion } from "@/round-history";
 import { track } from "@/telemetry";
 import { ExplanationButton } from "@/explanation-button";
 import { captureCardReviewUndo, restoreCardReview, type CardReviewUndo } from "@/card-review-undo";
 
 type Phase = "ready" | "studying" | "celebrating" | "complete";
 type Graduation = { learned: Word; replacement?: Word };
-type ReviewedCard = { position: number; correct: boolean; graduated: boolean; undo: CardReviewUndo };
+type ReviewedCard = { position: number; correct: boolean; graduated: boolean; completedAt?: number; undo: CardReviewUndo };
 const webDragSurface = Platform.OS === "web"
   ? ({ touchAction: "none" } as any)
   : undefined;
@@ -172,6 +172,7 @@ export default function Cards() {
       position,
       correct,
       graduated: !!learned,
+      completedAt: roundComplete ? reviewedAt : undefined,
       undo,
     }]);
     if (learned) {
@@ -187,18 +188,24 @@ export default function Cards() {
   };
   const previousCard = () => {
     const previous = reviewedCards.at(-1);
-    if (!previous || previous.position !== position - 1) return;
+    const previousPosition = phase === "studying" ? position - 1 : position;
+    if (!previous || previous.position !== previousPosition) return;
     swipe.stopAnimation();
     cardSpin.stopAnimation();
     grading.current = false;
     patch((current) => ({
       ...current,
       words: restoreCardReview(current.words, previous.undo),
+      roundCompletions: previous.completedAt === undefined
+        ? current.roundCompletions
+        : undoRoundCompletion(current.roundCompletions, studyRound, previous.completedAt),
     }));
     setReviewedCards((cards) => cards.slice(0, -1));
     if (!previous.correct) setMistakeIds((ids) => ids.slice(0, -1));
     if (previous.graduated) setGraduations((items) => items.slice(0, -1));
+    setRoundEndsAfterCelebration(false);
     setPosition(previous.position);
+    setPhase("studying");
     setFlipped(true);
     setExampleIndex(0);
     swipe.setValue({ x: 0, y: 0 });
@@ -308,10 +315,11 @@ export default function Cards() {
     const graduation = graduations[graduations.length - 1];
     return (
       <ScrollView style={shell.page} contentContainerStyle={shell.content}>
-        <Header
+        <RoundReviewHeader
           eyebrow={`${t("Round")} ${studyRound} · ${t("Milestone")}`}
           title="Word learned!"
           subtitle="A word graduated from your active card pool."
+          onPreviousCard={previousCard}
         />
         <SwipeableGraduation
           graduation={graduation}
@@ -328,12 +336,13 @@ export default function Cards() {
       .filter(Boolean);
     return (
       <ScrollView style={shell.page} contentContainerStyle={shell.content}>
-        <Header
+        <RoundReviewHeader
           eyebrow={`${t("Round")} ${studyRound} ${t("complete")}`}
           title={
             mistaken.length ? `${mistaken.length} ${t("to review")}` : "Perfect round!"
           }
           subtitle={`${roundWords.length - mistaken.length} ${t("correct")} · ${mistaken.length} ${t("mistaken")}`}
+          onPreviousCard={previousCard}
         />
         {graduations.map((graduation) => (
           <GraduationCelebration
@@ -383,23 +392,12 @@ export default function Cards() {
 
   return (
     <ScrollView style={shell.page} contentContainerStyle={shell.content}>
-      <View style={styles.studyHeading}>
-        <View style={styles.studyTitle}>
-          <Header
-            eyebrow={`${t("Round")} ${studyRound} · ${t("Card")} ${position + 1} ${t("of")} ${roundWords.length}`}
-            title="Flashcards"
-            subtitle={`${word.cardSrsLevel < CARD_GRADUATION_LEVEL ? `${t("Learning step")} ${word.cardSrsLevel + 1} ${t("of")} ${CARD_GRADUATION_LEVEL}` : `${t("Retention level")} ${word.cardSrsLevel}`} · ${mistakeIds.length} ${t("mistaken")}`}
-          />
-        </View>
-        {position > 0 && <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Previous card"
-          onPress={previousCard}
-          style={({ pressed }) => [styles.previousCardButton, pressed && styles.previousCardButtonPressed]}
-        >
-          <Ionicons name="arrow-back" size={22} color={colors.green} />
-        </Pressable>}
-      </View>
+      <RoundReviewHeader
+        eyebrow={`${t("Round")} ${studyRound} · ${t("Card")} ${position + 1} ${t("of")} ${roundWords.length}`}
+        title="Flashcards"
+        subtitle={`${word.cardSrsLevel < CARD_GRADUATION_LEVEL ? `${t("Learning step")} ${word.cardSrsLevel + 1} ${t("of")} ${CARD_GRADUATION_LEVEL}` : `${t("Retention level")} ${word.cardSrsLevel}`} · ${mistakeIds.length} ${t("mistaken")}`}
+        onPreviousCard={position > 0 ? previousCard : undefined}
+      />
       <View style={styles.progress}>
         <View
           style={[
@@ -440,6 +438,27 @@ export default function Cards() {
       </View>
     </ScrollView>
   );
+}
+
+function RoundReviewHeader({ eyebrow, title, subtitle, onPreviousCard }: {
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+  onPreviousCard?: () => void;
+}) {
+  return <View style={styles.studyHeading}>
+    <View style={styles.studyTitle}>
+      <Header eyebrow={eyebrow} title={title} subtitle={subtitle} />
+    </View>
+    {onPreviousCard && <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Previous card"
+      onPress={onPreviousCard}
+      style={({ pressed }) => [styles.previousCardButton, pressed && styles.previousCardButtonPressed]}
+    >
+      <Ionicons name="arrow-back" size={22} color={colors.green} />
+    </Pressable>}
+  </View>;
 }
 
 function StackCard({ word, depth, roundIndex, initialTilt, active, height, settings, translationLanguage,
