@@ -813,6 +813,7 @@ function GraduationCelebration({
       <Text style={styles.confetti}>🎉</Text>
       <Text style={styles.celebrationTitle}>LEARNED</Text>
       <View style={styles.graduationWordRow}>
+        <ExplanationButton kind="word" text={learned.hanzi} />
         <Text style={styles.learnedHanzi}>{learned.hanzi}</Text>
         <SpeakerButton
           pronunciation={learned}
@@ -840,6 +841,7 @@ function GraduationCelebration({
           <Text style={styles.confetti}>👀</Text>
           <Text style={styles.learnTitle}>LEARN</Text>
           <View style={styles.graduationWordRow}>
+            <ExplanationButton kind="word" text={replacement.hanzi} />
             <Text style={styles.learnedHanzi}>
               {replacement.hanzi}
             </Text>
