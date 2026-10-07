@@ -1,5 +1,7 @@
 # Hanzi Deck
 
+## [Production](https://zh.x.bormisov.com) · [Development](https://dev.zh.x.bormisov.com)
+
 An Expo frontend and one Bun/SQLite backend for Chinese vocabulary study.
 
 | Directory | Purpose |
