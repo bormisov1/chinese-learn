@@ -23,7 +23,7 @@ import { useStore } from "@/context";
 import { colors } from "@/theme";
 import { Header, shell, SpeakerButton } from "@/ui";
 import { Button } from "@/ui";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { Settings as SettingsData, Word } from "@/types";
 import { validateApiKey } from "@/deepseek";
 import { ExplanationButton } from "@/explanation-button";
@@ -41,8 +41,12 @@ import { parseBackup } from "@/backup";
 import { chooseBackup, downloadBackup } from "@/backup-files";
 
 export default function Settings() {
+  const params = useLocalSearchParams<{ focus?: string; request?: string }>();
   const { data, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, importWords, patch, retryDictionary, selectLanguage, setAutomaticWordAddition, account, authBusy, authError, signIn, signOut, createBackup, mergeBackup } = useStore();
   const scrollRef = useRef<ScrollView>(null);
+  const generalMeasured = useRef(false);
+  const apiKeyOffset = useRef<number | null>(null);
+  const handledFocusRequest = useRef<string | null>(null);
   const sectionOffsets = useRef<Record<SettingsSection, number>>({
     general: 0,
     audio: 0,
@@ -54,6 +58,7 @@ export default function Settings() {
   const [selectedWord, setSelectedWord] = useState<Word | null>(null);
   const [backupBusy, setBackupBusy] = useState(false);
   const [backupMessage, setBackupMessage] = useState("");
+  const [avatarFailed, setAvatarFailed] = useState(false);
   const indicatorPosition = useRef(new Animated.Value(0)).current;
   const [keyValidation, setKeyValidation] = useState<
     "idle" | "checking" | "valid" | "invalid" | "error"
@@ -136,6 +141,7 @@ export default function Settings() {
     .filter((word) => word.cardActive)
     .sort((a, b) => (a.cardIntroducedAt ?? 0) - (b.cardIntroducedAt ?? 0));
   const queuedWords = getActivePoolQueue(data.words, data.cardRound);
+  useEffect(() => setAvatarFailed(false), [account?.picture]);
   const stat = (
     level: number,
     correct: number,
@@ -163,8 +169,20 @@ export default function Settings() {
       useNativeDriver: true,
     }).start();
   }, [activeSection, indicatorPosition]);
+  const focusApiKey = () => {
+    if (params.focus !== "deepseek-key" || !generalMeasured.current || apiKeyOffset.current === null) return;
+    const request = params.request ?? "direct";
+    if (handledFocusRequest.current === request) return;
+    handledFocusRequest.current = request;
+    requestAnimationFrame(() => scrollRef.current?.scrollTo({
+      y: Math.max(0, sectionOffsets.current.general + apiKeyOffset.current! - 24),
+      animated: true,
+    }));
+  };
+  useEffect(focusApiKey, [params.focus, params.request]);
   const recordSection = (section: SettingsSection) => (event: LayoutChangeEvent) => {
     sectionOffsets.current[section] = event.nativeEvent.layout.y;
+    if (section === "general") { generalMeasured.current = true; focusApiKey(); }
   };
   const trackSection = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const position = event.nativeEvent.contentOffset.y + 120;
@@ -255,7 +273,7 @@ export default function Settings() {
         <View style={[shell.panel, styles.accountPanel]}>
           <Text style={styles.label}>ACCOUNT</Text>
           {account ? <View style={styles.accountProfile}>
-            {account.picture ? <Image source={{ uri: account.picture }} style={styles.accountAvatar} accessibilityLabel={`${account.name || "Account"} avatar`} /> : <View style={[styles.accountAvatar, styles.accountAvatarFallback]}><Text style={styles.accountInitial}>{(account.name || account.email || "?").trim().charAt(0).toUpperCase()}</Text></View>}
+            {account.picture && !avatarFailed ? <Image source={{ uri: account.picture }} style={styles.accountAvatar} accessibilityLabel={`${account.name || "Account"} avatar`} onError={() => setAvatarFailed(true)} /> : <View style={[styles.accountAvatar, styles.accountAvatarFallback]}><Text style={styles.accountInitial}>{(account.name || account.email || "?").trim().charAt(0).toUpperCase()}</Text></View>}
             <Text style={styles.accountName}>{account.name || account.email || account.id}</Text>
             <Button secondary label="Sign out" onPress={() => void signOut()} />
           </View> : <View style={styles.authButtons}><Button label="Continue with Google / Gmail" disabled={authBusy} onPress={() => void signIn("google")} /><Button secondary label="Continue with Telegram" disabled={authBusy} onPress={() => void signIn("telegram")} /></View>}
@@ -291,13 +309,15 @@ export default function Settings() {
             </View>
           ) : null}
         </View>
-        <Field
-          label="DEEPSEEK API KEY"
-          value={data.settings.apiKey}
-          onChangeText={updateApiKey}
-          secureTextEntry
-          placeholder="sk-…"
-        />
+        <View onLayout={event => { apiKeyOffset.current = event.nativeEvent.layout.y; focusApiKey(); }}>
+          <Field
+            label="DEEPSEEK API KEY"
+            value={data.settings.apiKey}
+            onChangeText={updateApiKey}
+            secureTextEntry
+            placeholder="sk-…"
+          />
+        </View>
         <Pressable
           accessibilityRole="link"
           onPress={() => void Linking.openURL("https://api-docs.deepseek.com/api/deepseek-api/")}

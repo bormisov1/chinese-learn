@@ -115,16 +115,16 @@ exec 8>"$CACHE_LOCK_FILE"
 flock 8
 mkdir -p -- "$DEPENDENCY_CACHE_ROOT"
 
-PACKAGE_LOCK_HASH=$(sha256sum "$WORKTREE_DIR/package-lock.json" | awk '{print $1}')
+PACKAGE_LOCK_HASH=$(sha256sum "$WORKTREE_DIR/frontend/package-lock.json" | awk '{print $1}')
 DEPENDENCY_CACHE="$DEPENDENCY_CACHE_ROOT/$PACKAGE_LOCK_HASH"
 
 if [[ -d "$DEPENDENCY_CACHE/node_modules" && \
       -f "$DEPENDENCY_CACHE/complete" && \
       "$(<"$DEPENDENCY_CACHE/complete")" == "$PACKAGE_LOCK_HASH" ]]; then
   log "Restoring dependencies from cache $PACKAGE_LOCK_HASH."
-  if ! cp -a --reflink=auto "$DEPENDENCY_CACHE/node_modules" "$WORKTREE_DIR/"; then
+  if ! cp -a --reflink=auto "$DEPENDENCY_CACHE/node_modules" "$WORKTREE_DIR/frontend/"; then
     log "Cached dependencies could not be restored; rebuilding them."
-    rm -rf -- "$WORKTREE_DIR/node_modules" "$DEPENDENCY_CACHE"
+    rm -rf -- "$WORKTREE_DIR/frontend/node_modules" "$DEPENDENCY_CACHE"
   fi
 else
   if [[ -e "$DEPENDENCY_CACHE" ]]; then
@@ -133,12 +133,12 @@ else
   fi
 fi
 
-if [[ ! -d "$WORKTREE_DIR/node_modules" ]]; then
+if [[ ! -d "$WORKTREE_DIR/frontend/node_modules" ]]; then
   log "Dependency cache miss; installing with Node $(node --version)."
-  npm --prefix "$WORKTREE_DIR" ci
+  npm --prefix "$WORKTREE_DIR/frontend" ci
 
   CACHE_STAGING=$(mktemp -d "$DEPENDENCY_CACHE_ROOT/.${PACKAGE_LOCK_HASH}.XXXXXX")
-  cp -a --reflink=auto "$WORKTREE_DIR/node_modules" "$CACHE_STAGING/node_modules"
+  cp -a --reflink=auto "$WORKTREE_DIR/frontend/node_modules" "$CACHE_STAGING/node_modules"
   printf '%s\n' "$PACKAGE_LOCK_HASH" > "$CACHE_STAGING/complete"
   mv -- "$CACHE_STAGING" "$DEPENDENCY_CACHE"
   CACHE_STAGING=""
@@ -148,17 +148,17 @@ fi
 flock -u 8
 
 log "Building into a temporary output directory."
-npm --prefix "$WORKTREE_DIR" run build:web -- --output-dir "$BUILD_OUTPUT"
+npm --prefix "$WORKTREE_DIR/frontend" run build:web -- --output-dir "$BUILD_OUTPUT"
 
 log "Publishing the backend architecture document."
 install -D -m 0644 \
-  "$WORKTREE_DIR/docs/backend-architecture.html" \
+  "$WORKTREE_DIR/backend/docs/backend-architecture.html" \
   "$BUILD_OUTPUT/docs/backend-architecture.html"
 install -D -m 0644 \
-  "$WORKTREE_DIR/docs/backend-architecture.html" \
+  "$WORKTREE_DIR/backend/docs/backend-architecture.html" \
   "$BUILD_OUTPUT/docs/backend-architecture.htm"
 install -D -m 0644 \
-  "$WORKTREE_DIR/docs/backend-architecture.html" \
+  "$WORKTREE_DIR/backend/docs/backend-architecture.html" \
   "$BUILD_OUTPUT/docs/backend-architecture/index.html"
 
 # Nginx serves the atomic output directly; make every published directory and

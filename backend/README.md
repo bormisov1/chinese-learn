@@ -1,7 +1,11 @@
 # Hanzi Deck backend
 
 Requires Bun 1.3+. Copy `.env.example` to `.env` and run `bun run src/server.ts`.
-The service uses Bun's built-in SQLite driver and creates `backend/data/app.sqlite`.
+The service uses Bun's built-in SQLite driver and creates `data/app.sqlite`
+relative to the `backend` directory. Run `bun test` here for the API tests.
+
+This is the only backend service. The Expo app's `frontend/src/api-client.ts`
+calls this service over HTTP; it is client code, not another server.
 
 For local smoke tests, set `AUTH_DEV_MODE=1` and use `POST /v1/auth/dev/session`
 with `{ "email": "local@example.test", "name": "Local tester" }`.

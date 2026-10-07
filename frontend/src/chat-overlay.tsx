@@ -8,9 +8,11 @@ import { CHAT_PRESETS, ChatPreset, ChatTurn, ChatWord, chatTitleForQuestion, req
 import { ChatMessage, Conversation, loadChatHistory, saveChatHistory } from './chat-history';
 import { colors } from './theme';
 import { removeVocabularyWord } from './vocabulary-selection';
+import { useMissingApiKeyPrompt } from './missing-api-key-prompt';
 
 export function ChatOverlay() {
   const { data, dictionary, importWords, patch } = useStore();
+  const { showMissingApiKeyPrompt } = useMissingApiKeyPrompt();
   const insets = useSafeAreaInsets();
   const scroll = useRef<ScrollView>(null);
   const [open, setOpen] = useState(false);
@@ -30,6 +32,7 @@ export function ChatOverlay() {
   const messages = active?.messages ?? [];
   const preset = active?.preset ?? draftPreset;
   const saved = new Set(data.words.map(word => word.hanzi));
+  const missingApiKey = !data.settings.apiKey.trim();
 
   useEffect(() => {
     const timer = setTimeout(() => { try { saveChatHistory(conversations); } catch { /* Storage can be disabled by the browser. */ } }, 300);
@@ -96,9 +99,9 @@ export function ChatOverlay() {
   };
 
   return <>
-    <Pressable accessibilityRole="button" accessibilityLabel="Open DeepSeek chat" onHoverIn={() => setHovered(true)} onHoverOut={() => setHovered(false)} onPressIn={() => setClicked(true)} onPress={() => { setClicked(true); setOpen(true); }} style={[styles.launcher, (hovered || clicked) && styles.launcherOpaque]}>
-      <View style={styles.launcherRing}><Ionicons name="hardware-chip-outline" size={25} color="#D9FFF4" /></View>
-      <View style={styles.orbitDot} />
+    <Pressable accessibilityRole="button" accessibilityLabel="Open DeepSeek chat" onHoverIn={() => setHovered(true)} onHoverOut={() => setHovered(false)} onPressIn={() => { if (!missingApiKey) setClicked(true); }} onPress={() => { if (missingApiKey) { showMissingApiKeyPrompt(); return; } setClicked(true); setOpen(true); }} style={[styles.launcher, missingApiKey && styles.launcherMissingKey, !missingApiKey && (hovered || clicked) && styles.launcherOpaque]}>
+      <View style={[styles.launcherRing, missingApiKey && styles.launcherRingMissingKey]}><Ionicons name="hardware-chip-outline" size={25} color={missingApiKey ? '#69726E' : '#D9FFF4'} /></View>
+      <View style={[styles.orbitDot, missingApiKey && styles.orbitDotMissingKey]} />
     </Pressable>
     <Modal visible={open} animationType="slide" onRequestClose={() => { setOpen(false); setClicked(false); }}>
       <View style={[styles.page, { paddingTop: insets.top }]}>
@@ -164,10 +167,13 @@ export function ChatOverlay() {
 }
 
 const styles = StyleSheet.create({
-  launcher: { position: 'absolute', left: 15, bottom: 83, zIndex: 20, width: 51, height: 51, borderRadius: 26, opacity: 0.85, backgroundColor: 'rgba(16, 73, 72, 0.72)', borderWidth: 1, borderColor: 'rgba(157, 255, 226, 0.65)', alignItems: 'center', justifyContent: 'center', shadowColor: '#25E6BD', shadowOpacity: 0.35, shadowRadius: 10, elevation: 8 },
+  launcher: { position: 'absolute', right: 15, bottom: 83, zIndex: 20, width: 51, height: 51, borderRadius: 26, opacity: 0.85, backgroundColor: 'rgba(16, 73, 72, 0.72)', borderWidth: 1, borderColor: 'rgba(157, 255, 226, 0.65)', alignItems: 'center', justifyContent: 'center', shadowColor: '#25E6BD', shadowOpacity: 0.35, shadowRadius: 10, elevation: 8 },
   launcherOpaque: { opacity: 1, backgroundColor: '#104948' },
+  launcherMissingKey: { opacity: 1, backgroundColor: '#D6DAD7', borderColor: '#AAB3AE', shadowOpacity: 0, elevation: 2 },
   launcherRing: { width: 38, height: 38, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(206, 255, 242, 0.45)', alignItems: 'center', justifyContent: 'center' },
+  launcherRingMissingKey: { borderColor: '#AAB3AE' },
   orbitDot: { position: 'absolute', right: 4, top: 6, width: 6, height: 6, borderRadius: 3, backgroundColor: '#9FFFE0' },
+  orbitDotMissingKey: { backgroundColor: '#929E97' },
   page: { flex: 1, backgroundColor: colors.paper },
   header: { minHeight: 70, paddingHorizontal: 19, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderColor: colors.line, backgroundColor: colors.card },
   headerTitle: { flex: 1, minWidth: 0, marginRight: 8 },
