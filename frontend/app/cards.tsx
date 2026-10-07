@@ -1,4 +1,5 @@
 import { displayTranslation, LANGUAGES, maskTranslatedHanzi, Text, useTranslation } from "@/i18n";
+import { Ionicons } from "@expo/vector-icons";
 import { useEffect,
   useMemo,
   useRef,
@@ -30,9 +31,11 @@ import { resolveSentencePronunciation, resolveWordPronunciation } from "@/pronun
 import { recordRoundCompletion } from "@/round-history";
 import { track } from "@/telemetry";
 import { ExplanationButton } from "@/explanation-button";
+import { captureCardReviewUndo, restoreCardReview, type CardReviewUndo } from "@/card-review-undo";
 
 type Phase = "ready" | "studying" | "celebrating" | "complete";
 type Graduation = { learned: Word; replacement?: Word };
+type ReviewedCard = { position: number; correct: boolean; graduated: boolean; undo: CardReviewUndo };
 const webDragSurface = Platform.OS === "web"
   ? ({ touchAction: "none" } as any)
   : undefined;
@@ -60,11 +63,13 @@ export default function Cards() {
     [exampleIndex, setExampleIndex] = useState(0),
     [mistakeIds, setMistakeIds] = useState<string[]>([]),
     [graduations, setGraduations] = useState<Graduation[]>([]),
+    [reviewedCards, setReviewedCards] = useState<ReviewedCard[]>([]),
     [roundEndsAfterCelebration, setRoundEndsAfterCelebration] = useState(false),
     [cardHeights, setCardHeights] = useState<Record<string, number>>({}),
     [roundTilts, setRoundTilts] = useState<Record<string, number>>({});
   const swipe = useRef(new Animated.ValueXY()).current;
   const cardSpin = useRef(new Animated.Value(0)).current;
+  const grading = useRef(false);
   const total = data.words.length;
   const translationLanguage = LANGUAGES.find(item => item.code === data.settings.language)?.nativeLabel.toUpperCase() ?? "ENGLISH";
   const upcoming = useMemo(
@@ -120,9 +125,11 @@ export default function Cards() {
     setPosition(0);
     setMistakeIds([]);
     setGraduations([]);
+    setReviewedCards([]);
     setRoundEndsAfterCelebration(false);
     setFlipped(false);
     setExampleIndex(0);
+    grading.current = false;
     swipe.setValue({ x: 0, y: 0 });
     cardSpin.setValue(0);
     setPhase("studying");
@@ -138,6 +145,7 @@ export default function Cards() {
       { kind: "card", wordId: word.id, correct, round: studyRound },
       reviewedAt,
     ).words;
+    const undo = captureCardReviewUndo(data.words, updatedWords);
     patch((d) => {
       const progressed = finishExercise(
         d,
@@ -160,6 +168,12 @@ export default function Cards() {
         item.cardActive &&
         !data.words.find((before) => before.id === item.id)?.cardActive,
     );
+    setReviewedCards((cards) => [...cards, {
+      position,
+      correct,
+      graduated: !!learned,
+      undo,
+    }]);
     if (learned) {
       setGraduations((items) => [...items, { learned, replacement }]);
       setRoundEndsAfterCelebration(roundComplete);
@@ -167,6 +181,25 @@ export default function Cards() {
     } else if (roundComplete) setPhase("complete");
     else setPosition((p) => p + 1);
     setFlipped(false);
+    setExampleIndex(0);
+    swipe.setValue({ x: 0, y: 0 });
+    cardSpin.setValue(0);
+  };
+  const previousCard = () => {
+    const previous = reviewedCards.at(-1);
+    if (!previous || previous.position !== position - 1) return;
+    swipe.stopAnimation();
+    cardSpin.stopAnimation();
+    grading.current = false;
+    patch((current) => ({
+      ...current,
+      words: restoreCardReview(current.words, previous.undo),
+    }));
+    setReviewedCards((cards) => cards.slice(0, -1));
+    if (!previous.correct) setMistakeIds((ids) => ids.slice(0, -1));
+    if (previous.graduated) setGraduations((items) => items.slice(0, -1));
+    setPosition(previous.position);
+    setFlipped(true);
     setExampleIndex(0);
     swipe.setValue({ x: 0, y: 0 });
     cardSpin.setValue(0);
@@ -180,11 +213,16 @@ export default function Cards() {
     setRoundEndsAfterCelebration(false);
   };
   const finishSwipe = (correct: boolean) => {
+    if (grading.current) return;
+    grading.current = true;
     Animated.timing(swipe, {
       toValue: { x: correct ? 520 : -520, y: 0 },
       duration: 180,
       useNativeDriver: true,
-    }).start(() => grade(correct));
+    }).start(({ finished }) => {
+      grading.current = false;
+      if (finished) grade(correct);
+    });
   };
   const flipCard = (nextFlipped: boolean) => {
     if (nextFlipped === flipped) return;
@@ -345,11 +383,23 @@ export default function Cards() {
 
   return (
     <ScrollView style={shell.page} contentContainerStyle={shell.content}>
-      <Header
-        eyebrow={`${t("Round")} ${studyRound} · ${t("Card")} ${position + 1} ${t("of")} ${roundWords.length}`}
-        title="Flashcards"
-        subtitle={`${word.cardSrsLevel < CARD_GRADUATION_LEVEL ? `${t("Learning step")} ${word.cardSrsLevel + 1} ${t("of")} ${CARD_GRADUATION_LEVEL}` : `${t("Retention level")} ${word.cardSrsLevel}`} · ${mistakeIds.length} ${t("mistaken")}`}
-      />
+      <View style={styles.studyHeading}>
+        <View style={styles.studyTitle}>
+          <Header
+            eyebrow={`${t("Round")} ${studyRound} · ${t("Card")} ${position + 1} ${t("of")} ${roundWords.length}`}
+            title="Flashcards"
+            subtitle={`${word.cardSrsLevel < CARD_GRADUATION_LEVEL ? `${t("Learning step")} ${word.cardSrsLevel + 1} ${t("of")} ${CARD_GRADUATION_LEVEL}` : `${t("Retention level")} ${word.cardSrsLevel}`} · ${mistakeIds.length} ${t("mistaken")}`}
+          />
+        </View>
+        {position > 0 && <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Previous card"
+          onPress={previousCard}
+          style={({ pressed }) => [styles.previousCardButton, pressed && styles.previousCardButtonPressed]}
+        >
+          <Ionicons name="arrow-back" size={22} color={colors.green} />
+        </Pressable>}
+      </View>
       <View style={styles.progress}>
         <View
           style={[
@@ -1215,6 +1265,21 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     overflow: "hidden",
   },
+  studyHeading: { flexDirection: "row", alignItems: "flex-start" },
+  studyTitle: { flex: 1 },
+  previousCardButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginTop: 24,
+    marginLeft: 12,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.line,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  previousCardButtonPressed: { opacity: 0.55 },
   fill: { height: 5, backgroundColor: colors.coral },
   studyStack: { position: "relative" },
   stackCard: {
