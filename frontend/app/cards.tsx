@@ -1,5 +1,7 @@
 import { displayTranslation, LANGUAGES, maskTranslatedHanzi, Text, useTranslation } from "@/i18n";
+import { Ionicons } from "@expo/vector-icons";
 import { useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState } from "react";
@@ -23,16 +25,31 @@ import {
   ACTIVE_CARD_LIMIT,
   CARD_GRADUATION_LEVEL,
   CARD_ROUND_SIZE,
+  gradeCard,
   selectRound,
 } from "@/card-srs";
 import { finishExercise } from "@/exercise-progress";
 import { resolveSentencePronunciation, resolveWordPronunciation } from "@/pronunciation";
-import { recordRoundCompletion } from "@/round-history";
+import { recordRoundCompletion, undoRoundCompletion } from "@/round-history";
 import { track } from "@/telemetry";
 import { ExplanationButton } from "@/explanation-button";
+import { captureCardReviewUndo, restoreCardReview, type CardReviewUndo } from "@/card-review-undo";
 
 type Phase = "ready" | "studying" | "celebrating" | "complete";
 type Graduation = { learned: Word; replacement?: Word };
+const findGraduation = (before: Word[], after: Word[], wordId: string): Graduation | undefined => {
+  const original = before.find((item) => item.id === wordId);
+  const learned = after.find(
+    (item) => item.id === wordId && original?.cardActive && !item.cardActive,
+  );
+  if (!learned) return undefined;
+  const replacement = after.find(
+    (item) => item.id !== wordId && item.cardActive &&
+      !before.find((previous) => previous.id === item.id)?.cardActive,
+  );
+  return { learned, replacement };
+};
+type ReviewedCard = { position: number; correct: boolean; graduated: boolean; completedAt?: number; undo: CardReviewUndo };
 const webDragSurface = Platform.OS === "web"
   ? ({ touchAction: "none" } as any)
   : undefined;
@@ -60,11 +77,13 @@ export default function Cards() {
     [exampleIndex, setExampleIndex] = useState(0),
     [mistakeIds, setMistakeIds] = useState<string[]>([]),
     [graduations, setGraduations] = useState<Graduation[]>([]),
+    [reviewedCards, setReviewedCards] = useState<ReviewedCard[]>([]),
     [roundEndsAfterCelebration, setRoundEndsAfterCelebration] = useState(false),
     [cardHeights, setCardHeights] = useState<Record<string, number>>({}),
     [roundTilts, setRoundTilts] = useState<Record<string, number>>({});
   const swipe = useRef(new Animated.ValueXY()).current;
   const cardSpin = useRef(new Animated.Value(0)).current;
+  const grading = useRef(false);
   const total = data.words.length;
   const translationLanguage = LANGUAGES.find(item => item.code === data.settings.language)?.nativeLabel.toUpperCase() ?? "ENGLISH";
   const upcoming = useMemo(
@@ -76,6 +95,12 @@ export default function Cards() {
     .map((id) => data.words.find((w) => w.id === id))
     .filter(Boolean) as typeof data.words;
   const word = roundWords[position];
+  const stagedGraduation = useMemo(() => {
+    if (phase !== "studying" || !word?.cardActive ||
+        word.cardSrsLevel !== CARD_GRADUATION_LEVEL - 1) return undefined;
+    const updated = gradeCard(data.words, word.id, true, studyRound, Date.now());
+    return findGraduation(data.words, updated, word.id);
+  }, [phase, data.words, word?.id, word?.cardActive, word?.cardSrsLevel, studyRound]);
   const examples = useMemo(
     () =>
       word
@@ -120,9 +145,11 @@ export default function Cards() {
     setPosition(0);
     setMistakeIds([]);
     setGraduations([]);
+    setReviewedCards([]);
     setRoundEndsAfterCelebration(false);
     setFlipped(false);
     setExampleIndex(0);
+    grading.current = false;
     swipe.setValue({ x: 0, y: 0 });
     cardSpin.setValue(0);
     setPhase("studying");
@@ -138,6 +165,7 @@ export default function Cards() {
       { kind: "card", wordId: word.id, correct, round: studyRound },
       reviewedAt,
     ).words;
+    const undo = captureCardReviewUndo(data.words, updatedWords);
     patch((d) => {
       const progressed = finishExercise(
         d,
@@ -151,22 +179,46 @@ export default function Cards() {
     if (!correct) setMistakeIds((ids) => [...ids, word.id]);
     void track("card_reviewed", { round: studyRound, result: correct ? "correct" : "incorrect", mode: "cards" });
     if (roundComplete) void track("round_completed", { round: studyRound, size: roundWords.length, mode: "cards" });
-    const learned = updatedWords.find(
-      (item) => item.id === word.id && word.cardActive && !item.cardActive,
-    );
-    const replacement = updatedWords.find(
-      (item) =>
-        item.id !== word.id &&
-        item.cardActive &&
-        !data.words.find((before) => before.id === item.id)?.cardActive,
-    );
-    if (learned) {
-      setGraduations((items) => [...items, { learned, replacement }]);
+    const graduation = findGraduation(data.words, updatedWords, word.id);
+    setReviewedCards((cards) => [...cards, {
+      position,
+      correct,
+      graduated: !!graduation,
+      completedAt: roundComplete ? reviewedAt : undefined,
+      undo,
+    }]);
+    if (graduation) {
+      setGraduations((items) => [...items, graduation]);
       setRoundEndsAfterCelebration(roundComplete);
       setPhase("celebrating");
     } else if (roundComplete) setPhase("complete");
     else setPosition((p) => p + 1);
     setFlipped(false);
+    setExampleIndex(0);
+    swipe.setValue({ x: 0, y: 0 });
+    cardSpin.setValue(0);
+  };
+  const previousCard = () => {
+    const previous = reviewedCards.at(-1);
+    const previousPosition = phase === "studying" ? position - 1 : position;
+    if (!previous || previous.position !== previousPosition) return;
+    swipe.stopAnimation();
+    cardSpin.stopAnimation();
+    grading.current = false;
+    patch((current) => ({
+      ...current,
+      words: restoreCardReview(current.words, previous.undo),
+      roundCompletions: previous.completedAt === undefined
+        ? current.roundCompletions
+        : undoRoundCompletion(current.roundCompletions, studyRound, previous.completedAt),
+    }));
+    setReviewedCards((cards) => cards.slice(0, -1));
+    if (!previous.correct) setMistakeIds((ids) => ids.slice(0, -1));
+    if (previous.graduated) setGraduations((items) => items.slice(0, -1));
+    setRoundEndsAfterCelebration(false);
+    setPosition(previous.position);
+    setPhase("studying");
+    setFlipped(true);
     setExampleIndex(0);
     swipe.setValue({ x: 0, y: 0 });
     cardSpin.setValue(0);
@@ -180,11 +232,16 @@ export default function Cards() {
     setRoundEndsAfterCelebration(false);
   };
   const finishSwipe = (correct: boolean) => {
+    if (grading.current) return;
+    grading.current = true;
     Animated.timing(swipe, {
       toValue: { x: correct ? 520 : -520, y: 0 },
       duration: 180,
       useNativeDriver: true,
-    }).start(() => grade(correct));
+    }).start(({ finished }) => {
+      grading.current = false;
+      if (finished) grade(correct);
+    });
   };
   const flipCard = (nextFlipped: boolean) => {
     if (nextFlipped === flipped) return;
@@ -266,36 +323,19 @@ export default function Cards() {
       </ScrollView>
     );
 
-  if (phase === "celebrating") {
-    const graduation = graduations[graduations.length - 1];
-    return (
-      <ScrollView style={shell.page} contentContainerStyle={shell.content}>
-        <Header
-          eyebrow={`${t("Round")} ${studyRound} · ${t("Milestone")}`}
-          title="Word learned!"
-          subtitle="A word graduated from your active card pool."
-        />
-        <SwipeableGraduation
-          graduation={graduation}
-          settings={data.settings}
-          onContinue={continueAfterCelebration}
-        />
-      </ScrollView>
-    );
-  }
-
   if (phase === "complete") {
     const mistaken = mistakeIds
       .map((id) => data.words.find((w) => w.id === id))
       .filter(Boolean);
     return (
       <ScrollView style={shell.page} contentContainerStyle={shell.content}>
-        <Header
+        <RoundReviewHeader
           eyebrow={`${t("Round")} ${studyRound} ${t("complete")}`}
           title={
             mistaken.length ? `${mistaken.length} ${t("to review")}` : "Perfect round!"
           }
           subtitle={`${roundWords.length - mistaken.length} ${t("correct")} · ${mistaken.length} ${t("mistaken")}`}
+          onPreviousCard={previousCard}
         />
         {graduations.map((graduation) => (
           <GraduationCelebration
@@ -343,53 +383,107 @@ export default function Cards() {
     );
   }
 
+  const celebrating = phase === "celebrating";
+  const visibleGraduation = celebrating
+    ? graduations[graduations.length - 1]
+    : stagedGraduation;
   return (
     <ScrollView style={shell.page} contentContainerStyle={shell.content}>
-      <Header
-        eyebrow={`${t("Round")} ${studyRound} · ${t("Card")} ${position + 1} ${t("of")} ${roundWords.length}`}
-        title="Flashcards"
-        subtitle={`${word.cardSrsLevel < CARD_GRADUATION_LEVEL ? `${t("Learning step")} ${word.cardSrsLevel + 1} ${t("of")} ${CARD_GRADUATION_LEVEL}` : `${t("Retention level")} ${word.cardSrsLevel}`} · ${mistakeIds.length} ${t("mistaken")}`}
-      />
-      <View style={styles.progress}>
-        <View
-          style={[
-            styles.fill,
-            { width: `${((position + 1) / roundWords.length) * 100}%` },
-          ]}
+      {celebrating ? (
+        <RoundReviewHeader
+          eyebrow={`${t("Round")} ${studyRound} · ${t("Milestone")}`}
+          title="Word learned!"
+          subtitle="A word graduated from your active card pool."
+          onPreviousCard={previousCard}
         />
-      </View>
-      <View style={[styles.studyStack, {
-        height: (cardHeights[word.id] ?? 300) + (roundWords.length - 1) * CARD_STACK_STEP,
-      }]}>
-        {roundWords.slice(position).map((stackWord, index) => (
-          <StackCard
-            key={stackWord.id}
-            word={stackWord}
-            depth={index}
-            roundIndex={position + index}
-            initialTilt={roundTilts[stackWord.id] ?? 0}
-            active={index === 0}
-            height={cardHeights[stackWord.id] ?? 300}
-            settings={data.settings}
-            translationLanguage={translationLanguage}
-            examples={(data.wordSentenceIndex[stackWord.id] ?? [])
-              .map((id) => data.sentences.find((sentence) => sentence.id === id))
-              .filter(Boolean).slice(0, 3) as Sentence[]}
-            flipped={flipped}
-            exampleIndex={exampleIndex}
-            onExampleIndexChange={setExampleIndex}
-            swipe={swipe}
-            cardSpin={cardSpin}
-            panHandlers={panResponder.panHandlers}
-            onFlip={flipCard}
-            onGrade={finishSwipe}
-            onHeightChange={(height) => setCardHeights((current) =>
-              current[stackWord.id] === height ? current : { ...current, [stackWord.id]: height })}
+      ) : (
+        <RoundReviewHeader
+          eyebrow={`${t("Round")} ${studyRound} · ${t("Card")} ${position + 1} ${t("of")} ${roundWords.length}`}
+          title="Flashcards"
+          subtitle={`${word.cardSrsLevel < CARD_GRADUATION_LEVEL ? `${t("Learning step")} ${word.cardSrsLevel + 1} ${t("of")} ${CARD_GRADUATION_LEVEL}` : `${t("Retention level")} ${word.cardSrsLevel}`} · ${mistakeIds.length} ${t("mistaken")}`}
+          onPreviousCard={position > 0 ? previousCard : undefined}
+        />
+      )}
+      {!celebrating ? <>
+        <View style={styles.progress}>
+          <View
+            style={[
+              styles.fill,
+              { width: `${((position + 1) / roundWords.length) * 100}%` },
+            ]}
           />
-        ))}
-      </View>
+        </View>
+        <View style={[styles.studyStack, {
+          height: (cardHeights[word.id] ?? 300) + (roundWords.length - 1) * CARD_STACK_STEP,
+        }]}>
+          {roundWords.slice(position).map((stackWord, index) => (
+            <StackCard
+              key={stackWord.id}
+              word={stackWord}
+              depth={index}
+              roundIndex={position + index}
+              initialTilt={roundTilts[stackWord.id] ?? 0}
+              active={index === 0}
+              height={cardHeights[stackWord.id] ?? 300}
+              settings={data.settings}
+              translationLanguage={translationLanguage}
+              examples={(data.wordSentenceIndex[stackWord.id] ?? [])
+                .map((id) => data.sentences.find((sentence) => sentence.id === id))
+                .filter(Boolean).slice(0, 3) as Sentence[]}
+              flipped={flipped}
+              exampleIndex={exampleIndex}
+              onExampleIndexChange={setExampleIndex}
+              swipe={swipe}
+              cardSpin={cardSpin}
+              panHandlers={panResponder.panHandlers}
+              onFlip={flipCard}
+              onGrade={finishSwipe}
+              onHeightChange={(height) => setCardHeights((current) =>
+                current[stackWord.id] === height ? current : { ...current, [stackWord.id]: height })}
+            />
+          ))}
+        </View>
+      </> : null}
+      {visibleGraduation ? (
+        <View
+          accessible={celebrating}
+          accessibilityElementsHidden={!celebrating}
+          importantForAccessibility={celebrating ? "auto" : "no-hide-descendants"}
+          pointerEvents={celebrating ? "auto" : "none"}
+          style={!celebrating && styles.stagedGraduation}
+        >
+          <SwipeableGraduation
+            key={visibleGraduation.learned.id}
+            graduation={visibleGraduation}
+            settings={data.settings}
+            active={celebrating}
+            onContinue={continueAfterCelebration}
+          />
+        </View>
+      ) : null}
     </ScrollView>
   );
+}
+
+function RoundReviewHeader({ eyebrow, title, subtitle, onPreviousCard }: {
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+  onPreviousCard?: () => void;
+}) {
+  return <View style={styles.studyHeading}>
+    <View style={styles.studyTitle}>
+      <Header eyebrow={eyebrow} title={title} subtitle={subtitle} />
+    </View>
+    {onPreviousCard && <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Previous card"
+      onPress={onPreviousCard}
+      style={({ pressed }) => [styles.previousCardButton, pressed && styles.previousCardButtonPressed]}
+    >
+      <Ionicons name="arrow-back" size={22} color={colors.green} />
+    </Pressable>}
+  </View>;
 }
 
 function StackCard({ word, depth, roundIndex, initialTilt, active, height, settings, translationLanguage,
@@ -534,10 +628,12 @@ function StackCard({ word, depth, roundIndex, initialTilt, active, height, setti
 function SwipeableGraduation({
   graduation,
   settings,
+  active,
   onContinue,
 }: {
   graduation: Graduation;
   settings: Settings;
+  active: boolean;
   onContinue: () => void;
 }) {
   const t = useTranslation();
@@ -548,9 +644,16 @@ function SwipeableGraduation({
   const { width: screenWidth } = useWindowDimensions();
   const continuing = useRef(false);
   const [showingReplacement, setShowingReplacement] = useState(false);
-  useEffect(() => {
+  useLayoutEffect(() => {
     learnedEntry.setValue(0);
     replacementEntry.setValue(0);
+    if (!active) {
+      swipe.stopAnimation();
+      swipe.setValue({ x: 0, y: 0 });
+      continuing.current = false;
+      setShowingReplacement(false);
+      return;
+    }
     const entrance = Animated.parallel([
       Animated.timing(learnedEntry, {
         toValue: 1,
@@ -567,9 +670,9 @@ function SwipeableGraduation({
     ]);
     entrance.start();
     return () => entrance.stop();
-  }, [graduation.learned.id]);
+  }, [active, graduation.learned.id]);
   useEffect(() => {
-    if (!graduation.replacement || showingReplacement) return;
+    if (!active || !graduation.replacement || showingReplacement) return;
     const animation = Animated.sequence([
       Animated.delay(450),
       Animated.timing(swipeHint, {
@@ -599,7 +702,7 @@ function SwipeableGraduation({
       animation.stop();
       swipeHint.setValue(0);
     };
-  }, [graduation.replacement?.id, showingReplacement]);
+  }, [active, graduation.replacement?.id, showingReplacement]);
   const continueInDirection = (direction: number) => {
     if (continuing.current) return;
     continuing.current = true;
@@ -813,6 +916,7 @@ function GraduationCelebration({
       <Text style={styles.confetti}>🎉</Text>
       <Text style={styles.celebrationTitle}>LEARNED</Text>
       <View style={styles.graduationWordRow}>
+        <ExplanationButton kind="word" text={learned.hanzi} />
         <Text style={styles.learnedHanzi}>{learned.hanzi}</Text>
         <SpeakerButton
           pronunciation={learned}
@@ -840,6 +944,7 @@ function GraduationCelebration({
           <Text style={styles.confetti}>👀</Text>
           <Text style={styles.learnTitle}>LEARN</Text>
           <View style={styles.graduationWordRow}>
+            <ExplanationButton kind="word" text={replacement.hanzi} />
             <Text style={styles.learnedHanzi}>
               {replacement.hanzi}
             </Text>
@@ -1077,6 +1182,13 @@ const styles = StyleSheet.create({
     borderColor: "#B9DDF5",
   },
   graduationStack: { position: "relative" },
+  stagedGraduation: {
+    position: "absolute",
+    top: 0,
+    left: 22,
+    right: 22,
+    opacity: 0,
+  },
   graduationUnderlay: {
     ...StyleSheet.absoluteFillObject,
   },
@@ -1215,6 +1327,21 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     overflow: "hidden",
   },
+  studyHeading: { flexDirection: "row", alignItems: "flex-start" },
+  studyTitle: { flex: 1 },
+  previousCardButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginTop: 24,
+    marginLeft: 12,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.line,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  previousCardButtonPressed: { opacity: 0.55 },
   fill: { height: 5, backgroundColor: colors.coral },
   studyStack: { position: "relative" },
   stackCard: {

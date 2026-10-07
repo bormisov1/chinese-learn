@@ -7,14 +7,19 @@ export const explanationKey = (kind: ExplanationKind, text: string, language: Ap
 
 const hanzi = (text: string) => (text.match(/\p{Script=Han}/gu) ?? []).join('');
 const filled = (value: unknown): value is string => typeof value === 'string' && !!value.trim();
-export function validateWordExplanation(value: unknown, target: string): WordExplanation {
+export const hasWordCharacterAnalysis = (explanation: WordExplanation): boolean =>
+  Array.isArray(explanation?.parts) && explanation.parts.length > 0 && explanation.parts.every(part =>
+    Array.isArray(part?.characters) && part.characters.length > 0 && part.characters.every(character =>
+      filled(character?.semanticComponent) && filled(character?.phoneticComponent) && filled(character?.memoryAssociation)));
+export function validateWordExplanation(value: unknown, target: string, kind: ExplanationKind = 'sentence'): WordExplanation {
   const result = value as WordExplanation;
   const invalid = !result || !filled(result.pinyin) || !filled(result.translation) || !filled(result.summary) || !filled(result.grammar) ||
     !Array.isArray(result.parts) || !result.parts.length ||
     result.parts.some(part => !part || !filled(part.text) || !filled(part.pinyin) || !filled(part.meaning) || !Array.isArray(part.characters) ||
       hanzi(part.text) !== part.characters.map(character => character?.hanzi).join('') ||
       part.characters.some(character => !filled(character?.hanzi) || !filled(character?.pinyin) || !filled(character?.meaning))) ||
-    hanzi(target) !== result.parts.map(part => hanzi(part.text)).join('');
+    hanzi(target) !== result.parts.map(part => hanzi(part.text)).join('') ||
+    (kind === 'word' && !hasWordCharacterAnalysis(result));
   if (invalid) throw new Error('DeepSeek returned an incomplete explanation. Please refresh to try again.');
   return result;
 }

@@ -23,7 +23,13 @@
           "photosPermission": "Choose vocabulary screenshots to import."
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-build-properties",
+        {
+          "ios": { "deploymentTarget": "15.5" }
+        }
+      ]
     ],
     "web": {
       "bundler": "metro",
