@@ -1,5 +1,5 @@
 import { StoreData } from "./types";
-import { bootstrap } from "./backend";
+import { bootstrap } from "./api-client";
 import { applyBootstrapSnapshot } from "./sync-merge";
 export function syncableSnapshot(data: StoreData) {
   const { apiKey: _apiKey, apiKeyValidated: _validated, apiUrl: _apiUrl, model: _model, ...settings } = data.settings;

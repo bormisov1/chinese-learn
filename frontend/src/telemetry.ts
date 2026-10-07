@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
-import { BACKEND_URL } from "./backend";
+import { BACKEND_URL } from "./api-client";
 
 type TelemetryProperties = Record<string, string | number | boolean | undefined>;
 type TelemetryEvent = {

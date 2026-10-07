@@ -30,3 +30,19 @@ test('different targets load independently and a failed request can be retried',
   assert.equal(await requestExplanation('en:word:再见', async () => { calls++; return explanation; }), explanation);
   assert.equal(calls, 2);
 });
+
+test('a remounted page receives previews from the shared request', async () => {
+  let push!: (partial: Partial<WordExplanation>) => void;
+  let finish!: (value: WordExplanation) => void;
+  const previews: string[] = [];
+  const first = requestExplanation('en:word:流', onPartial => {
+    push = onPartial;
+    return new Promise<WordExplanation>(resolve => { finish = resolve; });
+  }, partial => previews.push(`first:${partial.pinyin}`));
+  const second = requestExplanation('en:word:流', async () => { throw new Error('duplicate request'); }, partial => previews.push(`second:${partial.pinyin}`));
+  await Promise.resolve();
+  push({ pinyin: 'liú' });
+  finish(explanation);
+  await Promise.all([first, second]);
+  assert.deepEqual(previews, ['first:liú', 'second:liú']);
+});

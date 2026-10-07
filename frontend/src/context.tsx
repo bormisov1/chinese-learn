@@ -7,7 +7,7 @@ import { fillActivePool } from './card-srs';
 import { replenishAutomaticWords } from './hsk-vocabulary';
 import { Dictionary, loadDictionary } from './dictionary';
 import { refreshWords, switchStoreLanguage } from './language';
-import { Account, authUrl, clearTokens, exchangeCode, getAccount, getTokens } from './backend';
+import { Account, authUrl, clearTokens, exchangeCode, getAccount, getTokens } from './api-client';
 import { bootstrapStore, syncableSnapshot } from './sync';
 import { commitBootstrapResponse, createBootstrapCoordinator } from './sync-coordinator';
 import { initializeTelemetry, track } from './telemetry';

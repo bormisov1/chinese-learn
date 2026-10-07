@@ -2,6 +2,7 @@ import { Database } from "bun:sqlite";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { dirname } from "node:path";
 import { mkdirSync } from "node:fs";
+import { cacheTelegramPicture } from "./avatar";
 
 const port = Number(process.env.PORT ?? 8787);
 const dbPath = process.env.DATABASE_PATH ?? "./data/app.sqlite";
@@ -280,7 +281,8 @@ async function providerProfile(provider: Provider, code: string, verifier: strin
   if (!response.ok) throw new Error("Telegram token exchange failed");
   const tokens = await response.json() as { id_token?: string };
   const profile = await verifyIdToken(String(tokens.id_token ?? ""), "https://oauth.telegram.org", process.env.TELEGRAM_CLIENT_ID ?? "", "https://oauth.telegram.org/.well-known/jwks.json", nonce);
-  return { subject: String(profile.sub), profile: { name: profile.name ?? profile.preferred_username, username: profile.preferred_username, chatId: String(profile.sub), picture: profile.picture } };
+  const picture = await cacheTelegramPicture(profile.picture);
+  return { subject: String(profile.sub), profile: { name: profile.name ?? profile.preferred_username, username: profile.preferred_username, chatId: String(profile.sub), picture } };
 }
 
 async function fetchRequest(request: Request) {
