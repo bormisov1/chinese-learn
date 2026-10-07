@@ -57,7 +57,10 @@ export type WordExplanation = {
   pinyin: string;
   translation: string;
   summary: string;
-  parts: { text: string; pinyin: string; meaning: string; characters: { hanzi: string; pinyin: string; meaning: string }[] }[];
+  parts: { text: string; pinyin: string; meaning: string; characters: {
+    hanzi: string; pinyin: string; meaning: string;
+    semanticComponent?: string; phoneticComponent?: string; memoryAssociation?: string;
+  }[] }[];
   grammar: string;
 };
 export type CachedExplanation = { language: AppLanguage; kind: "word" | "sentence"; text: string; explanation: WordExplanation; updatedAt: number };
