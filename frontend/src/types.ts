@@ -74,6 +74,7 @@ export type Settings = {
   ttsVoiceURI: string;
   ttsRate: number;
   automaticWordAddition: boolean;
+  aiChatEnabled: boolean;
 };
 export type AppLanguage = "en" | "ru" | "th";
 export type PracticeDirection = "zh-ru" | "ru-zh";

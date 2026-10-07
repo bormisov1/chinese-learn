@@ -39,6 +39,7 @@ export const emptyStore: StoreData = {
     ttsVoiceURI: "",
     ttsRate: 0.85,
     automaticWordAddition: false,
+    aiChatEnabled: true,
   },
 };
 

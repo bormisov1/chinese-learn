@@ -98,8 +98,10 @@ export function ChatOverlay() {
     finally { setBusy(false); }
   };
 
+  if (!data.settings.aiChatEnabled) return null;
+
   return <>
-    <Pressable accessibilityRole="button" accessibilityLabel="Open DeepSeek chat" onHoverIn={() => setHovered(true)} onHoverOut={() => setHovered(false)} onPressIn={() => { if (!missingApiKey) setClicked(true); }} onPress={() => { if (missingApiKey) { showMissingApiKeyPrompt(); return; } setClicked(true); setOpen(true); }} style={[styles.launcher, missingApiKey && styles.launcherMissingKey, !missingApiKey && (hovered || clicked) && styles.launcherOpaque]}>
+    <Pressable accessibilityRole="button" accessibilityLabel="Open DeepSeek chat" onHoverIn={() => setHovered(true)} onHoverOut={() => setHovered(false)} onPressIn={() => { if (!missingApiKey) setClicked(true); }} onPress={() => { if (missingApiKey) { showMissingApiKeyPrompt(); return; } setClicked(true); setOpen(true); }} style={[styles.launcher, { top: insets.top + 14 }, missingApiKey && styles.launcherMissingKey, !missingApiKey && (hovered || clicked) && styles.launcherOpaque]}>
       <View style={[styles.launcherRing, missingApiKey && styles.launcherRingMissingKey]}><Ionicons name="hardware-chip-outline" size={25} color={missingApiKey ? '#69726E' : '#D9FFF4'} /></View>
       <View style={[styles.orbitDot, missingApiKey && styles.orbitDotMissingKey]} />
     </Pressable>
@@ -139,7 +141,7 @@ export function ChatOverlay() {
           </View>)}
           {!!error && <Text style={styles.error}>{error}</Text>}
         </ScrollView>
-        {busy && <View accessibilityLabel="DeepSeek is typing" style={styles.typingIndicator}><span className="chat-typing">typing<span className="chat-typing-dot">.</span><span className="chat-typing-dot">.</span><span className="chat-typing-dot">.</span></span></View>}
+        {busy && <View accessibilityLabel="DeepSeek is thinking" style={styles.typingIndicator}><span className="chat-typing">thinking<span className="chat-typing-dot">.</span><span className="chat-typing-dot">.</span><span className="chat-typing-dot">.</span></span></View>}
         </View>
         <View style={styles.promptArea}>
           <Text style={styles.promptLabel}>CHOOSE A PROMPT</Text>
@@ -167,7 +169,7 @@ export function ChatOverlay() {
 }
 
 const styles = StyleSheet.create({
-  launcher: { position: 'absolute', right: 15, bottom: 83, zIndex: 20, width: 51, height: 51, borderRadius: 26, opacity: 0.85, backgroundColor: 'rgba(16, 73, 72, 0.72)', borderWidth: 1, borderColor: 'rgba(157, 255, 226, 0.65)', alignItems: 'center', justifyContent: 'center', shadowColor: '#25E6BD', shadowOpacity: 0.35, shadowRadius: 10, elevation: 8 },
+  launcher: { position: 'absolute', right: 15, zIndex: 20, width: 51, height: 51, borderRadius: 26, opacity: 0.85, backgroundColor: 'rgba(16, 73, 72, 0.72)', borderWidth: 1, borderColor: 'rgba(157, 255, 226, 0.65)', alignItems: 'center', justifyContent: 'center', shadowColor: '#25E6BD', shadowOpacity: 0.35, shadowRadius: 10, elevation: 8 },
   launcherOpaque: { opacity: 1, backgroundColor: '#104948' },
   launcherMissingKey: { opacity: 1, backgroundColor: '#D6DAD7', borderColor: '#AAB3AE', shadowOpacity: 0, elevation: 2 },
   launcherRing: { width: 38, height: 38, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(206, 255, 242, 0.45)', alignItems: 'center', justifyContent: 'center' },
