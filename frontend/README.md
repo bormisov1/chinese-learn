@@ -10,6 +10,19 @@ npm run web
 
 Add a DeepSeek API key under Settings. Vocabulary can be added from typed or pasted Chinese text and by HSK level.
 
+The Handwriting tab lets learners draw one Hanzi at a time, choose a recognition
+candidate, and append it to an editable, copyable output field. Undo removes the
+last stroke; Clear resets the drawing without changing the output. The browser
+uses the existing HanziLookup Rust/WASM worker. Android uses the bundled
+HanziLookupJS matcher. iOS uses the local `modules/hanzi-ink` Expo module with
+Google ML Kit Digital Ink Recognition. The iOS model downloads on first use and
+then runs on device. iOS handwriting needs a new native build and does not work
+in Expo Go. The native module requires iOS 15.5 or later.
+
+The Android matcher and its data are copied from the adjacent handwriting
+example. Its HanziLookupJS code is GPL v3 and the stroke data is under the
+Arphic Public License; both license texts are in `src/handwriting/vendor`.
+
 On first launch the app suggests a supported language from the browser locale and asks the learner to confirm it. The language can be changed later in Settings. A change first downloads and validates the target dictionary, then atomically updates the language and saved word meanings. Download failures leave the current language and study data untouched. Generated sentences are cleared after confirmation because their translations belong to the previous language; vocabulary and SRS progress are preserved.
 
 Word meanings are remembered per language, so custom or dictionary-missing meanings return when the learner switches back.
