@@ -16,7 +16,7 @@ test('removing a selected word unlinks its sentence references and survives a un
     attempts: [], sentenceDataByLanguage: {}, explanations: {}, cardRound: 0, roundCompletions: [], mixQueue: [], mixPosition: 0,
     onboardingComplete: true,
     languageSelected: true,
-    settings: { language: 'en', apiKey: '', apiKeyValidated: false, apiUrl: '', model: '', ttsProvider: '', ttsVoiceURI: '', ttsRate: 1, automaticWordAddition: false },
+    settings: { language: 'en', apiKey: '', apiKeyValidated: false, apiUrl: '', model: '', ttsProvider: '', ttsVoiceURI: '', ttsRate: 1, automaticWordAddition: false, aiChatEnabled: true },
   };
   const removed = removeVocabularyWord(local, '你好');
   assert.deepEqual(removed.words.map(item => item.hanzi), ['学习']);
