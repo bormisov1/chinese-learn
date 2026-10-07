@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+cd "$(dirname "$0")/.."
+
 echo "==> Building iOS app on EAS..."
 npx eas-cli@latest build \
   --platform ios \
