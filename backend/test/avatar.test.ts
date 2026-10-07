@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { cacheTelegramPicture } from "../backend/src/avatar";
+import { cacheTelegramPicture } from "../src/avatar";
 
 test("Telegram avatar bytes are saved as a persistent data URL", async () => {
   const image = new Uint8Array([0xff, 0xd8, 0xff]);
