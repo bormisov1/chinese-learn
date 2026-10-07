@@ -17,6 +17,7 @@ const russianRepairs = new Map(
 export const emptyStore: StoreData = {
   storageVersion: STORAGE_VERSION,
   words: [],
+  removedWordHanzi: [],
   sentences: [],
   wordSentenceIndex: {},
   attempts: [],
@@ -83,6 +84,9 @@ export async function loadStore(): Promise<StoreData> {
         }),
         parsed.cardRound ?? 0,
       ),
+      removedWordHanzi: Array.isArray(parsed.removedWordHanzi)
+        ? parsed.removedWordHanzi.filter((hanzi): hanzi is string => typeof hanzi === 'string')
+        : [],
       cardRound: parsed.cardRound ?? 0,
       roundCompletions: migrateRoundCompletions(parsed.roundCompletions),
       mixQueue: parsed.mixQueue ?? [],

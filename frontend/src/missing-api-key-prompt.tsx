@@ -33,7 +33,7 @@ export function MissingApiKeyPromptProvider({ children }: { children: React.Reac
           </View>
           <View style={styles.actions}>
             <Pressable accessibilityRole="button" onPress={() => setVisible(false)} style={styles.action}>
-              <Text style={styles.actionText}>OK</Text>
+              <Text style={styles.actionText}>Close</Text>
             </Pressable>
             <Pressable accessibilityRole="button" onPress={openSettings} style={[styles.action, styles.settingsAction]}>
               <Text style={[styles.actionText, styles.primaryActionText]}>Open Settings</Text>
