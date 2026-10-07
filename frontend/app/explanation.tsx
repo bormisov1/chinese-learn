@@ -7,7 +7,7 @@ import { explainWordOrSentence } from '@/deepseek';
 import { requestExplanation } from '@/explanation-loading';
 import { Text, useTranslation } from '@/i18n';
 import { colors } from '@/theme';
-import { explanationKey, normalizeExplanationText, type ExplanationKind } from '@/word-explanations';
+import { explanationKey, hasWordCharacterAnalysis, normalizeExplanationText, type ExplanationKind } from '@/word-explanations';
 import { explanationReturnPath } from '@/explanation-navigation';
 import type { WordExplanation } from '@/types';
 
@@ -39,7 +39,7 @@ function ExplanationDetail({ kind, text, cacheKey, returnPath }: { kind: Explana
     finally { setPartial(null); setBusy(false); }
   };
   useEffect(() => {
-    if (!ready || !text || cached) return;
+    if (!ready || !text || (cached && (kind !== 'word' || hasWordCharacterAnalysis(cached.explanation) || !data.settings.apiKey))) return;
     let active = true;
     setBusy(true); setError(''); setPartial(null);
     void requestExplanation(cacheKey, onPartial => explainWordOrSentence(data.settings, kind, text, onPartial), preview => { if (active) setPartial(preview); })
@@ -51,7 +51,7 @@ function ExplanationDetail({ kind, text, cacheKey, returnPath }: { kind: Explana
       .catch(reason => { if (active) setError(reason instanceof Error ? reason.message : 'Could not get explanation.'); })
       .finally(() => { if (active) { setPartial(null); setBusy(false); } });
     return () => { active = false; };
-  }, [cacheKey, ready, !!cached]);
+  }, [cacheKey, ready, cached?.updatedAt, !!data.settings.apiKey]);
   const explanation = partial ?? cached?.explanation;
   const parts = Array.isArray(explanation?.parts) ? explanation.parts : [];
   return <View style={styles.page}>
@@ -71,13 +71,19 @@ function ExplanationDetail({ kind, text, cacheKey, returnPath }: { kind: Explana
           {!!part.meaning && <Text style={styles.meaning}>{part.meaning}</Text>}
           {(Array.isArray(part.characters) ? part.characters : []).map((character, characterIndex) => character && typeof character === 'object' ? <View key={`${character.hanzi ?? ''}-${characterIndex}`} style={styles.characterRow}>
             {!!character.hanzi && <Text style={styles.character}>{character.hanzi}</Text>}
-            <Text style={styles.characterMeaning}>{character.pinyin ?? ''}{character.meaning ? ` · ${character.meaning}` : ''}</Text>
+            <View style={styles.characterDetails}>
+              <Text style={styles.characterMeaning}>{character.pinyin ?? ''}{character.meaning ? ` · ${character.meaning}` : ''}</Text>
+              {!!character.semanticComponent && <Text style={styles.componentNote}><Text style={styles.componentLabel}>{t('Semantic component')}: </Text>{character.semanticComponent}</Text>}
+              {!!character.phoneticComponent && <Text style={styles.componentNote}><Text style={styles.componentLabel}>{t('Phonetic component')}: </Text>{character.phoneticComponent}</Text>}
+              {!!character.memoryAssociation && <Text style={styles.componentNote}><Text style={styles.componentLabel}>{t('Remember it')}: </Text>{character.memoryAssociation}</Text>}
+            </View>
           </View> : null)}
         </View> : null)}
         {!!explanation.grammar && <Text style={styles.summary}>{explanation.grammar}</Text>}
       </> : null}
       {!cached && !partial && !error && ready && <ActivityIndicator accessibilityLabel={t('Loading explanation')} color={colors.green} style={{ marginTop: 20 }} />}
       {!!partial && busy && <ActivityIndicator accessibilityLabel={t('Loading explanation')} color={colors.green} style={{ marginTop: 10 }} />}
+      {!!cached && !partial && busy && <ActivityIndicator accessibilityLabel={t('Loading explanation')} color={colors.green} style={{ marginTop: 10 }} />}
       {!!error && <Text style={styles.error}>{error} {t('Use Refresh to try again.')}</Text>}
     </ScrollView>
   </View>;
@@ -96,8 +102,11 @@ const styles = StyleSheet.create({
   card: { backgroundColor: colors.card, padding: 17, borderRadius: 16, gap: 7, marginTop: 8 },
   part: { fontSize: 21, fontWeight: '700', color: colors.green },
   meaning: { fontSize: 16, color: '#444' },
-  characterRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 9 },
+  characterRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 9 },
   character: { fontSize: 26, fontWeight: '700', color: colors.green },
-  characterMeaning: { fontSize: 15, flex: 1, color: '#444' },
+  characterDetails: { flex: 1, gap: 5 },
+  characterMeaning: { fontSize: 15, color: '#444' },
+  componentNote: { fontSize: 14, lineHeight: 20, color: '#444' },
+  componentLabel: { fontWeight: '700', color: colors.green },
   error: { color: '#B54747', fontSize: 15 },
 });
