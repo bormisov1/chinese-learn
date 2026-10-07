@@ -23,7 +23,7 @@ import { useStore } from "@/context";
 import { colors } from "@/theme";
 import { Header, shell, SpeakerButton } from "@/ui";
 import { Button } from "@/ui";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { Settings as SettingsData, Word } from "@/types";
 import { validateApiKey } from "@/deepseek";
 import { ExplanationButton } from "@/explanation-button";
@@ -41,8 +41,12 @@ import { parseBackup } from "@/backup";
 import { chooseBackup, downloadBackup } from "@/backup-files";
 
 export default function Settings() {
+  const params = useLocalSearchParams<{ focus?: string; request?: string }>();
   const { data, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, importWords, patch, retryDictionary, selectLanguage, setAutomaticWordAddition, account, authBusy, authError, signIn, signOut, createBackup, mergeBackup } = useStore();
   const scrollRef = useRef<ScrollView>(null);
+  const generalMeasured = useRef(false);
+  const apiKeyOffset = useRef<number | null>(null);
+  const handledFocusRequest = useRef<string | null>(null);
   const sectionOffsets = useRef<Record<SettingsSection, number>>({
     general: 0,
     audio: 0,
@@ -165,8 +169,20 @@ export default function Settings() {
       useNativeDriver: true,
     }).start();
   }, [activeSection, indicatorPosition]);
+  const focusApiKey = () => {
+    if (params.focus !== "deepseek-key" || !generalMeasured.current || apiKeyOffset.current === null) return;
+    const request = params.request ?? "direct";
+    if (handledFocusRequest.current === request) return;
+    handledFocusRequest.current = request;
+    requestAnimationFrame(() => scrollRef.current?.scrollTo({
+      y: Math.max(0, sectionOffsets.current.general + apiKeyOffset.current! - 24),
+      animated: true,
+    }));
+  };
+  useEffect(focusApiKey, [params.focus, params.request]);
   const recordSection = (section: SettingsSection) => (event: LayoutChangeEvent) => {
     sectionOffsets.current[section] = event.nativeEvent.layout.y;
+    if (section === "general") { generalMeasured.current = true; focusApiKey(); }
   };
   const trackSection = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const position = event.nativeEvent.contentOffset.y + 120;
@@ -293,13 +309,15 @@ export default function Settings() {
             </View>
           ) : null}
         </View>
-        <Field
-          label="DEEPSEEK API KEY"
-          value={data.settings.apiKey}
-          onChangeText={updateApiKey}
-          secureTextEntry
-          placeholder="sk-…"
-        />
+        <View onLayout={event => { apiKeyOffset.current = event.nativeEvent.layout.y; focusApiKey(); }}>
+          <Field
+            label="DEEPSEEK API KEY"
+            value={data.settings.apiKey}
+            onChangeText={updateApiKey}
+            secureTextEntry
+            placeholder="sk-…"
+          />
+        </View>
         <Pressable
           accessibilityRole="link"
           onPress={() => void Linking.openURL("https://api-docs.deepseek.com/api/deepseek-api/")}

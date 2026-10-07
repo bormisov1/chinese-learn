@@ -31,6 +31,16 @@ export function recordRoundCompletion(
   };
 }
 
+export function undoRoundCompletion(
+  completions: RoundCompletion[],
+  round: number,
+  completedAt: number,
+): RoundCompletion[] {
+  return completions.filter((item) =>
+    item.round !== round || item.completedAt !== completedAt
+  );
+}
+
 export function roundsByDay(
   completions: RoundCompletion[],
   now = Date.now(),

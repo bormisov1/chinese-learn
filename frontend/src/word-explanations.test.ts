@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { explanationKey, mergeExplanations, validateWordExplanation } from './word-explanations';
+import { explanationKey, hasWordCharacterAnalysis, mergeExplanations, validateWordExplanation } from './word-explanations';
 import { applyBootstrapSnapshot } from './sync-merge';
 import { mergeBackupData, createBackup } from './backup';
+import { wordExplanationPrompt } from './prompts';
 import type { CachedExplanation, StoreData } from './types';
 
 const emptyStore: StoreData = {
@@ -26,6 +27,34 @@ test('rejects explanations that omit target characters or pinyin before caching'
   assert.equal(validateWordExplanation(entry(1, 'hello').explanation, '你好').translation, 'hello');
   assert.throws(() => validateWordExplanation(entry(1, 'hello').explanation, '你好啊'), /incomplete/);
   assert.throws(() => validateWordExplanation({ ...entry(1, 'hello').explanation, pinyin: '' }, '你好'), /incomplete/);
+});
+
+test('word explanations require component notes and a memory association for every Hanzi', () => {
+  const explanation = entry(1, 'hello').explanation;
+  const detailed = { ...explanation, parts: explanation.parts.map(part => ({ ...part, characters: part.characters.map(character => ({
+    ...character,
+    semanticComponent: 'Meaning component or none, with a reason.',
+    phoneticComponent: 'Sound component or none, with a reason.',
+    memoryAssociation: 'A memorable link to the character.',
+  })) })) };
+  assert.equal(validateWordExplanation(detailed, '你好', 'word'), detailed);
+  assert.equal(hasWordCharacterAnalysis(detailed), true);
+  assert.equal(hasWordCharacterAnalysis(explanation), false);
+  assert.throws(() => validateWordExplanation(explanation, '你好', 'word'), /incomplete/);
+  const missingOne = { ...detailed, parts: [{ ...detailed.parts[0], characters: [
+    detailed.parts[0].characters[0], { ...detailed.parts[0].characters[1], phoneticComponent: '' },
+  ] }] };
+  assert.throws(() => validateWordExplanation(missingOne, '你好', 'word'), /incomplete/);
+  assert.equal(validateWordExplanation(explanation, '你好', 'sentence'), explanation);
+});
+
+test('word prompt requests component analysis without inventing an absent component', () => {
+  const prompt = wordExplanationPrompt('en', 'word', '你好');
+  assert.match(prompt, /semanticComponent/);
+  assert.match(prompt, /phoneticComponent/);
+  assert.match(prompt, /memoryAssociation/);
+  assert.match(prompt, /rather than inventing one/);
+  assert.doesNotMatch(wordExplanationPrompt('en', 'sentence', '你好'), /memoryAssociation/);
 });
 
 test('sync merges concurrent explanation entries and latest refresh wins', () => {
