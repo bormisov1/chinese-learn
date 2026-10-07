@@ -231,7 +231,8 @@ provision_branch_host() {
       --non-interactive --agree-tos --no-eff-email
   fi
 
-  cat >"$config_staging" <<NGINX
+  if [[ "$CURRENT_BRANCH" == dev ]]; then
+    cat >"$config_staging" <<NGINX
 server {
     listen 8443 ssl http2 proxy_protocol;
     server_name $DEPLOY_HOST;
@@ -267,6 +268,28 @@ server {
     }
 }
 NGINX
+  else
+    cat >"$config_staging" <<NGINX
+server {
+    listen 8443 ssl http2 proxy_protocol;
+    server_name $DEPLOY_HOST;
+
+    set_real_ip_from 127.0.0.1;
+    real_ip_header proxy_protocol;
+
+    ssl_certificate /etc/letsencrypt/live/$DEPLOY_HOST/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$DEPLOY_HOST/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    root $DEPLOY_TARGET;
+    index index.html;
+
+    location / {
+        try_files \$uri \$uri/ /index.html;
+    }
+}
+NGINX
+  fi
   sudo install -m 0644 "$config_staging" "$config_path"
   rm -f -- "$config_staging"
   sudo ln -sfn "$config_path" "$NGINX_SITES_ENABLED/chinese-learn-$DEPLOY_SLUG"
