@@ -333,7 +333,20 @@ export default function Settings() {
         />
         <Text style={styles.modelRouting}>
           All AI requests use DeepSeek V4 Flash.
-        </Text>
+</Text>
+        <View style={styles.aiChatRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.privacyTitle}>AI chat</Text>
+            <Text style={styles.help}>
+              Show the floating AI chat button. Turn off to remove AI chat from the app.
+            </Text>
+          </View>
+          <Switch
+            value={data.settings.aiChatEnabled}
+            onValueChange={(value) => update("aiChatEnabled", value)}
+            trackColor={{ false: colors.line, true: colors.green }}
+          />
+        </View>
         {data.settings.apiKey ? (
           <Text
             style={[
@@ -929,6 +942,7 @@ const styles = StyleSheet.create({
   deepSeekValidated: { backgroundColor: "#EAF7ED", borderColor: "#AED8B7" },
   validationStatus: { color: colors.muted, marginTop: -4, marginBottom: 14 },
   modelRouting: { color: colors.muted, lineHeight: 20, marginBottom: 18 },
+  aiChatRow: { flexDirection: "row", alignItems: "center", gap: 14, marginTop: -6 },
   validationSuccess: { color: colors.green, fontWeight: "700" },
   apiKeyGuide: {
     alignSelf: "flex-start",

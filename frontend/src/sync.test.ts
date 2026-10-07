@@ -18,7 +18,7 @@ const store = (overrides: Partial<StoreData> = {}) => ({
   mixPosition: 0,
   onboardingComplete: false,
   languageSelected: false,
-  settings: { language: "en", apiKey: "", apiKeyValidated: false, apiUrl: "", model: "", ttsProvider: "browser", ttsVoiceURI: "", ttsRate: 1, automaticWordAddition: false },
+  settings: { language: "en", apiKey: "", apiKeyValidated: false, apiUrl: "", model: "", ttsProvider: "browser", ttsVoiceURI: "", ttsRate: 1, automaticWordAddition: false, aiChatEnabled: true },
   ...overrides,
 } as StoreData);
 
