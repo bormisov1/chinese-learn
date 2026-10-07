@@ -30,7 +30,10 @@ test('all DeepSeek tasks request Flash even with a saved Pro model', async () =>
       : system.startsWith('Translate')
         ? { words: [{ hanzi: '你好', pinyin: 'nǐ hǎo', translation: 'hello' }] }
         : system.startsWith('You are a precise')
-          ? { pinyin: 'nǐ hǎo', translation: 'hello', summary: 'greeting', grammar: 'greeting', parts: [{ text: '你好', pinyin: 'nǐ hǎo', meaning: 'hello', characters: [{ hanzi: '你', pinyin: 'nǐ', meaning: 'you' }, { hanzi: '好', pinyin: 'hǎo', meaning: 'good' }] }] }
+          ? { pinyin: 'nǐ hǎo', translation: 'hello', summary: 'greeting', grammar: 'greeting', parts: [{ text: '你好', pinyin: 'nǐ hǎo', meaning: 'hello', characters: [
+            { hanzi: '你', pinyin: 'nǐ', meaning: 'you', semanticComponent: '亻 hints at a person.', phoneticComponent: '尔 suggests the sound.', memoryAssociation: 'Picture a person greeting you.' },
+            { hanzi: '好', pinyin: 'hǎo', meaning: 'good', semanticComponent: '女 and 子 combine in the character.', phoneticComponent: 'No clear phonetic component.', memoryAssociation: 'Imagine a happy family saying hello.' },
+          ] }] }
           : {};
     return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(result) } }] }), { status: 200 });
   };

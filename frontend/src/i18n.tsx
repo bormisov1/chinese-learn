@@ -9,6 +9,9 @@ export { LANGUAGES } from "./languages";
 const contextualTranslations: Partial<Record<AppLanguage, Record<string, string>>> = {
   ru: {
     "Explanation": "Объяснение",
+    "Semantic component": "Смысловой компонент",
+    "Phonetic component": "Фонетический компонент",
+    "Remember it": "Как запомнить",
     "Back": "Назад",
     "Refresh explanation": "Обновить объяснение",
     "Get explanation": "Получить объяснение",
@@ -56,6 +59,9 @@ const contextualTranslations: Partial<Record<AppLanguage, Record<string, string>
   },
   th: {
     "Explanation": "คำอธิบาย",
+    "Semantic component": "ส่วนบอกความหมาย",
+    "Phonetic component": "ส่วนบอกเสียง",
+    "Remember it": "วิธีจำ",
     "Back": "กลับ",
     "Refresh explanation": "สร้างคำอธิบายใหม่",
     "Get explanation": "สร้างคำอธิบาย",

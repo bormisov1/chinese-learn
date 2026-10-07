@@ -67,7 +67,7 @@ export async function explainWordOrSentence(settings: Settings, kind: 'word' | '
   const result = response.headers.get('content-type')?.includes('text/event-stream')
     ? await readExplanationStream(response, onPartial)
     : JSON.parse((await response.json()).choices?.[0]?.message?.content ?? '{}');
-  return validateWordExplanation(result, text);
+  return validateWordExplanation(result, text, kind);
 }
 export async function translateWords(settings: Settings, words: string[], language: AppLanguage): Promise<ImportedWord[]> {
   const translated: ImportedWord[] = [];
