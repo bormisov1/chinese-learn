@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f5ee">
+  <title>汉 — Logo explorations</title>
+  <style>
+    :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f7f5ee; color: #242b26; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    .page { max-width: 1440px; margin: auto; padding: 34px clamp(18px, 4vw, 64px) 72px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid #dadbd2; padding-bottom: 24px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 800; letter-spacing: .01em; }
+    .brand-mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; background: #315b49; color: white; font: 700 22px "Noto Sans CJK SC", "PingFang SC", sans-serif; }
+    .header-note { color: #7d837b; font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+    .intro { display: flex; justify-content: space-between; align-items: end; gap: 24px; padding: 58px 0 42px; }
+    .eyebrow { margin: 0 0 13px; color: #b75d43; font-size: 12px; font-weight: 800; letter-spacing: .17em; text-transform: uppercase; }
+    h1 { margin: 0; font-size: clamp(42px, 6.2vw, 82px); letter-spacing: -.065em; line-height: .99; font-weight: 720; }
+    .intro p:last-child { margin: 19px 0 0; max-width: 560px; color: #717970; font-size: 16px; line-height: 1.55; }
+    .count { white-space: nowrap; color: #aeb6a9; font-size: clamp(56px, 8vw, 110px); line-height: .8; letter-spacing: -.08em; font-weight: 700; }
+    .count small { color: #8f9b90; font-size: 14px; letter-spacing: 0; font-weight: 700; vertical-align: top; }
+    .grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }
+    .card { min-width: 0; border: 1px solid #e5e6dc; border-radius: 19px; overflow: hidden; background: #fffefa; transition: transform .18s ease, box-shadow .18s ease; }
+    .card:hover { transform: translateY(-3px); box-shadow: 0 14px 26px #243d2912; }
+    .art { display: grid; place-items: center; min-height: 215px; padding: 28px 16px 18px; background: #f3f2ec; }
+    .art svg { display: block; width: min(100%, 160px); height: auto; filter: drop-shadow(0 9px 12px #26382912); }
+    .meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 16px 17px 18px; }
+    .meta h2 { margin: 0; font-size: 14px; line-height: 1.2; font-weight: 760; }
+    .meta p { margin: 6px 0 0; color: #8b9189; font-size: 11px; line-height: 1.2; }
+    .number { align-self: start; color: #b0b6ad; font-size: 11px; font-variant-numeric: tabular-nums; font-weight: 700; }
+    footer { display: flex; justify-content: space-between; gap: 15px; margin-top: 35px; padding-top: 17px; border-top: 1px solid #dadbd2; color: #8a9188; font-size: 12px; }
+    @media (max-width: 1100px) { .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+    @media (max-width: 800px) { .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } .art { min-height: 190px; } }
+    @media (max-width: 600px) { .page { padding-top: 20px; } .header-note, .count { display: none; } .intro { padding: 42px 0 31px; } .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } .art { min-height: 150px; padding: 20px 12px 12px; } .art svg { width: min(100%, 122px); } .meta { padding: 12px; } .meta h2 { font-size: 12px; } .meta p { font-size: 10px; } footer { line-height: 1.5; } }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header><div class="brand"><span class="brand-mark" lang="zh-Hans">汉</span> Hanzi Deck</div><span class="header-note">Identity exploration / 2026</span></header>
+    <section class="intro" aria-labelledby="title">
+      <div><p class="eyebrow">App icon concepts</p><h1 id="title">One character.<br>Twenty directions.</h1><p>Twenty simple ways to make 汉 feel at home on your screen. Each mark is drawn as a scalable vector.</p></div>
+      <div class="count" aria-hidden="true">20<small> / 20</small></div>
+    </section>
+    <div class="grid" id="gallery"></div>
+    <footer><span>汉 · hàn · Chinese language</span><span>Hanzi Deck — logo study</span></footer>
+  </main>
+  <script>
+    const sans = '"Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", sans-serif';
+    const serif = '"Noto Serif CJK SC", "Songti SC", "SimSun", serif';
+    const han = (fill, size = 92, y = 108, weight = 700, family = sans, extra = '') => `<text x="80" y="${y}" text-anchor="middle" font-family='${family}' font-size="${size}" font-weight="${weight}" fill="${fill}" ${extra}>汉</text>`;
+    const tile = (fill, radius = 34) => `<rect width="160" height="160" rx="${radius}" fill="${fill}"/>`;
+    const concepts = [
+      { name: 'Jade', note: 'Quiet and familiar', art: `${tile('#315b49')}${han('#fffdf3')}<circle cx="126" cy="32" r="5" fill="#f19472"/>` },
+      { name: 'Seal', note: 'Traditional stamp', art: `${tile('#ba4c3b', 21)}<rect x="12" y="12" width="136" height="136" rx="11" fill="none" stroke="#fff1d8" stroke-width="2"/>${han('#fff1d8', 89, 108, 800, serif)}` },
+      { name: 'Ink', note: 'Brush and paper', art: `${tile('#ede7d7')}<circle cx="80" cy="79" r="60" fill="none" stroke="#222924" stroke-width="2" opacity=".7"/><path d="M37 129c27 5 59 5 87-1" fill="none" stroke="#c65d48" stroke-width="4" stroke-linecap="round"/>${han('#252d29', 89, 108, 700, serif)}` },
+      { name: 'Outline', note: 'Open and precise', art: `${tile('#fcfbf5', 27)}<rect x="14" y="14" width="132" height="132" rx="24" fill="none" stroke="#356c5b" stroke-width="3"/>${han('#356c5b', 91, 107, 500)}` },
+      { name: 'Orbit', note: 'A learning journey', art: `${tile('#182d38', 80)}<circle cx="80" cy="80" r="66" fill="none" stroke="#6eaaa2" stroke-width="1.5" stroke-dasharray="5 7"/><circle cx="122" cy="28" r="7" fill="#f6bb70"/>${han('#f8f3e7', 84, 106, 650)}` },
+      { name: 'Paper cut', note: 'Bold negative space', art: `${tile('#f2d9c9', 36)}<path d="M25 24h110v112H25z" fill="#bf4539"/><path d="M25 24l15 15m95-15-15 15M25 136l15-15m95 15-15-15" stroke="#f2d9c9" stroke-width="6"/>${han('#fff6e7', 87, 107, 800)}` },
+      { name: 'Electric', note: 'Bright digital edge', art: `${tile('#1425a1', 28)}<path d="M25 37h38M97 123h38" stroke="#8adbd4" stroke-width="6" stroke-linecap="round"/>${han('#fbfbf4', 91, 108, 700)}<circle cx="127" cy="32" r="6" fill="#eefa5f"/>` },
+      { name: 'Sunrise', note: 'Warm daily practice', art: `${tile('#f7c07c', 34)}<circle cx="80" cy="84" r="55" fill="#e9714d"/><path d="M22 121h116" stroke="#a94135" stroke-width="5" stroke-linecap="round"/>${han('#fff5df', 88, 107, 800)}` },
+      { name: 'Soft focus', note: 'Playful color', art: `${tile('#d7c9e9', 40)}<circle cx="119" cy="42" r="26" fill="#f2a7a2"/><circle cx="47" cy="123" r="27" fill="#adcdb5"/>${han('#473662', 89, 108, 700)}` },
+      { name: 'Study lines', note: 'Notebook rhythm', art: `${tile('#eaf0e8', 31)}<path d="M25 34h110M25 126h110" stroke="#a8bdaa" stroke-width="2"/>${han('#2d6150', 88, 106, 700)}<path d="M50 137h60" stroke="#d88366" stroke-width="5" stroke-linecap="round"/>` },
+      { name: 'Editorial', note: 'A clear statement', art: `${tile('#fffefa', 16)}<rect x="0" y="0" width="16" height="160" fill="#bc5b43"/>${han('#222923', 99, 111, 800, serif)}` },
+      { name: 'Fold', note: 'Page turned forward', art: `${tile('#2f665a', 32)}<path d="M109 0h25q26 0 26 26v25z" fill="#aad6b2"/><path d="M109 0v25q0 26 26 26h25" fill="#6db398"/>${han('#fffaf0', 86, 107, 700)}` },
+      { name: 'Blocks', note: 'Built one stroke at a time', art: `${tile('#144f59', 25)}<rect x="16" y="17" width="39" height="39" rx="8" fill="#6db2ab"/><rect x="105" y="105" width="39" height="39" rx="8" fill="#e9ad6d"/>${han('#fff9ed', 91, 109, 800)}` },
+      { name: 'Calligraphy', note: 'Literary and calm', art: `${tile('#f5f0e6', 35)}<path d="M31 128c37 8 72 6 100-4" fill="none" stroke="#d6cfbd" stroke-width="2"/>${han('#212a25', 100, 111, 600, serif)}<rect x="119" y="25" width="15" height="15" rx="2" fill="#bd4c3f"/>` },
+      { name: 'Duotone', note: 'Warm contrast', art: `${tile('#f9f5ee', 80)}<circle cx="81" cy="81" r="62" fill="#e78468"/><path d="M80 19a62 62 0 0 1 0 124z" fill="#f5bb83"/>${han('#253d35', 89, 108, 800)}` },
+      { name: 'Emblem', note: 'A little badge', art: `${tile('#e9ece1', 80)}<circle cx="80" cy="80" r="66" fill="#315847"/><circle cx="80" cy="80" r="56" fill="none" stroke="#eacb8d" stroke-width="2"/>${han('#fff6dc', 78, 103, 700, serif)}<circle cx="80" cy="132" r="3" fill="#eacb8d"/>` },
+      { name: 'Echo', note: 'Motion in a mark', art: `${tile('#f1ded2', 30)}${han('#dd9e84', 88, 111, 800, sans, 'transform="translate(8 7)"')}${han('#653e3d', 88, 105, 800)}` },
+      { name: 'Dot grid', note: 'Modern learning', art: `${tile('#f4f2e9', 29)}<g fill="#c9d8cb">${Array.from({length: 25}, (_, i) => `<circle cx="${32 + i % 5 * 24}" cy="${32 + Math.floor(i / 5) * 24}" r="3"/>`).join('')}</g>${han('#345d4e', 90, 107, 750)}` },
+      { name: 'Split', note: 'Confident geometry', art: `${tile('#3356a5', 31)}<path d="M0 88L160 24v111q0 25-25 25H25Q0 160 0 135z" fill="#172d67"/>${han('#fff9e6', 91, 108, 800)}` },
+      { name: 'Midnight', note: 'Small and timeless', art: `${tile('#202b2a', 32)}<rect x="17" y="17" width="126" height="126" rx="22" fill="none" stroke="#c9ac74" stroke-width="1.5"/>${han('#e8d3a0', 89, 108, 650, serif)}<circle cx="129" cy="129" r="3" fill="#c9ac74"/>` },
+    ];
+    document.getElementById('gallery').innerHTML = concepts.map((item, index) => `
+      <article class="card">
+        <div class="art"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="${item.name} logo concept featuring 汉"><title>${item.name} logo</title>${item.art}</svg></div>
+        <div class="meta"><div><h2>${item.name}</h2><p>${item.note}</p></div><span class="number">${String(index + 1).padStart(2, '0')}</span></div>
+      </article>`).join('');
+  </script>
+</body>
+</html>
