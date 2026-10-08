@@ -1,10 +1,10 @@
-import type { ChatPreset, ChatReply } from './chat';
+import { CHAT_PRESETS, type ChatPreset, type ChatReply } from './chat';
 
 export type ChatMessage = { role: 'user'; text: string } | { role: 'assistant'; text: string; reply: ChatReply };
 export type Conversation = { id: string; title: string; preset: ChatPreset; messages: ChatMessage[]; updatedAt: number };
 
 const KEY = 'hanzi-deck:chat-history:v1';
-const presets: ChatPreset[] = ['none', 'words', 'hanzi', 'reply'];
+const presets = CHAT_PRESETS.map(item => item.id);
 
 export function loadChatHistory(storage: Pick<Storage, 'getItem'> = globalThis.localStorage): Conversation[] {
   try {
