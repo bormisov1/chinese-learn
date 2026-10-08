@@ -15,12 +15,22 @@
         "ITSAppUsesNonExemptEncryption": false
       }
     },
+    "android": {
+      "package": "com.bormisov.hanzideck",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon-foreground.png",
+        "backgroundColor": "#F7C07C"
+      },
+      "permissions": []
+    },
     "plugins": [
       "expo-router",
       [
         "expo-image-picker",
         {
-          "photosPermission": "Choose vocabulary screenshots to import."
+          "photosPermission": "Choose vocabulary screenshots to import.",
+          "cameraPermission": false,
+          "microphonePermission": false
         }
       ],
       "expo-font",
@@ -28,6 +38,14 @@
         "expo-build-properties",
         {
           "ios": { "deploymentTarget": "15.5" }
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "backgroundColor": "#F7F5EE",
+          "imageWidth": 180
         }
       ]
     ],
