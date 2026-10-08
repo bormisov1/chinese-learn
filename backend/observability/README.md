@@ -21,3 +21,14 @@ starts/completions. Round number, mode, language and bounded result dimensions
 are retained. Telegram login telemetry additionally stores the verified chat ID,
 full name, and username as requested; learner text, words, answers, and API
 keys are not collected.
+
+iOS card rounds also send two `card_transition_timed` events: `round_start`
+records the time from pressing Start until two frames after the first card
+commits; `round_summary` records the average and worst card transition, plus
+the worst time to receive the native swipe callback, the worst time from that
+callback until the next screen is ready, and the last card's completion time.
+The app sends these only after the measured frame and flushes them to the
+backend, so the measurement does not wait for telemetry. The values are stored
+in `analytics_events.properties_json`
+and exported as `card_transition_seconds` histograms by stage. No word or
+answer data is included.
