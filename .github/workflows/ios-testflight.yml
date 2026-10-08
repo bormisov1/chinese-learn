@@ -55,6 +55,7 @@ jobs:
           npm ci
           npm test
           npm run typecheck
+          npm run audit:i18n
       - name: Set a unique App Store build number
         run: |
           node - <<'NODE'

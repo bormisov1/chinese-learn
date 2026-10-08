@@ -52,6 +52,28 @@ test('chat progressively decodes JSON answer text and completes an SSE response'
   } finally { globalThis.fetch = originalFetch; }
 });
 
+test('chat accepts SSE replies even when a proxy omits the event-stream content type', async () => {
+  const originalFetch = globalThis.fetch;
+  const reply = { answer: 'Доброе утро!', words: [] };
+  globalThis.fetch = async () => new Response(
+    `data: ${JSON.stringify({ choices: [{ delta: { content: JSON.stringify(reply) } }] })}\n\ndata: [DONE]\n\n`,
+    { headers: { 'content-type': 'text/plain' } },
+  );
+  try {
+    const settings: Settings = { language: 'ru', apiKey: 'test-key', apiKeyValidated: true, apiUrl: 'https://example.com/chat', model: 'deepseek-v4-flash', ttsProvider: 'browser', ttsVoiceURI: '', ttsRate: 1, automaticWordAddition: false, aiChatEnabled: true };
+    assert.deepEqual(await requestChatReply(settings, 'none', [{ role: 'user', content: 'Доброе утро' }]), reply);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test('chat gives a useful error when DeepSeek cuts off JSON', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ choices: [{ message: { content: '{"answer":"unfinished' } }] }));
+  try {
+    const settings: Settings = { language: 'en', apiKey: 'test-key', apiKeyValidated: true, apiUrl: 'https://example.com/chat', model: 'deepseek-v4-flash', ttsProvider: 'browser', ttsVoiceURI: '', ttsRate: 1, automaticWordAddition: false, aiChatEnabled: true };
+    await assert.rejects(requestChatReply(settings, 'none', [{ role: 'user', content: 'Hello' }]), /incomplete reply/);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test('first chat request asks for a 2–5 word title with the selected prompt', async () => {
   const originalFetch = globalThis.fetch;
   const requests: { messages: { role: string; content: string }[] }[] = [];

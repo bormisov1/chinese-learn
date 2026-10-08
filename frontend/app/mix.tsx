@@ -130,7 +130,7 @@ export default function Mix() {
 
   return (
     <ScrollView style={shell.page} contentContainerStyle={shell.content} keyboardShouldPersistTaps="handled">
-      <Header eyebrow={`Mix · ${item.mode}${listening ? ` · ${item.sourceKind}` : ""}`} title="Everything in one round." subtitle={`${position + 1} of ${queue.length} · words, sentences, and listening`} />
+      <Header eyebrow={`${t("Mix")} · ${t(item.mode)}${listening ? ` · ${t(item.sourceKind)}` : ""}`} title="Everything in one round." subtitle={`${position + 1} ${t("of")} ${queue.length} · ${t("words, sentences, and listening")}`} />
       {sentence && !listening && !answered && <View style={styles.direction}>
         <Button secondary={!chineseFirst} label={`${t("Chinese")} → ${LANGUAGES.find(item => item.code === data.settings.language)?.nativeLabel}`} onPress={() => { setDirection("zh-ru"); reset(); }} />
         <Button secondary={chineseFirst} label={`${LANGUAGES.find(item => item.code === data.settings.language)?.nativeLabel} → ${t("Chinese")}`} onPress={() => { setDirection("ru-zh"); reset(); }} />

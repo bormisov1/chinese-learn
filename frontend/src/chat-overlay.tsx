@@ -1,14 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useRef, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, View, type PointerEvent as NativePointerEvent, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from './context';
-import { Text } from './i18n';
+import { Text, TextInput } from './i18n';
 import { CHAT_PRESETS, ChatPreset, ChatTurn, ChatWord, addableChatWords, chatTitleForQuestion, requestChatReply } from './chat';
-import { ChatMessage, Conversation, loadChatHistory, saveChatHistory } from './chat-history';
+import { CHAT_HISTORY_KEY, ChatMessage, Conversation, loadChatHistory, parseChatHistory, saveChatHistory } from './chat-history';
 import { colors } from './theme';
 import { removeVocabularyWord } from './vocabulary-selection';
 import { useMissingApiKeyPrompt } from './missing-api-key-prompt';
+import { ChatLauncherPosition, clampChatLauncherPosition, loadChatLauncherPosition, saveChatLauncherPosition } from './chat-launcher-position';
 
 export function ChatOverlay() {
   const { data, dictionary, importWords, patch } = useStore();
@@ -19,13 +21,19 @@ export function ChatOverlay() {
   const [hovered, setHovered] = useState(false);
   const [clicked, setClicked] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [conversations, setConversations] = useState<Conversation[]>(loadChatHistory);
-  const [activeId, setActiveId] = useState<string | null>(() => loadChatHistory()[0]?.id ?? null);
+  const [conversations, setConversations] = useState<Conversation[]>(() => Platform.OS === 'web' ? loadChatHistory() : []);
+  const [activeId, setActiveId] = useState<string | null>(() => Platform.OS === 'web' ? loadChatHistory()[0]?.id ?? null : null);
+  const [historyReady, setHistoryReady] = useState(Platform.OS === 'web');
   const [draftPreset, setDraftPreset] = useState<ChatPreset>('words');
   const [input, setInput] = useState('');
   const [pendingRemoval, setPendingRemoval] = useState<ChatWord | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [launcherPosition, setLauncherPosition] = useState<ChatLauncherPosition | null>(() => Platform.OS === 'web' ? loadChatLauncherPosition() : null);
+  const launcherPositionRef = useRef(launcherPosition);
+  launcherPositionRef.current = launcherPosition;
+  const launcherDrag = useRef<{ startX: number; startY: number; origin: ChatLauncherPosition; moved: boolean } | null>(null);
+  const suppressLauncherPress = useRef(false);
   const conversationsRef = useRef(conversations);
   conversationsRef.current = conversations;
   const active = conversations.find(item => item.id === activeId);
@@ -36,15 +44,76 @@ export function ChatOverlay() {
   const missingApiKey = !data.settings.apiKey.trim();
 
   useEffect(() => {
-    const timer = setTimeout(() => { try { saveChatHistory(conversations); } catch { /* Storage can be disabled by the browser. */ } }, 300);
-    return () => clearTimeout(timer);
-  }, [conversations]);
+    if (Platform.OS !== 'web') return;
+    const fit = (position: ChatLauncherPosition) => clampChatLauncherPosition(position, window.innerWidth, window.innerHeight, insets.top, insets.bottom);
+    const keepVisible = () => {
+      const current = launcherPositionRef.current;
+      if (!current) return;
+      const next = fit(current);
+      if (next.x !== current.x || next.y !== current.y) {
+        launcherPositionRef.current = next;
+        setLauncherPosition(next);
+        saveChatLauncherPosition(next);
+      }
+    };
+    const move = (event: PointerEvent) => {
+      const drag = launcherDrag.current;
+      if (!drag) return;
+      const dx = event.pageX - drag.startX;
+      const dy = event.pageY - drag.startY;
+      if (!drag.moved && Math.hypot(dx, dy) < 6) return;
+      drag.moved = true;
+      suppressLauncherPress.current = true;
+      const next = fit({ x: drag.origin.x + dx, y: drag.origin.y + dy });
+      launcherPositionRef.current = next;
+      setLauncherPosition(next);
+    };
+    const finish = () => {
+      if (launcherDrag.current?.moved && launcherPositionRef.current) saveChatLauncherPosition(launcherPositionRef.current);
+      launcherDrag.current = null;
+    };
+    keepVisible();
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', finish);
+    window.addEventListener('pointercancel', finish);
+    window.addEventListener('resize', keepVisible);
+    return () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', finish);
+      window.removeEventListener('pointercancel', finish);
+      window.removeEventListener('resize', keepVisible);
+    };
+  }, [insets.top, insets.bottom]);
+
   useEffect(() => {
+    if (Platform.OS === 'web') return;
+    let mounted = true;
+    void AsyncStorage.getItem(CHAT_HISTORY_KEY).then(raw => {
+      if (!mounted) return;
+      const history = parseChatHistory(raw);
+      setConversations(history);
+      setActiveId(history[0]?.id ?? null);
+    }).catch(() => { /* Chat remains usable if device storage is unavailable. */ })
+      .finally(() => { if (mounted) setHistoryReady(true); });
+    return () => { mounted = false; };
+  }, []);
+  useEffect(() => {
+    if (!historyReady) return;
+    const timer = setTimeout(() => {
+      if (Platform.OS === 'web') {
+        try { saveChatHistory(conversations); } catch { /* Browser storage can be disabled. */ }
+      } else void AsyncStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(conversations)).catch(() => {});
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [conversations, historyReady]);
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
     const flush = () => { try { saveChatHistory(conversationsRef.current); } catch { /* Storage can be disabled by the browser. */ } };
     window.addEventListener('beforeunload', flush);
     return () => { window.removeEventListener('beforeunload', flush); flush(); };
   }, []);
   useEffect(() => {
+    if (Platform.OS !== 'web') return;
     const style = document.createElement('style');
     style.textContent = '@keyframes chat-dot-flash { 0%, 20%, 100% { opacity: .22; } 50% { opacity: 1; } } .chat-typing { color: #326448; font-style: italic; font-size: 18px; } .chat-typing-dot { display: inline-block; animation: chat-dot-flash 1.8s ease-in-out infinite; } .chat-typing-dot:nth-child(2) { animation-delay: .3s; } .chat-typing-dot:nth-child(3) { animation-delay: .6s; }';
     document.head.appendChild(style);
@@ -99,10 +168,18 @@ export function ChatOverlay() {
     finally { setBusy(false); }
   };
 
+  const launcherPointerProps = Platform.OS === 'web' ? { onPointerDown: (event: NativePointerEvent) => {
+    suppressLauncherPress.current = false;
+    launcherDrag.current = { startX: event.nativeEvent.pageX, startY: event.nativeEvent.pageY,
+      origin: launcherPositionRef.current ?? { x: window.innerWidth - 51 - 15, y: insets.top + 14 }, moved: false };
+  } } : {};
+
   if (!data.settings.aiChatEnabled) return null;
 
   return <>
-    <Pressable accessibilityRole="button" accessibilityLabel="Open DeepSeek chat" onHoverIn={() => setHovered(true)} onHoverOut={() => setHovered(false)} onPressIn={() => { if (!missingApiKey) setClicked(true); }} onPress={() => { if (missingApiKey) { showMissingApiKeyPrompt(); return; } setClicked(true); setOpen(true); }} style={[styles.launcher, { top: insets.top + 14 }, missingApiKey && styles.launcherMissingKey, !missingApiKey && (hovered || clicked) && styles.launcherOpaque]}>
+    <Pressable {...launcherPointerProps} accessibilityRole="button" accessibilityLabel="Open DeepSeek chat" onHoverIn={() => setHovered(true)} onHoverOut={() => setHovered(false)} onPressIn={() => {
+      if (!missingApiKey) setClicked(true);
+    }} onPress={() => { if (suppressLauncherPress.current) return; if (missingApiKey) { showMissingApiKeyPrompt(); return; } setClicked(true); setOpen(true); }} style={[styles.launcher, launcherPosition ? { left: launcherPosition.x, top: launcherPosition.y } : { right: 15, top: insets.top + 14 }, { touchAction: 'none' } as ViewStyle, missingApiKey && styles.launcherMissingKey, !missingApiKey && (hovered || clicked) && styles.launcherOpaque]}>
       <View style={[styles.launcherRing, missingApiKey && styles.launcherRingMissingKey]}><Ionicons name="hardware-chip-outline" size={25} color={missingApiKey ? '#69726E' : '#D9FFF4'} /></View>
       <View style={[styles.orbitDot, missingApiKey && styles.orbitDotMissingKey]} />
     </Pressable>
@@ -149,7 +226,7 @@ export function ChatOverlay() {
           </View>;})}
           {!!error && <Text style={styles.error}>{error}</Text>}
         </ScrollView>
-        {busy && <View accessibilityLabel="DeepSeek is thinking" style={styles.typingIndicator}><span className="chat-typing">thinking<span className="chat-typing-dot">.</span><span className="chat-typing-dot">.</span><span className="chat-typing-dot">.</span></span></View>}
+        {busy && <View accessibilityLabel="DeepSeek is thinking" style={styles.typingIndicator}>{Platform.OS === 'web' ? <span className="chat-typing">thinking<span className="chat-typing-dot">.</span><span className="chat-typing-dot">.</span><span className="chat-typing-dot">.</span></span> : <Text style={styles.typingText}>Thinking…</Text>}</View>}
         </View>
         <View style={styles.promptArea}>
           <Text style={styles.promptLabel}>CHOOSE A PROMPT</Text>
@@ -226,6 +303,7 @@ const styles = StyleSheet.create({
   pinyin: { fontSize: 16, fontWeight: '700', color: colors.white },
   translation: { fontSize: 16, color: colors.white },
   typingIndicator: { position: 'absolute', left: 16, bottom: 7, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: colors.paper },
+  typingText: { color: colors.green, fontSize: 16, fontStyle: 'italic' },
   error: { color: colors.red, fontSize: 14, lineHeight: 21 },
   composer: { flexDirection: 'row', gap: 10, alignItems: 'center', paddingHorizontal: 12, paddingTop: 10, borderTopWidth: 1, borderColor: colors.line, backgroundColor: colors.card },
   input: { flex: 1, maxHeight: 120, minHeight: 44, borderWidth: 1, borderColor: '#C5D8CD', borderRadius: 20, paddingHorizontal: 15, paddingVertical: 10, color: colors.ink, fontSize: 16, backgroundColor: colors.paper },
