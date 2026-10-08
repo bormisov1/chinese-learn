@@ -31,7 +31,7 @@ import {
 import { finishExercise } from "@/exercise-progress";
 import { resolveSentencePronunciation, resolveWordPronunciation } from "@/pronunciation";
 import { recordRoundCompletion, undoRoundCompletion } from "@/round-history";
-import { track } from "@/telemetry";
+import { flushTelemetry, track } from "@/telemetry";
 import { ExplanationButton } from "@/explanation-button";
 import { captureCardReviewUndo, restoreCardReview, type CardReviewUndo } from "@/card-review-undo";
 
@@ -50,6 +50,10 @@ const findGraduation = (before: Word[], after: Word[], wordId: string): Graduati
   return { learned, replacement };
 };
 type ReviewedCard = { position: number; correct: boolean; graduated: boolean; completedAt?: number; undo: CardReviewUndo };
+type PendingTransition = { kind: "start" | "card"; startedAt: number; swipeCallbackAt?: number; lastCard?: boolean };
+type RoundTransitionTimes = { count: number; totalMs: number; maxMs: number; maxSwipeCallbackMs: number; maxRenderReadyMs: number };
+const transitionNow = () => globalThis.performance?.now?.() ?? Date.now();
+const roundedMs = (duration: number) => Math.max(0, Math.round(duration));
 const webDragSurface = Platform.OS === "web"
   ? ({ touchAction: "none" } as any)
   : undefined;
@@ -79,6 +83,8 @@ export default function Cards() {
   const swipe = useRef(new Animated.ValueXY()).current;
   const cardSpin = useRef(new Animated.Value(0)).current;
   const grading = useRef(false);
+  const pendingTransition = useRef<PendingTransition | null>(null);
+  const roundTransitionTimes = useRef<RoundTransitionTimes>({ count: 0, totalMs: 0, maxMs: 0, maxSwipeCallbackMs: 0, maxRenderReadyMs: 0 });
   const total = data.words.length;
   const translationLanguage = LANGUAGES.find(item => item.code === data.settings.language)?.nativeLabel.toUpperCase() ?? "ENGLISH";
   const upcoming = useMemo(
@@ -125,6 +131,46 @@ export default function Cards() {
     )
       generateBatch(word);
   }, [phase, word?.id]);
+  useEffect(() => {
+    if (Platform.OS !== "ios") return;
+    const pending = pendingTransition.current;
+    if (!pending) return;
+    // Two frames after React commits is a cheap proxy for the new native screen being usable.
+    let secondFrame = 0;
+    const firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => {
+        if (pendingTransition.current !== pending) return;
+        pendingTransition.current = null;
+        const readyAt = transitionNow();
+        const durationMs = roundedMs(readyAt - pending.startedAt);
+        if (pending.kind === "start") {
+          void track("card_transition_timed", { mode: "cards", kind: "round_start", durationMs, size: roundWords.length })
+            .then(() => flushTelemetry()).catch(() => {});
+          return;
+        }
+        const swipeCallbackMs = roundedMs((pending.swipeCallbackAt ?? readyAt) - pending.startedAt);
+        const renderReadyMs = roundedMs(readyAt - (pending.swipeCallbackAt ?? readyAt));
+        const times = roundTransitionTimes.current;
+        times.count += 1;
+        times.totalMs += durationMs;
+        times.maxMs = Math.max(times.maxMs, durationMs);
+        times.maxSwipeCallbackMs = Math.max(times.maxSwipeCallbackMs, swipeCallbackMs);
+        times.maxRenderReadyMs = Math.max(times.maxRenderReadyMs, renderReadyMs);
+        if (pending.lastCard) {
+          void track("card_transition_timed", {
+            mode: "cards", kind: "round_summary", size: roundWords.length,
+            count: times.count, completionMs: durationMs, averageMs: roundedMs(times.totalMs / times.count),
+            maxMs: times.maxMs, maxSwipeCallbackMs: times.maxSwipeCallbackMs,
+            maxRenderReadyMs: times.maxRenderReadyMs,
+          }).then(() => flushTelemetry()).catch(() => {});
+        }
+      });
+    });
+    return () => {
+      cancelAnimationFrame(firstFrame);
+      if (secondFrame) cancelAnimationFrame(secondFrame);
+    };
+  }, [phase, position, word?.id]);
 
   if (!total)
     return (
@@ -139,6 +185,10 @@ export default function Cards() {
     );
 
   const begin = (words: typeof data.words, round: number) => {
+    if (Platform.OS === "ios") {
+      pendingTransition.current = { kind: "start", startedAt: transitionNow() };
+      roundTransitionTimes.current = { count: 0, totalMs: 0, maxMs: 0, maxSwipeCallbackMs: 0, maxRenderReadyMs: 0 };
+    }
     void track("round_started", { round, size: words.length, mode: "cards" });
     setStudyRound(round);
     patch((d) => ({ ...d, cardRound: Math.max(d.cardRound, round) }));
@@ -239,13 +289,19 @@ export default function Cards() {
   const finishSwipe = (correct: boolean) => {
     if (grading.current) return;
     grading.current = true;
+    if (Platform.OS === "ios") pendingTransition.current = {
+      kind: "card", startedAt: transitionNow(), lastCard: position + 1 === roundWords.length,
+    };
     Animated.timing(swipe, {
       toValue: { x: correct ? 520 : -520, y: 0 },
       duration: 180,
       useNativeDriver: true,
     }).start(({ finished }) => {
       grading.current = false;
-      if (finished) grade(correct);
+      if (finished) {
+        if (pendingTransition.current?.kind === "card") pendingTransition.current.swipeCallbackAt = transitionNow();
+        grade(correct);
+      } else pendingTransition.current = null;
     });
   };
   const flipCard = (nextFlipped: boolean) => {
