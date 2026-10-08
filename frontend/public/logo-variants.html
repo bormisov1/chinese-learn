@@ -12,7 +12,7 @@
     .page { max-width: 1440px; margin: auto; padding: 34px clamp(18px, 4vw, 64px) 72px; }
     header { display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid #dadbd2; padding-bottom: 24px; }
     .brand { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 800; letter-spacing: .01em; }
-    .brand-mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: #ba4c3b; color: #fff1d8; font: 700 22px "Noto Serif CJK SC", "Songti SC", serif; }
+    .brand-mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: #f7c07c; color: #a94135; font: 800 22px "Noto Sans CJK SC", "PingFang SC", sans-serif; }
     .header-note { color: #7d837b; font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
     .intro { display: flex; justify-content: space-between; align-items: end; gap: 24px; padding: 58px 0 42px; }
     .eyebrow { margin: 0 0 13px; color: #b75d43; font-size: 12px; font-weight: 800; letter-spacing: .17em; text-transform: uppercase; }
@@ -25,7 +25,7 @@
     .family-heading h2 { margin: 0; font-size: 26px; letter-spacing: -.04em; }
     .family-heading p { margin: 0; color: #858d83; font-size: 13px; }
     .family-index { color: #bf694e; font-size: 11px; font-weight: 800; }
-    .grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 14px; }
+    .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
     .card { min-width: 0; border: 1px solid #e5e6dc; border-radius: 19px; overflow: hidden; background: #fffefa; transition: transform .18s ease, box-shadow .18s ease; }
     .card:hover { transform: translateY(-3px); box-shadow: 0 14px 26px #243d2912; }
     .art { display: grid; place-items: center; min-height: 215px; padding: 28px 16px 18px; background: #f3f2ec; }
@@ -35,8 +35,8 @@
     .meta p { margin: 6px 0 0; color: #8b9189; font-size: 11px; line-height: 1.2; }
     .number { align-self: start; color: #b0b6ad; font-size: 11px; font-variant-numeric: tabular-nums; font-weight: 700; }
     footer { display: flex; justify-content: space-between; gap: 15px; margin-top: 35px; padding-top: 17px; border-top: 1px solid #dadbd2; color: #8a9188; font-size: 12px; }
-    @media (max-width: 1100px) { .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-    @media (max-width: 800px) { .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } .art { min-height: 190px; } }
+    @media (max-width: 1100px) { .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    @media (max-width: 800px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .art { min-height: 190px; } }
     @media (max-width: 600px) { .page { padding-top: 20px; } .header-note, .count { display: none; } .intro { padding: 42px 0 31px; } .family { margin-bottom: 32px; } .family-heading { flex-wrap: wrap; gap: 5px 10px; } .family-heading h2 { font-size: 21px; } .family-heading p { width: 100%; padding-left: 23px; } .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } .art { min-height: 150px; padding: 20px 12px 12px; } .art svg { width: min(100%, 122px); } .meta { padding: 12px; } .meta h3 { font-size: 12px; } .meta p { font-size: 10px; } footer { line-height: 1.5; } }
   </style>
 </head>
@@ -44,8 +44,8 @@
   <main class="page">
     <header><div class="brand"><span class="brand-mark" lang="zh-Hans">汉</span> Hanzi Deck</div><span class="header-note">Identity exploration / 2026</span></header>
     <section class="intro" aria-labelledby="title">
-      <div><p class="eyebrow">App icon concepts</p><h1 id="title">Three directions.<br>One character.</h1><p>More ways to explore the three styles you picked: Sunrise, Editorial, and Seal.</p></div>
-      <div class="count" aria-hidden="true">18<small> / 18</small></div>
+      <div><p class="eyebrow">App icon concepts</p><h1 id="title">A closer look<br>at Sunrise.</h1><p>Small changes to the original Sunrise mark, with Editorial, Inverse, and Seal kept for comparison.</p></div>
+      <div class="count" aria-hidden="true">11<small> / 11</small></div>
     </section>
     <div id="gallery"></div>
     <footer><span>汉 · hàn · Chinese language</span><span>Hanzi Deck — logo study</span></footer>
@@ -57,43 +57,33 @@
     const tile = (fill, radius = 34) => `<rect width="160" height="160" rx="${radius}" fill="${fill}"/>`;
     const families = [
       {
-        name: 'Sunrise', note: 'Warm, optimistic, and ready for every morning.', items: [
+        name: 'Sunrise studies', note: 'The original form, refined one detail at a time.', items: [
           { name: 'Sunrise', note: 'Original concept', art: `${tile('#f7c07c', 34)}<circle cx="80" cy="84" r="55" fill="#e9714d"/><path d="M22 121h116" stroke="#a94135" stroke-width="5" stroke-linecap="round"/>${han('#fff5df', 88, 107, 800)}` },
-          { name: 'First light', note: 'Soft morning glow', art: `${tile('#f9ead2', 34)}<circle cx="80" cy="95" r="52" fill="#e9ae68"/><path d="M23 120h114" stroke="#d37355" stroke-width="4" stroke-linecap="round"/>${han('#3f5849', 89, 109, 800)}` },
-          { name: 'Horizon', note: 'Sun at the edge', art: `${tile('#e88765', 30)}<circle cx="80" cy="91" r="55" fill="#ffe1a2"/><path d="M0 107h160v53H0z" fill="#c85a48"/><path d="M21 107h118" stroke="#fff1d3" stroke-width="3"/>${han('#783d35', 89, 108, 800)}` },
-          { name: 'Amber', note: 'Golden and bold', art: `${tile('#bc593f', 35)}<circle cx="80" cy="80" r="59" fill="#f6c376"/><circle cx="80" cy="80" r="51" fill="none" stroke="#fff0cc" stroke-width="2"/>${han('#7e3c32', 87, 107, 800)}` },
-          { name: 'Morning mist', note: 'A softer dawn', art: `${tile('#f4d9d1', 34)}<circle cx="80" cy="81" r="55" fill="#e99a7c"/><path d="M16 108h128M28 122h104" stroke="#fff2df" stroke-width="6" stroke-linecap="round" opacity=".75"/>${han('#8c4d43', 88, 106, 800)}` },
-          { name: 'Golden hour', note: 'Lasting warmth', art: `${tile('#713e43', 34)}<circle cx="80" cy="80" r="58" fill="#d99962"/><path d="M20 121h120" stroke="#f4cf93" stroke-width="4" stroke-linecap="round"/>${han('#fff3d7', 88, 107, 800)}` },
+          { name: 'Line at bottom', note: 'Horizon below the sun', art: `${tile('#f7c07c', 34)}<circle cx="80" cy="84" r="55" fill="#e9714d"/><path d="M22 145h116" stroke="#a94135" stroke-width="5" stroke-linecap="round"/>${han('#fff5df', 88, 107, 800)}` },
+          { name: 'No line', note: 'Circle and character only', art: `${tile('#f7c07c', 34)}<circle cx="80" cy="84" r="55" fill="#e9714d"/>${han('#fff5df', 88, 107, 800)}` },
+          { name: 'Lower 汉', note: 'Centered within the circle', art: `${tile('#f7c07c', 34)}<circle cx="80" cy="84" r="55" fill="#e9714d"/>${han('#fff5df', 88, 115, 800)}` },
+          { name: 'Han River', note: 'River only below the old line', art: `${tile('#f7c07c', 34)}<circle cx="80" cy="84" r="55" fill="#e9714d"/><clipPath id="river-bottom"><rect x="0" y="121" width="160" height="39"/></clipPath><path d="M15 129C38 121 56 122 78 130c23 9 41 9 67-6v14c-24 16-42 15-68 5-22-9-39-7-62 2z" fill="#a94135" clip-path="url(#river-bottom)"/>${han('#fff5df', 88, 107, 800)}` },
+          { name: 'Short horizon', note: 'A lighter underline', art: `${tile('#f7c07c', 34)}<circle cx="80" cy="84" r="55" fill="#e9714d"/><path d="M40 121h80" stroke="#a94135" stroke-width="4" stroke-linecap="round"/>${han('#fff5df', 88, 107, 800)}` },
+          { name: 'Sun ring', note: 'Open, airy sun shape', art: `${tile('#f7c07c', 34)}<circle cx="80" cy="84" r="54" fill="none" stroke="#e9714d" stroke-width="7"/>${han('#a94135', 88, 107, 800)}` },
+          { name: 'Inset sun', note: 'More space around the mark', art: `${tile('#f7c07c', 34)}<circle cx="80" cy="84" r="48" fill="#e9714d"/><path d="M27 121h106" stroke="#a94135" stroke-width="4" stroke-linecap="round"/>${han('#fff5df', 82, 106, 800)}` },
         ],
       },
       {
-        name: 'Editorial', note: 'Typography and layout with a publishing feel.', items: [
+        name: 'Kept concepts', note: 'The three other marks you wanted to preserve.', items: [
           { name: 'Editorial', note: 'Original concept', art: `${tile('#fffefa', 16)}<rect x="0" y="0" width="16" height="160" fill="#bc5b43"/>${han('#222923', 99, 111, 800, serif)}` },
-          { name: 'Margin', note: 'A single red rule', art: `${tile('#f7f3e9', 17)}<path d="M31 17v126" stroke="#bc5b43" stroke-width="3"/><text x="123" y="31" font-family="sans-serif" font-size="10" font-weight="700" fill="#aa9a85">01</text>${han('#282b29', 91, 109, 800, serif)}` },
-          { name: 'Masthead', note: 'Framed by type', art: `${tile('#fefdf7', 15)}<path d="M22 34h116M22 128h116" stroke="#252925" stroke-width="2"/><text x="80" y="24" text-anchor="middle" font-family="sans-serif" font-size="9" letter-spacing="3" fill="#a5503f">HANZI DECK</text>${han('#252925', 89, 107, 800, serif)}` },
           { name: 'Inverse', note: 'Ink on dark paper', art: `${tile('#252a27', 16)}<rect x="20" y="20" width="13" height="13" fill="#cb6d53"/>${han('#f9f5e8', 96, 109, 800, serif)}<path d="M24 138h112" stroke="#cb6d53" stroke-width="2"/>` },
-          { name: 'Column', note: 'Confident side bar', art: `${tile('#f9f5e9', 16)}<rect width="37" height="160" fill="#293c39"/><text x="18" y="137" transform="rotate(-90 18 137)" font-family="sans-serif" font-size="10" font-weight="700" letter-spacing="3" fill="#f5eee0">HANZI</text>${han('#293c39', 88, 108, 800, serif)}` },
-          { name: 'Index card', note: 'A tidy reference', art: `${tile('#fffdf6', 17)}<path d="M16 32h128M16 127h128" stroke="#d2d1c6" stroke-width="2"/><rect x="118" y="0" width="25" height="15" fill="#bf644b"/>${han('#2a302b', 89, 107, 800)}<text x="80" y="145" text-anchor="middle" font-family="sans-serif" font-size="8" letter-spacing="3" fill="#ad6c59">H A N Z I</text>` },
-        ],
-      },
-      {
-        name: 'Seal', note: 'A traditional stamp, simplified for an app icon.', items: [
           { name: 'Seal', note: 'Original concept', art: `${tile('#ba4c3b', 21)}<rect x="12" y="12" width="136" height="136" rx="11" fill="none" stroke="#fff1d8" stroke-width="2"/>${han('#fff1d8', 89, 108, 800, serif)}` },
-          { name: 'Round stamp', note: 'Circular impression', art: `${tile('#f3e9d9', 32)}<circle cx="80" cy="80" r="64" fill="#b74839"/><circle cx="80" cy="80" r="54" fill="none" stroke="#f6e7ca" stroke-width="2"/>${han('#fff0d6', 86, 107, 800, serif)}` },
-          { name: 'Ivory seal', note: 'Red character on paper', art: `${tile('#bd503e', 23)}<rect x="16" y="16" width="128" height="128" rx="8" fill="#f7e9d1"/>${han('#ae4737', 87, 107, 800, serif)}` },
-          { name: 'Double border', note: 'A formal stamp', art: `${tile('#963e37', 17)}<rect x="10" y="10" width="140" height="140" rx="8" fill="none" stroke="#f8e8cd" stroke-width="2"/><rect x="17" y="17" width="126" height="126" rx="5" fill="none" stroke="#f8e8cd" stroke-width="1"/>${han('#f8e8cd', 87, 108, 800, serif)}` },
-          { name: 'Red ink', note: 'A softer impression', art: `${tile('#f5ecdc', 32)}<path d="M28 19L132 16l12 17-3 96-13 15-100-2-12-17 2-89z" fill="#c45644"/>${han('#fff0d7', 88, 108, 800, serif)}` },
-          { name: 'Tall seal', note: 'A vertical chop', art: `${tile('#f5e9d7', 31)}<rect x="28" y="8" width="104" height="144" rx="8" fill="#ac4639"/><rect x="35" y="15" width="90" height="130" rx="4" fill="none" stroke="#f8e9d0" stroke-width="2"/>${han('#f8e9d0', 83, 106, 800, serif)}` },
         ],
       },
     ];
+    let conceptNumber = 0;
     document.getElementById('gallery').innerHTML = families.map((family, familyIndex) => `
       <section class="family" aria-labelledby="family-${familyIndex}">
         <div class="family-heading"><span class="family-index">0${familyIndex + 1}</span><h2 id="family-${familyIndex}">${family.name}</h2><p>${family.note}</p></div>
         <div class="grid">${family.items.map((item, index) => `
           <article class="card">
             <div class="art"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="${item.name} logo concept featuring 汉"><title>${item.name} logo</title>${item.art}</svg></div>
-            <div class="meta"><div><h3>${item.name}</h3><p>${item.note}</p></div><span class="number">${String(familyIndex * 6 + index + 1).padStart(2, '0')}</span></div>
+            <div class="meta"><div><h3>${item.name}</h3><p>${item.note}</p></div><span class="number">${String(++conceptNumber).padStart(2, '0')}</span></div>
           </article>`).join('')}</div>
       </section>`).join('');
   </script>
