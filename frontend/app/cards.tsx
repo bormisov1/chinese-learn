@@ -54,17 +54,12 @@ const webDragSurface = Platform.OS === "web"
   ? ({ touchAction: "none" } as any)
   : undefined;
 const CARD_STACK_STEP = 12;
+const BACK_CARD_SCALE = 0.96;
+const STACK_DEPTHS = Array.from({ length: CARD_ROUND_SIZE + 1 }, (_, depth) => depth);
 const waveOffset = (depth: number) => ({
   x: Math.round(Math.sin(depth * 1.65) * depth * CARD_STACK_STEP),
   y: depth * 10,
 });
-const webStackOffsetTransition = Platform.OS === "web"
-  ? ({
-      transitionProperty: "left, right, top, transform",
-      transitionDuration: "460ms",
-      transitionTimingFunction: "cubic-bezier(0.75, -0.06, 0, 1)",
-    } as any)
-  : undefined;
 
 export default function Cards() {
   const { data, patch, generateBatch } = useStore();
@@ -91,6 +86,16 @@ export default function Cards() {
     [data.words, data.cardRound],
   );
   const activeCount = data.words.filter((item) => item.cardActive).length;
+  const readySubtitle = data.settings.language === "ru"
+    ? `${upcoming.length} из ${CARD_ROUND_SIZE} карточек · ${activeCount} из ${ACTIVE_CARD_LIMIT} активных`
+    : data.settings.language === "th"
+      ? `${upcoming.length} จาก ${CARD_ROUND_SIZE} บัตรคำ · ${activeCount} จาก ${ACTIVE_CARD_LIMIT} คำที่กำลังเรียน`
+      : `${upcoming.length} of ${CARD_ROUND_SIZE} cards · ${activeCount} of ${ACTIVE_CARD_LIMIT} active`;
+  const startRoundLabel = data.settings.language === "ru"
+    ? `Начать раунд из ${upcoming.length} ${upcoming.length === 1 ? "карточки" : "карточек"}`
+    : data.settings.language === "th"
+      ? `เริ่มรอบ ${upcoming.length} บัตรคำ`
+      : `Start ${upcoming.length}-card round`;
   const roundWords = roundIds
     .map((id) => data.words.find((w) => w.id === id))
     .filter(Boolean) as typeof data.words;
@@ -305,18 +310,18 @@ export default function Cards() {
         <Header
           eyebrow={`${t("Round")} ${data.cardRound + 1}`}
           title="Ready for a card round?"
-          subtitle={`${upcoming.length} of ${CARD_ROUND_SIZE} cards · ${activeCount} of ${ACTIVE_CARD_LIMIT} active`}
+          subtitle={readySubtitle}
         />
         <View style={styles.roundPanel}>
           <Text style={styles.roundIcon}>卡</Text>
-          <Text style={styles.roundTitle}>Round {data.cardRound + 1}</Text>
+          <Text style={styles.roundTitle}>{`${t("Round")} ${data.cardRound + 1}`}</Text>
           <Text style={styles.roundText}>
             Correct cards skip the next round. Three correct appearances move
             a word to retention review and bring in another deck word.
           </Text>
         </View>
         <Button
-          label={`Start ${upcoming.length}-card round`}
+          label={startRoundLabel}
           icon="play"
           onPress={startRound}
         />
@@ -516,26 +521,61 @@ function StackCard({ word, depth, roundIndex, initialTilt, active, height, setti
   const hanziSize = Math.min(66, Math.floor(hanziWidth / Math.max(1, Array.from(pronunciation.hanzi).length)));
   const [frontHeight, setFrontHeight] = useState(0);
   const [backHeight, setBackHeight] = useState(0);
+  const animatedDepth = useRef(new Animated.Value(depth)).current;
   useEffect(() => {
     onHeightChange(Math.max(300, Math.ceil(frontHeight + 84), Math.ceil(backHeight + 52)));
   }, [frontHeight, backHeight]);
+  useEffect(() => {
+    const animation = Animated.timing(animatedDepth, {
+      toValue: depth,
+      duration: 460,
+      easing: Easing.bezier(0.75, -0.06, 0, 1),
+      useNativeDriver: Platform.OS !== "web",
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [animatedDepth, depth]);
   const showingBack = active && flipped;
-  const offset = waveOffset(depth);
-  const tilt = roundIndex === 0 ? 0 : initialTilt * depth / roundIndex;
+  const translateX = animatedDepth.interpolate({
+    inputRange: STACK_DEPTHS,
+    outputRange: STACK_DEPTHS.map(item => waveOffset(item).x),
+    extrapolate: "clamp",
+  });
+  const translateY = animatedDepth.interpolate({
+    inputRange: STACK_DEPTHS,
+    outputRange: STACK_DEPTHS.map(item => waveOffset(item).y),
+    extrapolate: "clamp",
+  });
+  const rotation = animatedDepth.interpolate({
+    inputRange: STACK_DEPTHS,
+    outputRange: STACK_DEPTHS.map(item => `${roundIndex === 0 ? 0 : initialTilt * item / roundIndex}deg`),
+    extrapolate: "clamp",
+  });
+  const scale = animatedDepth.interpolate({
+    inputRange: STACK_DEPTHS,
+    outputRange: STACK_DEPTHS.map(item => BACK_CARD_SCALE ** item),
+    extrapolate: "clamp",
+  });
   return (
-    <View
+    <Animated.View
+      testID={`stack-card-${roundIndex}`}
       accessible={active}
       accessibilityElementsHidden={!active}
       importantForAccessibility={active ? "auto" : "no-hide-descendants"}
       pointerEvents={active ? "auto" : "none"}
       style={[styles.stackCard, {
-        top: offset.y,
-        left: offset.x,
-        right: -offset.x,
+        top: 0,
+        left: 0,
+        right: 0,
         zIndex: 10 - depth,
         transformOrigin: initialTilt >= 0 ? "left top" : "right top",
-        transform: [{ rotate: `${tilt}deg` }],
-      }, webStackOffsetTransition, Platform.OS === "web" && ({ transitionDelay: `${depth * 25}ms` } as any)]}
+        transform: [
+          { translateX },
+          { translateY },
+          { rotate: rotation },
+          { scale },
+        ],
+      }]}
     >
       <Animated.View
         {...(active ? panHandlers : {})}
@@ -621,7 +661,7 @@ function StackCard({ word, depth, roundIndex, initialTilt, active, height, setti
           {!showingBack && <Text style={styles.hint}>Tap to reveal</Text>}
         </Pressable>
       </Animated.View>
-    </View>
+    </Animated.View>
   );
 }
 
