@@ -4,7 +4,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from './context';
 import { Text } from './i18n';
-import { CHAT_PRESETS, ChatPreset, ChatTurn, ChatWord, chatTitleForQuestion, requestChatReply } from './chat';
+import { CHAT_PRESETS, ChatPreset, ChatTurn, ChatWord, addableChatWords, chatTitleForQuestion, requestChatReply } from './chat';
 import { ChatMessage, Conversation, loadChatHistory, saveChatHistory } from './chat-history';
 import { colors } from './theme';
 import { removeVocabularyWord } from './vocabulary-selection';
@@ -30,6 +30,7 @@ export function ChatOverlay() {
   conversationsRef.current = conversations;
   const active = conversations.find(item => item.id === activeId);
   const messages = active?.messages ?? [];
+  const visibleMessages = messages.filter(item => item.role === 'user' || !!item.text || !!item.reply.words.length);
   const preset = active?.preset ?? draftPreset;
   const saved = new Set(data.words.map(word => word.hanzi));
   const missingApiKey = !data.settings.apiKey.trim();
@@ -125,20 +126,27 @@ export function ChatOverlay() {
         <View style={styles.historyFrame}>
         <ScrollView ref={scroll} style={styles.history} contentContainerStyle={[styles.historyContent, busy && styles.historyContentWhileTyping]} keyboardShouldPersistTaps="handled" onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: true })}>
           {!messages.length && <Text style={styles.empty}>Ask about Chinese words, a Hanzi, or a message you want to answer.</Text>}
-          {messages.filter(item => item.role === 'user' || !!item.text || !!item.reply.words.length).map((item, index) => <View key={index} style={[styles.bubble, item.role === 'user' ? styles.userBubble : styles.assistantBubble]}>
+          {visibleMessages.map((item, index) => {
+            const question = visibleMessages.slice(0, index).reverse().find(message => message.role === 'user')?.text ?? '';
+            const addable = item.role === 'assistant' ? new Set(addableChatWords(item.reply.words, question).map(word => word.hanzi)) : new Set<string>();
+            return <View key={index} style={[styles.bubble, item.role === 'user' ? styles.userBubble : styles.assistantBubble]}>
             {!!item.text && <Text style={[styles.messageText, item.role === 'user' && styles.userText]}>{item.text}</Text>}
             {item.role === 'assistant' && !!item.reply.words.length && <View style={styles.wordsSection}>
-              <Text style={styles.wordsTitle}>BREAKDOWN · TAP TO ADD</Text>
+              <Text style={styles.wordsTitle}>BREAKDOWN · TAP GREEN TO ADD</Text>
               {item.reply.words.map(word => {
                 const added = saved.has(word.hanzi);
+                const wordContent = <>
+                  <Text style={[styles.hanzi, added && styles.wordTextAdded, !addable.has(word.hanzi) && styles.wordReadOnlyText]}>{word.hanzi}</Text>
+                  <View style={styles.wordDetail}><Text style={[styles.pinyin, added && styles.wordTextAdded, !addable.has(word.hanzi) && styles.wordReadOnlyText]}>{word.pinyin}</Text><Text style={[styles.translation, added && styles.wordTextAdded, !addable.has(word.hanzi) && styles.wordReadOnlyText]}>{word.translation}</Text></View>
+                </>;
+                if (!addable.has(word.hanzi)) return <View key={word.hanzi} style={[styles.wordRow, styles.wordReadOnly]}>{wordContent}</View>;
                 return <Pressable key={word.hanzi} accessibilityRole="button" accessibilityLabel={`${added ? 'Remove' : 'Add'} ${word.hanzi} ${added ? 'from' : 'to'} vocabulary`} accessibilityState={{ selected: added }} onPress={() => { if (added) setPendingRemoval(word); else importWords([dictionary?.get(word.hanzi) ?? { hanzi: word.hanzi, pinyin: word.pinyin, russian: word.translation }]); }} style={[styles.wordRow, added && styles.wordAdded]}>
-                  <Text style={[styles.hanzi, added && styles.wordTextAdded]}>{word.hanzi}</Text>
-                  <View style={styles.wordDetail}><Text style={[styles.pinyin, added && styles.wordTextAdded]}>{word.pinyin}</Text><Text style={[styles.translation, added && styles.wordTextAdded]}>{word.translation}</Text></View>
+                  {wordContent}
                   <Ionicons name={added ? 'checkmark' : 'add'} size={16} color={added ? colors.green : colors.white} />
                 </Pressable>;
               })}
             </View>}
-          </View>)}
+          </View>;})}
           {!!error && <Text style={styles.error}>{error}</Text>}
         </ScrollView>
         {busy && <View accessibilityLabel="DeepSeek is thinking" style={styles.typingIndicator}><span className="chat-typing">thinking<span className="chat-typing-dot">.</span><span className="chat-typing-dot">.</span><span className="chat-typing-dot">.</span></span></View>}
@@ -209,6 +217,8 @@ const styles = StyleSheet.create({
   wordsSection: { marginTop: 13, borderTopWidth: 1, borderColor: colors.line, paddingTop: 12, gap: 7 },
   wordsTitle: { fontSize: 10, fontWeight: '800', letterSpacing: 1.1, color: colors.muted, marginBottom: 2 },
   wordRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 9, borderRadius: 11, backgroundColor: colors.green, borderWidth: 1, borderColor: '#236E52' },
+  wordReadOnly: { backgroundColor: colors.paper, borderColor: colors.line },
+  wordReadOnlyText: { color: colors.ink },
   wordAdded: { backgroundColor: '#D8EBDD', borderColor: '#A9CBB4' },
   wordTextAdded: { color: colors.green },
   hanzi: { fontSize: 24, fontWeight: '800', color: colors.white, minWidth: 44 },
