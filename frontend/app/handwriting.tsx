@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  PanResponder, Pressable, ScrollView, StyleSheet, TextInput, View,
+  PanResponder, Pressable, ScrollView, StyleSheet, View,
   type GestureResponderEvent,
 } from 'react-native';
 import Svg, { Circle, Polyline } from 'react-native-svg';
@@ -114,23 +114,16 @@ export default function Handwriting() {
   const visible = active.length ? [...strokes, active] : strokes;
   return <View style={styles.page}>
     <View style={styles.outputPanel}>
-      <View style={styles.outputHeading}>
-        <Text style={styles.eyebrow}>OUTPUT</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="Copy output" disabled={!output} onPress={copyOutput} style={[styles.copyButton, !output && styles.disabled]}>
-          <Ionicons name={copied ? 'checkmark-outline' : 'copy-outline'} size={18} color={colors.green} />
-          <Text style={styles.copyLabel}>{copied ? 'Copied' : 'Copy'}</Text>
-        </Pressable>
-      </View>
-      <TextInput
+      <Text
         accessibilityLabel="Handwriting output"
-        multiline
-        value={output}
-        onChangeText={setOutput}
-        placeholder="Your text appears here"
-        placeholderTextColor={colors.muted}
-        selectionColor={colors.green}
-        style={styles.outputText}
-      />
+        selectable
+        numberOfLines={1}
+        style={[styles.outputText, !output && styles.outputPlaceholder]}
+      >{output || 'Your text appears here'}</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel="Copy output" disabled={!output} onPress={copyOutput} style={[styles.copyButton, !output && styles.disabled]}>
+        <Ionicons name={copied ? 'checkmark-outline' : 'copy-outline'} size={18} color={colors.green} />
+        <Text style={styles.copyLabel}>{copied ? 'Copied' : 'Copy'}</Text>
+      </Pressable>
     </View>
 
     <View style={styles.drawingFrame}>
@@ -179,12 +172,11 @@ export default function Handwriting() {
 
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.paper },
-  outputPanel: { marginHorizontal: 16, marginTop: 12, marginBottom: 10, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 8, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.card },
-  outputHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  eyebrow: { color: colors.coral, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
+  outputPanel: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 52, marginHorizontal: 16, marginTop: 12, marginBottom: 10, paddingHorizontal: 16, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.card },
   copyButton: { flexDirection: 'row', alignItems: 'center', gap: 5, padding: 4 },
   copyLabel: { color: colors.green, fontSize: 13, fontWeight: '700' },
-  outputText: { minHeight: 54, maxHeight: 112, color: colors.ink, fontSize: 24, textAlignVertical: 'top', paddingVertical: 7 },
+  outputText: { flex: 1, color: colors.ink, fontSize: 22 },
+  outputPlaceholder: { color: colors.muted, fontSize: 16 },
   drawingFrame: { flex: 1, marginHorizontal: 16, marginBottom: 10, borderRadius: 18, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.card, overflow: 'hidden' },
   canvas: { flex: 1, touchAction: 'none' } as any,
   placeholder: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
