@@ -116,6 +116,8 @@ const contextualTranslations: Partial<Record<AppLanguage, Record<string, string>
     "sentence": "предложение",
     "listening": "аудирование",
     "Unmatched Chinese characters will be skipped:": "Неопознанные китайские иероглифы будут пропущены:",
+    "Mandarin voice": "Голос для китайского",
+    "Selected voice unavailable — using automatic": "Выбранный голос недоступен — используется автоматический выбор",
   },
   th: {
     "Explanation": "คำอธิบาย",
@@ -226,6 +228,8 @@ const contextualTranslations: Partial<Record<AppLanguage, Record<string, string>
     "sentence": "ประโยค",
     "listening": "การฟัง",
     "Unmatched Chinese characters will be skipped:": "อักษรจีนที่ไม่พบจะถูกข้าม:",
+    "Mandarin voice": "เสียงภาษาจีนกลาง",
+    "Selected voice unavailable — using automatic": "เสียงที่เลือกไม่พร้อมใช้งาน — ใช้การเลือกอัตโนมัติ",
   },
 };
 
