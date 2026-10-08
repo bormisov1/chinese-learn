@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useRef, useState } from 'react';
-import { Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, View, type PointerEvent as NativePointerEvent, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from './context';
 import { Text, TextInput } from './i18n';
@@ -10,6 +10,7 @@ import { CHAT_HISTORY_KEY, ChatMessage, Conversation, loadChatHistory, parseChat
 import { colors } from './theme';
 import { removeVocabularyWord } from './vocabulary-selection';
 import { useMissingApiKeyPrompt } from './missing-api-key-prompt';
+import { ChatLauncherPosition, clampChatLauncherPosition, loadChatLauncherPosition, saveChatLauncherPosition } from './chat-launcher-position';
 
 export function ChatOverlay() {
   const { data, dictionary, importWords, patch } = useStore();
@@ -28,6 +29,11 @@ export function ChatOverlay() {
   const [pendingRemoval, setPendingRemoval] = useState<ChatWord | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [launcherPosition, setLauncherPosition] = useState<ChatLauncherPosition | null>(() => Platform.OS === 'web' ? loadChatLauncherPosition() : null);
+  const launcherPositionRef = useRef(launcherPosition);
+  launcherPositionRef.current = launcherPosition;
+  const launcherDrag = useRef<{ startX: number; startY: number; origin: ChatLauncherPosition; moved: boolean } | null>(null);
+  const suppressLauncherPress = useRef(false);
   const conversationsRef = useRef(conversations);
   conversationsRef.current = conversations;
   const active = conversations.find(item => item.id === activeId);
@@ -36,6 +42,48 @@ export function ChatOverlay() {
   const preset = active?.preset ?? draftPreset;
   const saved = new Set(data.words.map(word => word.hanzi));
   const missingApiKey = !data.settings.apiKey.trim();
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const fit = (position: ChatLauncherPosition) => clampChatLauncherPosition(position, window.innerWidth, window.innerHeight, insets.top, insets.bottom);
+    const keepVisible = () => {
+      const current = launcherPositionRef.current;
+      if (!current) return;
+      const next = fit(current);
+      if (next.x !== current.x || next.y !== current.y) {
+        launcherPositionRef.current = next;
+        setLauncherPosition(next);
+        saveChatLauncherPosition(next);
+      }
+    };
+    const move = (event: PointerEvent) => {
+      const drag = launcherDrag.current;
+      if (!drag) return;
+      const dx = event.pageX - drag.startX;
+      const dy = event.pageY - drag.startY;
+      if (!drag.moved && Math.hypot(dx, dy) < 6) return;
+      drag.moved = true;
+      suppressLauncherPress.current = true;
+      const next = fit({ x: drag.origin.x + dx, y: drag.origin.y + dy });
+      launcherPositionRef.current = next;
+      setLauncherPosition(next);
+    };
+    const finish = () => {
+      if (launcherDrag.current?.moved && launcherPositionRef.current) saveChatLauncherPosition(launcherPositionRef.current);
+      launcherDrag.current = null;
+    };
+    keepVisible();
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', finish);
+    window.addEventListener('pointercancel', finish);
+    window.addEventListener('resize', keepVisible);
+    return () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', finish);
+      window.removeEventListener('pointercancel', finish);
+      window.removeEventListener('resize', keepVisible);
+    };
+  }, [insets.top, insets.bottom]);
 
   useEffect(() => {
     if (Platform.OS === 'web') return;
@@ -120,10 +168,18 @@ export function ChatOverlay() {
     finally { setBusy(false); }
   };
 
+  const launcherPointerProps = Platform.OS === 'web' ? { onPointerDown: (event: NativePointerEvent) => {
+    suppressLauncherPress.current = false;
+    launcherDrag.current = { startX: event.nativeEvent.pageX, startY: event.nativeEvent.pageY,
+      origin: launcherPositionRef.current ?? { x: window.innerWidth - 51 - 15, y: insets.top + 14 }, moved: false };
+  } } : {};
+
   if (!data.settings.aiChatEnabled) return null;
 
   return <>
-    <Pressable accessibilityRole="button" accessibilityLabel="Open DeepSeek chat" onHoverIn={() => setHovered(true)} onHoverOut={() => setHovered(false)} onPressIn={() => { if (!missingApiKey) setClicked(true); }} onPress={() => { if (missingApiKey) { showMissingApiKeyPrompt(); return; } setClicked(true); setOpen(true); }} style={[styles.launcher, { top: insets.top + 14 }, missingApiKey && styles.launcherMissingKey, !missingApiKey && (hovered || clicked) && styles.launcherOpaque]}>
+    <Pressable {...launcherPointerProps} accessibilityRole="button" accessibilityLabel="Open DeepSeek chat" onHoverIn={() => setHovered(true)} onHoverOut={() => setHovered(false)} onPressIn={() => {
+      if (!missingApiKey) setClicked(true);
+    }} onPress={() => { if (suppressLauncherPress.current) return; if (missingApiKey) { showMissingApiKeyPrompt(); return; } setClicked(true); setOpen(true); }} style={[styles.launcher, launcherPosition ? { left: launcherPosition.x, top: launcherPosition.y } : { right: 15, top: insets.top + 14 }, { touchAction: 'none' } as ViewStyle, missingApiKey && styles.launcherMissingKey, !missingApiKey && (hovered || clicked) && styles.launcherOpaque]}>
       <View style={[styles.launcherRing, missingApiKey && styles.launcherRingMissingKey]}><Ionicons name="hardware-chip-outline" size={25} color={missingApiKey ? '#69726E' : '#D9FFF4'} /></View>
       <View style={[styles.orbitDot, missingApiKey && styles.orbitDotMissingKey]} />
     </Pressable>
