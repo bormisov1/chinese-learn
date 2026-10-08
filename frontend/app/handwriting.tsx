@@ -120,10 +120,14 @@ export default function Handwriting() {
         numberOfLines={1}
         style={[styles.outputText, !output && styles.outputPlaceholder]}
       >{output || 'Your text appears here'}</Text>
-      <Pressable accessibilityRole="button" accessibilityLabel="Copy output" disabled={!output} onPress={copyOutput} style={[styles.copyButton, !output && styles.disabled]}>
-        <Ionicons name={copied ? 'checkmark-outline' : 'copy-outline'} size={18} color={colors.green} />
-        <Text style={styles.copyLabel}>{copied ? 'Copied' : 'Copy'}</Text>
-      </Pressable>
+      <View style={styles.outputActions}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Copy output" disabled={!output} onPress={copyOutput} style={[styles.outputAction, !output && styles.disabled]}>
+          <Ionicons name={copied ? 'checkmark-outline' : 'copy-outline'} size={19} color={colors.green} />
+        </Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Clear output" disabled={!output} onPress={() => { setOutput(''); setCopied(false); }} style={[styles.outputAction, !output && styles.disabled]}>
+          <Ionicons name="close" size={22} color={colors.green} />
+        </Pressable>
+      </View>
     </View>
 
     <View style={styles.drawingFrame}>
@@ -173,8 +177,8 @@ export default function Handwriting() {
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.paper },
   outputPanel: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 52, marginHorizontal: 16, marginTop: 12, marginBottom: 10, paddingHorizontal: 16, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.card },
-  copyButton: { flexDirection: 'row', alignItems: 'center', gap: 5, padding: 4 },
-  copyLabel: { color: colors.green, fontSize: 13, fontWeight: '700' },
+  outputActions: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  outputAction: { width: 30, height: 36, alignItems: 'center', justifyContent: 'center' },
   outputText: { flex: 1, color: colors.ink, fontSize: 22 },
   outputPlaceholder: { color: colors.muted, fontSize: 16 },
   drawingFrame: { flex: 1, marginHorizontal: 16, marginBottom: 10, borderRadius: 18, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.card, overflow: 'hidden' },
