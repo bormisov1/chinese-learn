@@ -67,6 +67,8 @@ jobs:
         run: npx expo prebuild --platform ios --no-install
       - name: Install CocoaPods
         run: pod install --project-directory=ios
+      - name: Apply Xcode 26 fmt workaround
+        run: node scripts/patch-ios-fmt.mjs
       - name: Install Apple API key
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
