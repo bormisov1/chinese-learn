@@ -46,3 +46,10 @@ HEAD from `frontend/` and deploys the web export to
 page from `backend/docs/`. `master` targets `https://zh.x.bormisov.com`.
 The script is VPS-only; it needs the server's Node 22.13.0, Nginx, Certbot,
 and sudo environment.
+# iOS TestFlight CI
+
+The GitHub Actions workflow in `.github/workflows/ios-testflight.yml` builds the iOS app on a standard macOS runner and uploads it to TestFlight whenever `master` receives a commit (including a merge from `dev`). Builds of this workflow queue behind earlier iOS builds. It can also be started manually from the Actions tab. The workflow uses Expo prebuild locally on the runner, without EAS Build or EAS Submit.
+
+The repository needs these GitHub Actions secrets from an App Store Connect Team API key: `ASC_KEY_ID`, `ASC_ISSUER_ID`, and `ASC_API_KEY_P8` (the full downloaded `.p8` contents). Keep the key out of the repository. The Linux credentials job checks them before reserving a macOS runner.
+
+Pull requests to `dev` run `.github/workflows/ios-verify.yml`, which compiles an unsigned iOS Simulator build. It needs no Apple secrets.
