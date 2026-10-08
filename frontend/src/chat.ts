@@ -94,21 +94,25 @@ export async function requestChatReply(settings: Settings, preset: ChatPreset, h
   } catch { throw new Error('Could not reach DeepSeek. Check your connection and API endpoint.'); }
   if (!response.ok) throw new Error(`DeepSeek error ${response.status}`);
   let content = '';
+  const consume = (line: string) => {
+    if (!line.startsWith('data:')) return;
+    const payload = line.slice(5).trim();
+    if (!payload || payload === '[DONE]') return;
+    let chunk: { choices?: { delta?: { content?: string }; finish_reason?: string }[]; error?: { message?: string } };
+    try { chunk = JSON.parse(payload); }
+    catch { throw new Error('DeepSeek returned an unreadable chat stream. Please try again.'); }
+    if (chunk.error) throw new Error(chunk.error.message || 'DeepSeek chat failed. Please try again.');
+    if (chunk.choices?.[0]?.finish_reason === 'length') throw new Error('DeepSeek cut off its reply. Please try again.');
+    const delta = chunk.choices?.[0]?.delta?.content;
+    if (typeof delta === 'string') {
+      content += delta;
+      onPartial?.(partialChatAnswer(content));
+    }
+  };
   if (response.body && response.headers.get('content-type')?.includes('text/event-stream')) {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
-    const consume = (line: string) => {
-      if (!line.startsWith('data:')) return;
-      const payload = line.slice(5).trim();
-      if (!payload || payload === '[DONE]') return;
-      const chunk = JSON.parse(payload);
-      const delta = chunk.choices?.[0]?.delta?.content;
-      if (typeof delta === 'string') {
-        content += delta;
-        onPartial?.(partialChatAnswer(content));
-      }
-    };
     while (true) {
       const { done, value } = await reader.read();
       buffer += decoder.decode(value, { stream: !done });
@@ -118,9 +122,20 @@ export async function requestChatReply(settings: Settings, preset: ChatPreset, h
       if (done) { if (buffer) consume(buffer); break; }
     }
   } else {
-    const data = await response.json();
-    content = data.choices?.[0]?.message?.content ?? '';
+    const body = await response.text();
+    if (body.trimStart().startsWith('data:')) {
+      for (const line of body.trimStart().split(/\r?\n/)) consume(line);
+    } else {
+      let data: { choices?: { message?: { content?: string }; finish_reason?: string }[] };
+      try { data = JSON.parse(body); }
+      catch { throw new Error('DeepSeek returned an unreadable response. Check the API endpoint and try again.'); }
+      if (data.choices?.[0]?.finish_reason === 'length') throw new Error('DeepSeek cut off its reply. Please try again.');
+      content = data.choices?.[0]?.message?.content ?? '';
+    }
   }
-  try { return parseChatReply(JSON.parse(content || '{}')); }
-  catch (error) { throw error instanceof Error ? error : new Error('DeepSeek returned invalid JSON.'); }
+  if (!content.trim()) throw new Error('DeepSeek returned an empty reply. Please try again.');
+  let parsed: unknown;
+  try { parsed = JSON.parse(content); }
+  catch { throw new Error('DeepSeek returned an incomplete reply. Please try again.'); }
+  return parseChatReply(parsed);
 }
