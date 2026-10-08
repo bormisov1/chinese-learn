@@ -26,6 +26,10 @@ export const CHAT_PRESETS: { id: ChatPreset; label: string; prompt: string }[] =
   { id: 'correct', label: 'Correct & translate', prompt: 'Correct the following text. Translate any English parts into natural Chinese so the complete corrected text is in Chinese. Show the corrected Chinese text first, then explain each correction and translation.' },
 ];
 
+export function addableChatWords(words: ChatWord[], question: string): ChatWord[] {
+  return words.filter(word => question.includes(word.hanzi));
+}
+
 export function parseChatReply(value: unknown): ChatReply {
   if (!value || typeof value !== 'object') throw new Error('DeepSeek returned an invalid reply.');
   const result = value as { answer?: unknown; words?: unknown; title?: unknown };

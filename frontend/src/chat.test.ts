@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { CHAT_PRESETS, chatTitleForQuestion, fallbackChatTitle, parseChatReply, partialChatAnswer, requestChatReply } from './chat';
+import { CHAT_PRESETS, addableChatWords, chatTitleForQuestion, fallbackChatTitle, parseChatReply, partialChatAnswer, requestChatReply } from './chat';
 import { loadChatHistory, saveChatHistory } from './chat-history';
 import type { Settings } from './types';
 
@@ -11,6 +11,17 @@ test('chat keeps only valid, unique, clickable Chinese words', () => {
     { hanzi: 'hello', pinyin: 'x', translation: 'invalid' },
   ] }), { answer: 'A greeting', words: [{ hanzi: '你好', pinyin: 'nǐ hǎo', translation: 'hello' }] });
   assert.throws(() => parseChatReply({ answer: 'missing list' }), /word list/);
+});
+
+test('only words present in the user question can be added from a reply', () => {
+  const words = [
+    { hanzi: '清', pinyin: 'qīng', translation: 'clear' },
+    { hanzi: '氵', pinyin: 'shuǐ', translation: 'water radical' },
+    { hanzi: '青', pinyin: 'qīng', translation: 'blue-green' },
+    { hanzi: '爱', pinyin: 'ài', translation: 'love' },
+  ];
+  assert.deepEqual(addableChatWords(words, 'What does 清 mean?').map(word => word.hanzi), ['清']);
+  assert.deepEqual(addableChatWords(words, 'Correct 我 love 你').map(word => word.hanzi), []);
 });
 
 test('chat progressively decodes JSON answer text and completes an SSE response', async () => {
@@ -81,4 +92,6 @@ test('chat title accepts only a short summary and history survives reload', () =
   ] }];
   saveChatHistory(conversations, storage);
   assert.deepEqual(loadChatHistory(storage), conversations);
+  saveChatHistory([{ ...conversations[0], preset: 'correct' }], storage);
+  assert.equal(loadChatHistory(storage)[0]?.preset, 'correct');
 });
