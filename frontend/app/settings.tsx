@@ -711,10 +711,21 @@ function TtsSettings({
 }) {
   const provider = getTtsProvider(settings);
   const [voices, setVoices] = useState<TtsVoice[]>([]);
+  const [voicePickerOpen, setVoicePickerOpen] = useState(false);
   useEffect(
     () => subscribeToVoices(() => setVoices(provider.voices())),
     [provider],
   );
+  const selectedVoice = voices.find((voice) => voice.id === settings.ttsVoiceURI);
+  const selectedVoiceLabel = !settings.ttsVoiceURI
+    ? "Automatic"
+    : selectedVoice
+      ? `${selectedVoice.name} (${selectedVoice.language})`
+      : "Selected voice unavailable — using automatic";
+  const selectVoice = (voiceId: string) => {
+    update("ttsVoiceURI", voiceId);
+    setVoicePickerOpen(false);
+  };
   return (
     <View style={[shell.panel, styles.ttsPanel]}>
       <Text style={styles.sectionTitle}>Mandarin audio</Text>
@@ -742,21 +753,58 @@ function TtsSettings({
             ))}
           </View>
           <Text style={[styles.label, styles.ttsLabel]}>MANDARIN VOICE</Text>
-          <View style={styles.chips}>
-            <Choice
-              label="Automatic"
-              selected={!settings.ttsVoiceURI}
-              onPress={() => update("ttsVoiceURI", "")}
-            />
-            {voices.map((voice) => (
-              <Choice
-                key={voice.id}
-                label={`${voice.name} (${voice.language})`}
-                selected={settings.ttsVoiceURI === voice.id}
-                onPress={() => update("ttsVoiceURI", voice.id)}
-              />
-            ))}
-          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Mandarin voice: ${selectedVoiceLabel}`}
+            accessibilityHint="Opens the list of available Mandarin voices"
+            accessibilityState={{ expanded: voicePickerOpen }}
+            onPress={() => setVoicePickerOpen(true)}
+            style={({ pressed }) => [styles.voiceSelect, pressed && styles.pressed]}
+          >
+            <Text numberOfLines={1} style={styles.voiceSelectText}>{selectedVoiceLabel}</Text>
+            <Ionicons name="chevron-down" size={18} color={colors.green} />
+          </Pressable>
+          <Modal
+            animationType="fade"
+            transparent
+            visible={voicePickerOpen}
+            onRequestClose={() => setVoicePickerOpen(false)}
+          >
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close voice list"
+              onPress={() => setVoicePickerOpen(false)}
+              style={styles.modalBackdrop}
+            >
+              <Pressable
+                accessibilityRole="none"
+                onPress={(event) => event.stopPropagation()}
+                style={styles.voicePicker}
+              >
+                <Text style={styles.voicePickerTitle}>Mandarin voice</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Close"
+                  hitSlop={10}
+                  onPress={() => setVoicePickerOpen(false)}
+                  style={({ pressed }) => [styles.modalClose, pressed && styles.pressed]}
+                >
+                  <Ionicons name="close" size={24} color={colors.muted} />
+                </Pressable>
+                <ScrollView style={styles.voiceOptions} keyboardShouldPersistTaps="handled">
+                  <VoiceOption label="Automatic" selected={!settings.ttsVoiceURI} onPress={() => selectVoice("")} />
+                  {voices.map((voice) => (
+                    <VoiceOption
+                      key={voice.id}
+                      label={`${voice.name} (${voice.language})`}
+                      selected={settings.ttsVoiceURI === voice.id}
+                      onPress={() => selectVoice(voice.id)}
+                    />
+                  ))}
+                </ScrollView>
+              </Pressable>
+            </Pressable>
+          </Modal>
           <View style={styles.testButton}>
             <Button
               secondary
@@ -772,6 +820,20 @@ function TtsSettings({
         </>
       )}
     </View>
+  );
+}
+
+function VoiceOption({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected }}
+      onPress={onPress}
+      style={({ pressed }) => [styles.voiceOption, selected && styles.voiceOptionSelected, pressed && styles.pressed]}
+    >
+      <Text style={[styles.voiceOptionText, selected && styles.voiceOptionTextSelected]}>{label}</Text>
+      {selected ? <Ionicons name="checkmark" size={19} color={colors.green} /> : null}
+    </Pressable>
   );
 }
 
@@ -977,6 +1039,48 @@ const styles = StyleSheet.create({
   hskMessage: { color: colors.green, fontWeight: "700", marginTop: 12 },
   ttsPanel: { marginTop: 14 },
   ttsLabel: { marginTop: 18 },
+  voiceSelect: {
+    maxWidth: 440,
+    minHeight: 50,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 13,
+    backgroundColor: colors.paper,
+    paddingHorizontal: 14,
+  },
+  voiceSelectText: { flex: 1, color: colors.ink, fontSize: 15 },
+  voicePicker: {
+    width: "100%",
+    maxWidth: 440,
+    maxHeight: "80%",
+    padding: 20,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.card,
+    shadowColor: "#1D231E",
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 10 },
+  },
+  voicePickerTitle: { color: colors.ink, fontSize: 21, fontWeight: "800", marginBottom: 16, paddingRight: 40 },
+  voiceOptions: { flexGrow: 0 },
+  voiceOption: {
+    minHeight: 50,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 13,
+  },
+  voiceOptionSelected: { backgroundColor: colors.pale },
+  voiceOptionText: { flex: 1, color: colors.ink, fontSize: 15 },
+  voiceOptionTextSelected: { color: colors.green, fontWeight: "700" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   choice: {
     borderWidth: 1,
