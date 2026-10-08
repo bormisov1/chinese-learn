@@ -55,7 +55,7 @@ const telemetryNames = new Set([
   "app_opened", "first_app_opened", "login_started", "login_succeeded", "login_failed",
   "language_switched", "language_switch_failed", "words_added", "round_started",
   "round_completed", "card_reviewed", "sentence_practice_completed", "listening_item_completed",
-  "mix_item_completed", "sync_bootstrap", "study_mode_selected",
+  "mix_item_completed", "sync_bootstrap", "study_mode_selected", "card_transition_timed",
 ]);
 const metricLabel = (value: string) => value.replace(/[^a-zA-Z0-9_.:-]/g, "_").slice(0, 80) || "unknown";
 const inc = (name: string, labels: Record<string, string> = {}, amount = 1) => {
@@ -110,7 +110,7 @@ function recordTelemetry(event: Snapshot) {
   if (!telemetryNames.has(name)) return false;
   const properties = safeJson(event.properties);
   const boundedProperties: Snapshot = {};
-  for (const key of ["platform", "provider", "source", "language", "from", "to", "mode", "kind", "result", "round", "count", "size", "firstTime", "chatId", "fullName", "username"]) {
+  for (const key of ["platform", "provider", "source", "language", "from", "to", "mode", "kind", "result", "round", "count", "size", "firstTime", "chatId", "fullName", "username", "durationMs", "completionMs", "averageMs", "maxMs", "maxSwipeCallbackMs", "maxRenderReadyMs"]) {
     if (properties[key] !== undefined) boundedProperties[key] = typeof properties[key] === "number" ? Math.max(0, Math.min(100000, Math.trunc(Number(properties[key])))) : String(properties[key]).slice(0, 40);
   }
   const eventId = String(event.eventId ?? "");
@@ -122,6 +122,17 @@ function recordTelemetry(event: Snapshot) {
   for (const key of ["platform", "provider", "language", "from", "to", "source", "mode", "kind", "result", "firstTime"]) if (boundedProperties[key] !== undefined) labels[key] = String(boundedProperties[key]);
   if (boundedProperties.round !== undefined) labels.round = String(boundedProperties.round);
   inc("client_events_total", labels);
+  if (name === "card_transition_timed" && String(event.platform) === "ios") {
+    const kind = boundedProperties.kind;
+    const durations = kind === "round_start"
+      ? [["round_start", boundedProperties.durationMs]]
+      : kind === "round_summary"
+        ? [["average_card", boundedProperties.averageMs], ["worst_card", boundedProperties.maxMs], ["round_end", boundedProperties.completionMs], ["swipe_callback", boundedProperties.maxSwipeCallbackMs], ["render_ready", boundedProperties.maxRenderReadyMs]]
+        : [];
+    for (const [stage, value] of durations) {
+      if (typeof value === "number" && Number.isFinite(value)) observe("card_transition_seconds", value / 1000, { stage: String(stage) });
+    }
+  }
   return true;
 }
 
