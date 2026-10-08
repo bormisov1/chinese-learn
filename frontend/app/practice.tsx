@@ -197,7 +197,7 @@ export default function Practice() {
       <Header
         eyebrow="Sentence practice"
         title="Read. Think. Translate."
-        subtitle={`${dueWords} words due · ${practicedWords} of ${data.words.length} practiced`}
+        subtitle={`${dueWords} ${t("words due")} · ${practicedWords} ${t("of")} ${data.words.length} ${t("practiced")}`}
       />
       <View style={styles.direction}>
         <Button

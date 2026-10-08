@@ -45,9 +45,11 @@ function sourceFiles(inputs) {
 
 const args = process.argv.slice(2);
 const strict = args.includes('--strict');
-const inputs = args.filter(arg => arg !== '--strict');
+const includeDynamic = args.includes('--dynamic');
+const inputs = args.filter(arg => arg !== '--strict' && arg !== '--dynamic');
 const files = sourceFiles(inputs.length ? inputs : ['app', 'src']);
 const candidates = new Map();
+const dynamicCandidates = new Map();
 for (const file of files) {
   const source = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   const add = (node, value) => {
@@ -55,6 +57,12 @@ for (const file of files) {
     if (!text || unchanged.has(text) || !/\p{Script=Latin}/u.test(text)) return;
     const line = source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
     candidates.set(`${file}:${line}:${text}`, { file: path.relative(process.cwd(), file), line, text });
+  };
+  const addDynamic = (node, value) => {
+    const snippet = normalize(value).replace(/\$\{[^}]+\}/g, '{…}');
+    if (!/[A-Za-z]{2}/.test(snippet.replace(productTerms, ''))) return;
+    const line = source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
+    dynamicCandidates.set(`${file}:${line}:${snippet}`, { file: path.relative(process.cwd(), file), line, snippet });
   };
   walk(source, node => {
     if (ts.isJsxElement(node) && node.openingElement.tagName.getText(source) === 'Text') {
@@ -64,6 +72,16 @@ for (const file of files) {
       }
     }
     if (ts.isJsxAttribute(node) && /^(label|title|subtitle|eyebrow|placeholder)$/.test(node.name.text) && node.initializer && ts.isStringLiteral(node.initializer)) add(node, node.initializer.text);
+    if (includeDynamic && ts.isJsxAttribute(node) && /^(label|title|subtitle|eyebrow|placeholder)$/.test(node.name.text) && node.initializer && ts.isJsxExpression(node.initializer) && node.initializer.expression && ts.isTemplateExpression(node.initializer.expression)) {
+      addDynamic(node, node.initializer.expression.getText(source));
+    }
+    if (includeDynamic && ts.isJsxElement(node) && node.openingElement.tagName.getText(source) === 'Text' && node.children.some(child => ts.isJsxExpression(child))) {
+      const literal = node.children.filter(ts.isJsxText).map(child => child.getText(source)).join(' {…} ');
+      if (literal.trim()) addDynamic(node, literal);
+    }
+    if (includeDynamic && ts.isJsxExpression(node) && node.expression && ts.isTemplateExpression(node.expression) && ts.isJsxElement(node.parent) && node.parent.openingElement.tagName.getText(source) === 'Text') {
+      addDynamic(node, node.expression.getText(source));
+    }
     if (ts.isCallExpression(node) && node.arguments.length && /^(t|translate)$/.test(node.expression.getText(source))) {
       const argument = node.expression.getText(source) === 'translate' ? node.arguments[1] : node.arguments[0];
       if (argument && (ts.isStringLiteral(argument) || ts.isNoSubstitutionTemplateLiteral(argument))) add(argument, argument.text);
@@ -96,4 +114,10 @@ for (const { file, line, text } of candidates.values()) {
   }
 }
 console.log(`Checked ${candidates.size} UI strings in ${files.length} files; ${findings} finding(s).`);
+if (includeDynamic) {
+  for (const { file, line, snippet } of dynamicCandidates.values()) {
+    console.log(`${file}:${line} dynamic UI text to review: ${JSON.stringify(snippet)}`);
+  }
+  console.log(`${dynamicCandidates.size} dynamic UI text candidate(s); these need human review of grammar and word order.`);
+}
 if (strict && findings) process.exitCode = 1;

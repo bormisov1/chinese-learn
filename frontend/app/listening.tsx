@@ -1,4 +1,4 @@
-import { displayTranslation, Text, TextInput } from "@/i18n";
+import { displayTranslation, Text, TextInput, useTranslation } from "@/i18n";
 import { useMemo,
   useState } from "react";
 import { ActivityIndicator,
@@ -28,6 +28,7 @@ type ListeningItem =
 
 export default function Listening() {
   const { data, patch } = useStore();
+  const t = useTranslation();
   const items = useMemo<ListeningItem[]>(() => {
     const words: ListeningItem[] = data.words.map((word) => ({ kind: "word", id: `word:${word.id}`, pronunciation: resolveWordPronunciation(word, displayTranslation(word.russian, data.settings.language)), word }));
     const sentences: ListeningItem[] = data.settings.apiKeyValidated
@@ -97,9 +98,9 @@ export default function Listening() {
   return (
     <ScrollView style={shell.page} contentContainerStyle={shell.content} keyboardShouldPersistTaps="handled">
       <Header
-        eyebrow={`Listening · ${item.kind}`}
+        eyebrow={`${t("Listening")} · ${t(item.kind)}`}
         title="Listen. Recognize. Recall."
-        subtitle={`${position % items.length + 1} of ${items.length} · ${includesSentences ? "words and sentences mixed" : "words only"}`}
+        subtitle={`${position % items.length + 1} ${t("of")} ${items.length} · ${t(includesSentences ? "words and sentences mixed" : "words only")}`}
       />
       <Pressable
         accessibilityRole={item.kind === "word" ? "button" : undefined}
