@@ -45,7 +45,7 @@
     <header><div class="brand"><span class="brand-mark" lang="zh-Hans">汉</span> Hanzi Deck</div><span class="header-note">Identity exploration / 2026</span></header>
     <section class="intro" aria-labelledby="title">
       <div><p class="eyebrow">App icon concepts</p><h1 id="title">A closer look<br>at Sunrise.</h1><p>Small changes to the original Sunrise mark, with Editorial, Inverse, and Seal kept for comparison.</p></div>
-      <div class="count" aria-hidden="true">11<small> / 11</small></div>
+      <div class="count" aria-hidden="true">15<small> / 15</small></div>
     </section>
     <div id="gallery"></div>
     <footer><span>汉 · hàn · Chinese language</span><span>Hanzi Deck — logo study</span></footer>
@@ -55,13 +55,49 @@
     const serif = '"Noto Serif CJK SC", "Songti SC", "SimSun", serif';
     const han = (fill, size = 92, y = 108, weight = 700, family = sans, extra = '') => `<text x="80" y="${y}" text-anchor="middle" font-family='${family}' font-size="${size}" font-weight="${weight}" fill="${fill}" ${extra}>汉</text>`;
     const tile = (fill, radius = 34) => `<rect width="160" height="160" rx="${radius}" fill="${fill}"/>`;
+    const watercolorTile = (id) => `
+      <defs>
+        <clipPath id="paper-edge-${id}"><rect width="160" height="160" rx="34"/></clipPath>
+        <radialGradient id="paper-color-${id}" cx="41%" cy="35%" r="83%">
+          <stop offset="0" stop-color="#fff0cb"/>
+          <stop offset=".5" stop-color="#ffd28e"/>
+          <stop offset="1" stop-color="#f5b779"/>
+        </radialGradient>
+        <filter id="paper-wash-${id}" x="0" y="0" width="100%" height="100%">
+          <feTurbulence type="fractalNoise" baseFrequency=".026" numOctaves="4" seed="11" stitchTiles="stitch"/>
+          <feColorMatrix type="matrix" values="0 0 0 0 .73  0 0 0 0 .39  0 0 0 0 .19  1.2 .8 .5 0 -1.05"/>
+        </filter>
+        <filter id="paper-pools-${id}" x="-50%" y="-50%" width="200%" height="200%">
+          <feTurbulence type="fractalNoise" baseFrequency=".045" numOctaves="2" seed="17" result="noise"/>
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="18" xChannelSelector="R" yChannelSelector="G"/>
+          <feGaussianBlur stdDeviation="8"/>
+        </filter>
+        <filter id="paper-grain-${id}" x="0" y="0" width="100%" height="100%">
+          <feTurbulence type="fractalNoise" baseFrequency=".32" numOctaves="2" seed="6" stitchTiles="stitch"/>
+          <feColorMatrix type="saturate" values="0"/>
+        </filter>
+      </defs>
+      <g clip-path="url(#paper-edge-${id})">
+        <rect width="160" height="160" fill="url(#paper-color-${id})"/>
+        <g filter="url(#paper-pools-${id})">
+          <ellipse cx="17" cy="103" rx="48" ry="74" fill="#d99560" opacity=".18"/>
+          <ellipse cx="128" cy="23" rx="55" ry="39" fill="#fff1c7" opacity=".55"/>
+          <ellipse cx="150" cy="137" rx="48" ry="61" fill="#d48a56" opacity=".12"/>
+        </g>
+        <rect width="160" height="160" filter="url(#paper-wash-${id})" opacity=".45"/>
+        <rect width="160" height="160" filter="url(#paper-grain-${id})" opacity=".09" style="mix-blend-mode:multiply"/>
+      </g>`;
     const families = [
       {
-        name: 'Sunrise studies', note: 'The original form, refined one detail at a time.', items: [
-          { name: 'Sunrise', note: 'Original concept', art: `${tile('#f7c07c', 34)}<circle cx="80" cy="84" r="55" fill="#e9714d"/><path d="M22 121h116" stroke="#a94135" stroke-width="5" stroke-linecap="round"/>${han('#fff5df', 88, 107, 800)}` },
-          { name: 'Line at bottom', note: 'Horizon below the sun', art: `${tile('#f7c07c', 34)}<circle cx="80" cy="84" r="55" fill="#e9714d"/><path d="M22 145h116" stroke="#a94135" stroke-width="5" stroke-linecap="round"/>${han('#fff5df', 88, 107, 800)}` },
-          { name: 'No line', note: 'Circle and character only', art: `${tile('#f7c07c', 34)}<circle cx="80" cy="84" r="55" fill="#e9714d"/>${han('#fff5df', 88, 107, 800)}` },
-          { name: 'Lower 汉', note: 'Centered within the circle', art: `${tile('#f7c07c', 34)}<circle cx="80" cy="84" r="55" fill="#e9714d"/>${han('#fff5df', 88, 115, 800)}` },
+        name: 'Sunrise studies', note: 'Watercolor first, original flat color directly below.', items: [
+          { name: 'Sunrise', note: 'Watercolor paper', art: `${watercolorTile('sunrise')}<circle cx="80" cy="84" r="55" fill="#e9714d"/><path d="M22 121h116" stroke="#a94135" stroke-width="5" stroke-linecap="round"/>${han('#fff5df', 88, 107, 800)}` },
+          { name: 'Line at bottom', note: 'Watercolor paper', art: `${watercolorTile('bottom')}<circle cx="80" cy="84" r="55" fill="#e9714d"/><path d="M22 145h116" stroke="#a94135" stroke-width="5" stroke-linecap="round"/>${han('#fff5df', 88, 107, 800)}` },
+          { name: 'No line', note: 'Watercolor paper', art: `${watercolorTile('no-line')}<circle cx="80" cy="84" r="55" fill="#e9714d"/>${han('#fff5df', 88, 107, 800)}` },
+          { name: 'Lower 汉', note: 'Watercolor paper', art: `${watercolorTile('lower')}<circle cx="80" cy="84" r="55" fill="#e9714d"/>${han('#fff5df', 88, 115, 800)}` },
+          { name: 'Sunrise', note: 'Original flat color', art: `${tile('#f7c07c', 34)}<circle cx="80" cy="84" r="55" fill="#e9714d"/><path d="M22 121h116" stroke="#a94135" stroke-width="5" stroke-linecap="round"/>${han('#fff5df', 88, 107, 800)}` },
+          { name: 'Line at bottom', note: 'Original flat color', art: `${tile('#f7c07c', 34)}<circle cx="80" cy="84" r="55" fill="#e9714d"/><path d="M22 145h116" stroke="#a94135" stroke-width="5" stroke-linecap="round"/>${han('#fff5df', 88, 107, 800)}` },
+          { name: 'No line', note: 'Original flat color', art: `${tile('#f7c07c', 34)}<circle cx="80" cy="84" r="55" fill="#e9714d"/>${han('#fff5df', 88, 107, 800)}` },
+          { name: 'Lower 汉', note: 'Original flat color', art: `${tile('#f7c07c', 34)}<circle cx="80" cy="84" r="55" fill="#e9714d"/>${han('#fff5df', 88, 115, 800)}` },
           { name: 'Han River', note: 'River only below the old line', art: `${tile('#f7c07c', 34)}<circle cx="80" cy="84" r="55" fill="#e9714d"/><clipPath id="river-bottom"><rect x="0" y="121" width="160" height="39"/></clipPath><path d="M15 129C38 121 56 122 78 130c23 9 41 9 67-6v14c-24 16-42 15-68 5-22-9-39-7-62 2z" fill="#a94135" clip-path="url(#river-bottom)"/>${han('#fff5df', 88, 107, 800)}` },
           { name: 'Short horizon', note: 'A lighter underline', art: `${tile('#f7c07c', 34)}<circle cx="80" cy="84" r="55" fill="#e9714d"/><path d="M40 121h80" stroke="#a94135" stroke-width="4" stroke-linecap="round"/>${han('#fff5df', 88, 107, 800)}` },
           { name: 'Sun ring', note: 'Open, airy sun shape', art: `${tile('#f7c07c', 34)}<circle cx="80" cy="84" r="54" fill="none" stroke="#e9714d" stroke-width="7"/>${han('#a94135', 88, 107, 800)}` },

@@ -3,12 +3,12 @@ import { CHAT_PRESETS, type ChatPreset, type ChatReply } from './chat';
 export type ChatMessage = { role: 'user'; text: string } | { role: 'assistant'; text: string; reply: ChatReply };
 export type Conversation = { id: string; title: string; preset: ChatPreset; messages: ChatMessage[]; updatedAt: number };
 
-const KEY = 'hanzi-deck:chat-history:v1';
+export const CHAT_HISTORY_KEY = 'hanzi-deck:chat-history:v1';
 const presets = CHAT_PRESETS.map(item => item.id);
 
-export function loadChatHistory(storage: Pick<Storage, 'getItem'> = globalThis.localStorage): Conversation[] {
+export function parseChatHistory(raw: string | null): Conversation[] {
   try {
-    const value = JSON.parse(storage?.getItem(KEY) ?? '[]');
+    const value = JSON.parse(raw ?? '[]');
     if (!Array.isArray(value)) return [];
     return value.filter((item): item is Conversation =>
       !!item && typeof item.id === 'string' && typeof item.title === 'string' &&
@@ -23,6 +23,10 @@ export function loadChatHistory(storage: Pick<Storage, 'getItem'> = globalThis.l
   } catch { return []; }
 }
 
+export function loadChatHistory(storage: Pick<Storage, 'getItem'> = globalThis.localStorage): Conversation[] {
+  return parseChatHistory(storage?.getItem(CHAT_HISTORY_KEY) ?? null);
+}
+
 export function saveChatHistory(conversations: Conversation[], storage: Pick<Storage, 'setItem'> = globalThis.localStorage): void {
-  storage?.setItem(KEY, JSON.stringify(conversations));
+  storage?.setItem(CHAT_HISTORY_KEY, JSON.stringify(conversations));
 }

@@ -16,6 +16,7 @@
     "build:dictionary:th": "node scripts/build-thai-dictionary.mjs",
     "validate:hsk-data": "node scripts/validate-hsk-data.mjs",
     "test": "tsx --test src/*.test.ts",
+    "audit:i18n": "node scripts/audit-ui-translations.mjs --strict",
     "serve:web": "serve -s dist -l tcp://0.0.0.0:8081",
     "android": "expo start --android",
     "ios": "expo start --ios",

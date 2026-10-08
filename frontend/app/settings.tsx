@@ -1,4 +1,4 @@
-import { displayTranslation, LANGUAGES, Text, TextInput } from "@/i18n";
+import { displayTranslation, LANGUAGES, Text, TextInput, useTranslation } from "@/i18n";
 import { useEffect,
   useRef,
   useState } from "react";
@@ -41,6 +41,7 @@ import { parseBackup } from "@/backup";
 import { chooseBackup, downloadBackup } from "@/backup-files";
 
 export default function Settings() {
+  const t = useTranslation();
   const params = useLocalSearchParams<{ focus?: string; request?: string }>();
   const { data, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, importWords, patch, retryDictionary, selectLanguage, setAutomaticWordAddition, account, authBusy, authError, signIn, signOut, createBackup, mergeBackup } = useStore();
   const scrollRef = useRef<ScrollView>(null);
@@ -433,7 +434,7 @@ export default function Settings() {
         <View>
           <Text style={styles.sectionTitle}>Active card set</Text>
           <Text style={styles.help}>
-            {activeWords.length} of 12 words · six cards per full round
+            {activeWords.length} {t("of 12 words · six cards per full round")}
           </Text>
         </View>
       </View>
@@ -650,6 +651,7 @@ function HskAdder({
   existing: Set<string>;
   onAdd: (words: ImportedWord[]) => number;
 }) {
+  const t = useTranslation();
   const [level, setLevel] = useState(1);
   const [message, setMessage] = useState("");
   const cumulative = hskLevels as Record<string, string[]>;
@@ -684,7 +686,7 @@ function HskAdder({
         ))}
       </View>
       <Text style={styles.hskRemaining}>
-        {available.length} HSK {level} words remaining
+        {`${available.length} HSK ${level} ${t("words remaining")}`}
       </Text>
       <View style={styles.hskButton}>
         <Button
@@ -942,7 +944,7 @@ const styles = StyleSheet.create({
   deepSeekValidated: { backgroundColor: "#EAF7ED", borderColor: "#AED8B7" },
   validationStatus: { color: colors.muted, marginTop: -4, marginBottom: 14 },
   modelRouting: { color: colors.muted, lineHeight: 20, marginBottom: 18 },
-  aiChatRow: { flexDirection: "row", alignItems: "center", gap: 14, marginTop: -6 },
+  aiChatRow: { flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 18 },
   validationSuccess: { color: colors.green, fontWeight: "700" },
   apiKeyGuide: {
     alignSelf: "flex-start",
