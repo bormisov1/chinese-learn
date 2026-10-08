@@ -1,6 +1,6 @@
 import type { AppLanguage, Settings } from './types';
 
-export type ChatPreset = 'none' | 'words' | 'hanzi' | 'reply';
+export type ChatPreset = 'none' | 'words' | 'hanzi' | 'reply' | 'correct';
 export type ChatTurn = { role: 'user' | 'assistant'; content: string };
 export type ChatWord = { hanzi: string; pinyin: string; translation: string };
 export type ChatReply = { answer: string; words: ChatWord[]; title?: string };
@@ -23,6 +23,7 @@ export const CHAT_PRESETS: { id: ChatPreset; label: string; prompt: string }[] =
   { id: 'words', label: 'Explain words', prompt: 'Explain each word and hanzi in following with pinyin' },
   { id: 'hanzi', label: 'Hanzi components', prompt: 'For following hanzi explain its components, what has meaning, what gives sound, what can be used as association to remember' },
   { id: 'reply', label: 'Suggest a reply', prompt: 'Suggest a reply to following' },
+  { id: 'correct', label: 'Correct & translate', prompt: 'Correct the following text. Translate any English parts into natural Chinese so the complete corrected text is in Chinese. Show the corrected Chinese text first, then explain each correction and translation.' },
 ];
 
 export function parseChatReply(value: unknown): ChatReply {
