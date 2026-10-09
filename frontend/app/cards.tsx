@@ -11,6 +11,7 @@ import {
   PanResponder,
   Platform,
   Pressable,
+  Modal,
   ScrollView,
   StyleSheet,
   View,
@@ -34,6 +35,7 @@ import { recordRoundCompletion, undoRoundCompletion } from "@/round-history";
 import { flushTelemetry, track } from "@/telemetry";
 import { ExplanationButton } from "@/explanation-button";
 import { captureCardReviewUndo, restoreCardReview, type CardReviewUndo } from "@/card-review-undo";
+import Handwriting from "./handwriting";
 
 type Phase = "ready" | "studying" | "celebrating" | "complete";
 type Graduation = { learned: Word; replacement?: Word };
@@ -79,10 +81,13 @@ export default function Cards() {
     [reviewedCards, setReviewedCards] = useState<ReviewedCard[]>([]),
     [roundEndsAfterCelebration, setRoundEndsAfterCelebration] = useState(false),
     [cardHeights, setCardHeights] = useState<Record<string, number>>({}),
-    [roundTilts, setRoundTilts] = useState<Record<string, number>>({});
+    [roundTilts, setRoundTilts] = useState<Record<string, number>>({}),
+    [handwritingOpen, setHandwritingOpen] = useState(false);
   const swipe = useRef(new Animated.ValueXY()).current;
   const cardSpin = useRef(new Animated.Value(0)).current;
   const grading = useRef(false);
+  const handwritingSwipeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (handwritingSwipeTimer.current) clearTimeout(handwritingSwipeTimer.current); }, []);
   const pendingTransition = useRef<PendingTransition | null>(null);
   const roundTransitionTimes = useRef<RoundTransitionTimes>({ count: 0, totalMs: 0, maxMs: 0, maxSwipeCallbackMs: 0, maxRenderReadyMs: 0 });
   const total = data.words.length;
@@ -203,6 +208,7 @@ export default function Cards() {
     setReviewedCards([]);
     setRoundEndsAfterCelebration(false);
     setFlipped(false);
+    setHandwritingOpen(false);
     setExampleIndex(0);
     grading.current = false;
     swipe.setValue({ x: 0, y: 0 });
@@ -257,6 +263,8 @@ export default function Cards() {
     const previous = reviewedCards.at(-1);
     const previousPosition = phase === "studying" ? position - 1 : position;
     if (!previous || previous.position !== previousPosition) return;
+    if (handwritingSwipeTimer.current) clearTimeout(handwritingSwipeTimer.current);
+    handwritingSwipeTimer.current = null;
     swipe.stopAnimation();
     cardSpin.stopAnimation();
     grading.current = false;
@@ -303,6 +311,14 @@ export default function Cards() {
         grade(correct);
       } else pendingTransition.current = null;
     });
+  };
+  const finishHandwriting = () => {
+    setHandwritingOpen(false);
+    flipCard(true);
+    handwritingSwipeTimer.current = setTimeout(() => {
+      handwritingSwipeTimer.current = null;
+      finishSwipe(true);
+    }, 400);
   };
   const flipCard = (nextFlipped: boolean) => {
     if (nextFlipped === flipped) return;
@@ -449,6 +465,7 @@ export default function Cards() {
     ? graduations[graduations.length - 1]
     : stagedGraduation;
   return (
+    <>
     <ScrollView style={shell.page} contentContainerStyle={shell.content}>
       {celebrating ? (
         <RoundReviewHeader
@@ -499,6 +516,7 @@ export default function Cards() {
               panHandlers={panResponder.panHandlers}
               onFlip={flipCard}
               onGrade={finishSwipe}
+              onHandwriting={() => setHandwritingOpen(true)}
               onHeightChange={(height) => setCardHeights((current) =>
                 current[stackWord.id] === height ? current : { ...current, [stackWord.id]: height })}
             />
@@ -523,6 +541,10 @@ export default function Cards() {
         </View>
       ) : null}
     </ScrollView>
+    {handwritingOpen && <Modal visible animationType="slide" onRequestClose={() => setHandwritingOpen(false)}>
+        <Handwriting targetHanzi={word.hanzi} onBack={() => setHandwritingOpen(false)} onCorrect={finishHandwriting} />
+      </Modal>}
+    </>
   );
 }
 
@@ -549,7 +571,7 @@ function RoundReviewHeader({ eyebrow, title, subtitle, onPreviousCard }: {
 
 function StackCard({ word, depth, roundIndex, initialTilt, active, height, settings, translationLanguage,
   examples, flipped, exampleIndex, onExampleIndexChange, swipe, cardSpin,
-  panHandlers, onFlip, onGrade, onHeightChange,
+  panHandlers, onFlip, onGrade, onHandwriting, onHeightChange,
 }: {
   word: Word;
   depth: number;
@@ -568,6 +590,7 @@ function StackCard({ word, depth, roundIndex, initialTilt, active, height, setti
   panHandlers: ReturnType<typeof PanResponder.create>["panHandlers"];
   onFlip: (flipped: boolean) => void;
   onGrade: (correct: boolean) => void;
+  onHandwriting: () => void;
   onHeightChange: (height: number) => void;
 }) {
   const t = useTranslation();
@@ -715,6 +738,9 @@ function StackCard({ word, depth, roundIndex, initialTilt, active, height, setti
             </View>
           </View>
           {!showingBack && <Text style={styles.hint}>Tap to reveal</Text>}
+          {active && !showingBack && <Pressable accessibilityRole="button" accessibilityLabel="Write answer by hand" onPress={(event) => { event.stopPropagation(); onHandwriting(); }} style={styles.handwritingButton}>
+            <Ionicons name="pencil-outline" size={24} color={colors.green} />
+          </Pressable>}
         </Pressable>
       </Animated.View>
     </Animated.View>
@@ -1480,6 +1506,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.8,
   },
   hint: { position: "absolute", left: 0, right: 0, bottom: 24, textAlign: "center", color: colors.muted, fontSize: 13 },
+  handwritingButton: { position: "absolute", right: 12, bottom: 12, width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   swipeHint: {
     color: colors.muted,
     fontSize: 12,

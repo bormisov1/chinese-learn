@@ -11,7 +11,13 @@ import { colors } from '@/theme';
 import { prepareRecognition, recognizeStrokes } from '@/handwriting/recognition';
 import type { Point, Stroke } from '@/handwriting/types';
 
-export default function Handwriting() {
+type HandwritingProps = {
+  targetHanzi?: string;
+  onBack?: () => void;
+  onCorrect?: () => void;
+};
+
+export default function Handwriting({ targetHanzi, onBack, onCorrect }: HandwritingProps) {
   const [output, setOutput] = useState('');
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [active, setActive] = useState<Stroke>([]);
@@ -21,9 +27,13 @@ export default function Handwriting() {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [correct, setCorrect] = useState(false);
   const [size, setSize] = useState({ width: 1, height: 1 });
   const sizeRef = useRef(size);
   const activeRef = useRef<Stroke>([]);
+  const successTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => { if (successTimer.current) clearTimeout(successTimer.current); }, []);
 
   function point(event: GestureResponderEvent): Point {
     const { locationX, locationY } = event.nativeEvent;
@@ -99,9 +109,14 @@ export default function Handwriting() {
 
   function insertCandidate() {
     const character = candidates[selected];
-    if (!character) return;
-    setOutput(current => current + character);
+    if (!character || correct || successTimer.current) return;
+    const next = output + character;
+    setOutput(next);
     clearDrawing();
+    if (targetHanzi && next === targetHanzi) {
+      setCorrect(true);
+      successTimer.current = setTimeout(() => onCorrect?.(), 650);
+    }
   }
 
   async function copyOutput() {
@@ -114,12 +129,16 @@ export default function Handwriting() {
   const visible = active.length ? [...strokes, active] : strokes;
   return <View style={styles.page}>
     <View style={styles.outputPanel}>
+      {onBack && <Pressable accessibilityRole="button" accessibilityLabel="Back to flashcard" onPress={onBack} style={styles.backAction}>
+        <Ionicons name="arrow-back" size={23} color={colors.green} />
+      </Pressable>}
       <Text
         accessibilityLabel="Handwriting output"
         selectable
         numberOfLines={1}
         style={[styles.outputText, !output && styles.outputPlaceholder]}
       >{output || 'Your text appears here'}</Text>
+      {correct && <Ionicons accessibilityLabel="Correct Hanzi" name="checkmark-circle" size={28} color={colors.green} />}
       <View style={styles.outputActions}>
         <Pressable accessibilityRole="button" accessibilityLabel="Copy output" disabled={!output} onPress={copyOutput} style={[styles.outputAction, !output && styles.disabled]}>
           <Ionicons name={copied ? 'checkmark-outline' : 'copy-outline'} size={19} color={colors.green} />
@@ -178,6 +197,7 @@ const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.paper },
   outputPanel: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 52, marginHorizontal: 16, marginTop: 12, marginBottom: 10, paddingHorizontal: 16, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.card },
   outputActions: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  backAction: { width: 30, height: 36, alignItems: 'center', justifyContent: 'center' },
   outputAction: { width: 30, height: 36, alignItems: 'center', justifyContent: 'center' },
   outputText: { flex: 1, color: colors.ink, fontSize: 22 },
   outputPlaceholder: { color: colors.muted, fontSize: 16 },
