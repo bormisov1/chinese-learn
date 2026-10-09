@@ -117,8 +117,9 @@ export function ChatOverlay() {
     if (!drag) return;
     const dx = pageX - drag.startX;
     const dy = pageY - drag.startY;
-    if (!drag.moved && Math.hypot(dx, dy) < 6) return;
+    if (!drag.moved && Math.hypot(dx, dy) < 2) return;
     drag.moved = true;
+    setLauncherPressed(false);
     suppressLauncherPress.current = true;
     const next = clampChatLauncherPosition({ x: drag.origin.x + dx, y: drag.origin.y + dy }, viewportWidth, viewportHeight, topInset, bottomInset);
     launcherPositionRef.current = next;
