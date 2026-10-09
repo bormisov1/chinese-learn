@@ -6,6 +6,7 @@ import {
   type GestureResponderEvent,
 } from 'react-native';
 import Svg, { Circle, Polyline } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/i18n';
 import { colors } from '@/theme';
 import { prepareRecognition, recognizeStrokes } from '@/handwriting/recognition';
@@ -18,6 +19,7 @@ type HandwritingProps = {
 };
 
 export default function Handwriting({ targetHanzi, onBack, onCorrect }: HandwritingProps) {
+  const insets = useSafeAreaInsets();
   const [output, setOutput] = useState('');
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [active, setActive] = useState<Stroke>([]);
@@ -127,7 +129,7 @@ export default function Handwriting({ targetHanzi, onBack, onCorrect }: Handwrit
   }
 
   const visible = active.length ? [...strokes, active] : strokes;
-  return <View style={styles.page}>
+  return <View style={[styles.page, onBack && { paddingTop: insets.top, paddingBottom: insets.bottom + 10 }]}>
     <View style={styles.outputPanel}>
       {onBack && <Pressable accessibilityRole="button" accessibilityLabel="Back to flashcard" onPress={onBack} style={styles.backAction}>
         <Ionicons name="arrow-back" size={23} color={colors.green} />
