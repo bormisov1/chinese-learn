@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useRef, useState } from 'react';
-import { Modal, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type GestureResponderEvent, type PointerEvent as NativePointerEvent, type ViewStyle } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type GestureResponderEvent, type PointerEvent as NativePointerEvent, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from './context';
 import { Text, TextInput } from './i18n';
@@ -19,6 +19,7 @@ export function ChatOverlay() {
   const { width, height } = useWindowDimensions();
   const scroll = useRef<ScrollView>(null);
   const [open, setOpen] = useState(false);
+  const [webViewport, setWebViewport] = useState<{ height: number; top: number } | null>(null);
   const [launcherPressed, setLauncherPressed] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>(() => Platform.OS === 'web' ? loadChatHistory() : []);
@@ -86,6 +87,24 @@ export function ChatOverlay() {
       window.removeEventListener('pointercancel', finish);
     };
   }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !open) return;
+    const viewport = window.visualViewport;
+    const update = () => {
+      const next = { height: viewport?.height ?? window.innerHeight, top: viewport?.offsetTop ?? 0 };
+      setWebViewport(current => current?.height === next.height && current.top === next.top ? current : next);
+    };
+    update();
+    viewport?.addEventListener('resize', update);
+    viewport?.addEventListener('scroll', update);
+    window.addEventListener('resize', update);
+    return () => {
+      viewport?.removeEventListener('resize', update);
+      viewport?.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, [open]);
 
   const startLauncherDrag = (pageX: number, pageY: number) => {
     suppressLauncherPress.current = false;
@@ -202,7 +221,7 @@ export function ChatOverlay() {
       <View style={[styles.orbitDot, missingApiKey && styles.orbitDotMissingKey]} />
     </Pressable>
     <Modal visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
-      <View style={[styles.page, { paddingTop: insets.top }]}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.page, { paddingTop: insets.top }, Platform.OS === 'web' && webViewport && { position: 'absolute', left: 0, right: 0, top: webViewport.top, height: webViewport.height, flex: 0 }]}>
         <View style={styles.header}>
           <View style={styles.headerTitle}><Text style={styles.eyebrow}>DEEPSEEK</Text><Text numberOfLines={1} style={styles.title}>{showHistory ? 'Previous chats' : active?.title ?? 'New chat'}</Text></View>
           <View style={styles.headerActions}>
@@ -266,7 +285,7 @@ export function ChatOverlay() {
             </View>
           </View>
         </View>}
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   </>;
 }
