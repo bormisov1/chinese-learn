@@ -14,7 +14,13 @@ export function clampChatLauncherPosition(position: ChatLauncherPosition, width:
 
 export function loadChatLauncherPosition(storage?: Pick<Storage, 'getItem'>): ChatLauncherPosition | null {
   try {
-    const value = JSON.parse((storage ?? globalThis.localStorage)?.getItem(CHAT_LAUNCHER_POSITION_KEY) ?? 'null');
+    return parseChatLauncherPosition((storage ?? globalThis.localStorage)?.getItem(CHAT_LAUNCHER_POSITION_KEY));
+  } catch { return null; }
+}
+
+export function parseChatLauncherPosition(raw: string | null): ChatLauncherPosition | null {
+  try {
+    const value = JSON.parse(raw ?? 'null');
     return value && typeof value.x === 'number' && Number.isFinite(value.x) && typeof value.y === 'number' && Number.isFinite(value.y)
       ? { x: value.x, y: value.y } : null;
   } catch { return null; }

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useRef, useState } from 'react';
-import { Modal, Platform, Pressable, ScrollView, StyleSheet, View, type PointerEvent as NativePointerEvent, type ViewStyle } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type GestureResponderEvent, type PointerEvent as NativePointerEvent, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from './context';
 import { Text, TextInput } from './i18n';
@@ -10,16 +10,17 @@ import { CHAT_HISTORY_KEY, ChatMessage, Conversation, loadChatHistory, parseChat
 import { colors } from './theme';
 import { removeVocabularyWord } from './vocabulary-selection';
 import { useMissingApiKeyPrompt } from './missing-api-key-prompt';
-import { ChatLauncherPosition, clampChatLauncherPosition, loadChatLauncherPosition, saveChatLauncherPosition } from './chat-launcher-position';
+import { CHAT_LAUNCHER_POSITION_KEY, ChatLauncherPosition, clampChatLauncherPosition, loadChatLauncherPosition, parseChatLauncherPosition, saveChatLauncherPosition } from './chat-launcher-position';
 
 export function ChatOverlay() {
   const { data, dictionary, importWords, patch } = useStore();
   const { showMissingApiKeyPrompt } = useMissingApiKeyPrompt();
   const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
   const scroll = useRef<ScrollView>(null);
   const [open, setOpen] = useState(false);
-  const [hovered, setHovered] = useState(false);
-  const [clicked, setClicked] = useState(false);
+  const [webViewport, setWebViewport] = useState<{ height: number; top: number } | null>(null);
+  const [launcherPressed, setLauncherPressed] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>(() => Platform.OS === 'web' ? loadChatHistory() : []);
   const [activeId, setActiveId] = useState<string | null>(() => Platform.OS === 'web' ? loadChatHistory()[0]?.id ?? null : null);
@@ -34,6 +35,8 @@ export function ChatOverlay() {
   launcherPositionRef.current = launcherPosition;
   const launcherDrag = useRef<{ startX: number; startY: number; origin: ChatLauncherPosition; moved: boolean } | null>(null);
   const suppressLauncherPress = useRef(false);
+  const launcherBounds = useRef({ width, height, top: insets.top, bottom: insets.bottom });
+  launcherBounds.current = { width, height, top: insets.top, bottom: insets.bottom };
   const conversationsRef = useRef(conversations);
   conversationsRef.current = conversations;
   const active = conversations.find(item => item.id === activeId);
@@ -43,47 +46,89 @@ export function ChatOverlay() {
   const saved = new Set(data.words.map(word => word.hanzi));
   const missingApiKey = !data.settings.apiKey.trim();
 
+  const fitLauncher = (position: ChatLauncherPosition) => clampChatLauncherPosition(position, width, height, insets.top, insets.bottom);
+  const persistLauncher = (position: ChatLauncherPosition) => {
+    if (Platform.OS === 'web') saveChatLauncherPosition(position);
+    else void AsyncStorage.setItem(CHAT_LAUNCHER_POSITION_KEY, JSON.stringify(position)).catch(() => {});
+  };
   useEffect(() => {
-    if (Platform.OS !== 'web') return;
-    const fit = (position: ChatLauncherPosition) => clampChatLauncherPosition(position, window.innerWidth, window.innerHeight, insets.top, insets.bottom);
-    const keepVisible = () => {
-      const current = launcherPositionRef.current;
-      if (!current) return;
-      const next = fit(current);
-      if (next.x !== current.x || next.y !== current.y) {
-        launcherPositionRef.current = next;
-        setLauncherPosition(next);
-        saveChatLauncherPosition(next);
-      }
-    };
-    const move = (event: PointerEvent) => {
-      const drag = launcherDrag.current;
-      if (!drag) return;
-      const dx = event.pageX - drag.startX;
-      const dy = event.pageY - drag.startY;
-      if (!drag.moved && Math.hypot(dx, dy) < 6) return;
-      drag.moved = true;
-      suppressLauncherPress.current = true;
-      const next = fit({ x: drag.origin.x + dx, y: drag.origin.y + dy });
+    if (Platform.OS === 'web') return;
+    let mounted = true;
+    void AsyncStorage.getItem(CHAT_LAUNCHER_POSITION_KEY).then(raw => {
+      const position = parseChatLauncherPosition(raw);
+      if (mounted && position) setLauncherPosition(position);
+    }).catch(() => {});
+    return () => { mounted = false; };
+  }, []);
+  useEffect(() => {
+    const current = launcherPositionRef.current;
+    if (!current) return;
+    const next = fitLauncher(current);
+    if (next.x !== current.x || next.y !== current.y) {
       launcherPositionRef.current = next;
       setLauncherPosition(next);
+      persistLauncher(next);
+    }
+  }, [width, height, insets.top, insets.bottom]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const move = (event: PointerEvent) => {
+      const bounds = launcherBounds.current;
+      moveLauncherTo(event.pageX, event.pageY, bounds.width, bounds.height, bounds.top, bounds.bottom);
     };
-    const finish = () => {
-      if (launcherDrag.current?.moved && launcherPositionRef.current) saveChatLauncherPosition(launcherPositionRef.current);
-      launcherDrag.current = null;
-    };
-    keepVisible();
+    const finish = () => finishLauncherDrag();
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', finish);
     window.addEventListener('pointercancel', finish);
-    window.addEventListener('resize', keepVisible);
     return () => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', finish);
       window.removeEventListener('pointercancel', finish);
-      window.removeEventListener('resize', keepVisible);
     };
-  }, [insets.top, insets.bottom]);
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !open) return;
+    const viewport = window.visualViewport;
+    const update = () => {
+      const next = { height: viewport?.height ?? window.innerHeight, top: viewport?.offsetTop ?? 0 };
+      setWebViewport(current => current?.height === next.height && current.top === next.top ? current : next);
+    };
+    update();
+    viewport?.addEventListener('resize', update);
+    viewport?.addEventListener('scroll', update);
+    window.addEventListener('resize', update);
+    return () => {
+      viewport?.removeEventListener('resize', update);
+      viewport?.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, [open]);
+
+  const startLauncherDrag = (pageX: number, pageY: number) => {
+    suppressLauncherPress.current = false;
+    setLauncherPressed(true);
+    launcherDrag.current = { startX: pageX, startY: pageY,
+      origin: launcherPositionRef.current ?? { x: width - 51 - 15, y: insets.top + 14 }, moved: false };
+  };
+  const moveLauncherTo = (pageX: number, pageY: number, viewportWidth: number, viewportHeight: number, topInset: number, bottomInset: number) => {
+    const drag = launcherDrag.current;
+    if (!drag) return;
+    const dx = pageX - drag.startX;
+    const dy = pageY - drag.startY;
+    if (!drag.moved && Math.hypot(dx, dy) < 6) return;
+    drag.moved = true;
+    suppressLauncherPress.current = true;
+    const next = clampChatLauncherPosition({ x: drag.origin.x + dx, y: drag.origin.y + dy }, viewportWidth, viewportHeight, topInset, bottomInset);
+    launcherPositionRef.current = next;
+    setLauncherPosition(next);
+  };
+  const finishLauncherDrag = () => {
+    setLauncherPressed(false);
+    if (launcherDrag.current?.moved && launcherPositionRef.current) persistLauncher(launcherPositionRef.current);
+    launcherDrag.current = null;
+  };
 
   useEffect(() => {
     if (Platform.OS === 'web') return;
@@ -168,29 +213,21 @@ export function ChatOverlay() {
     finally { setBusy(false); }
   };
 
-  const launcherPointerProps = Platform.OS === 'web' ? { onPointerDown: (event: NativePointerEvent) => {
-    suppressLauncherPress.current = false;
-    launcherDrag.current = { startX: event.nativeEvent.pageX, startY: event.nativeEvent.pageY,
-      origin: launcherPositionRef.current ?? { x: window.innerWidth - 51 - 15, y: insets.top + 14 }, moved: false };
-  } } : {};
-
   if (!data.settings.aiChatEnabled) return null;
 
   return <>
-    <Pressable {...launcherPointerProps} accessibilityRole="button" accessibilityLabel="Open DeepSeek chat" onHoverIn={() => setHovered(true)} onHoverOut={() => setHovered(false)} onPressIn={() => {
-      if (!missingApiKey) setClicked(true);
-    }} onPress={() => { if (suppressLauncherPress.current) return; if (missingApiKey) { showMissingApiKeyPrompt(); return; } setClicked(true); setOpen(true); }} style={[styles.launcher, launcherPosition ? { left: launcherPosition.x, top: launcherPosition.y } : { right: 15, top: insets.top + 14 }, { touchAction: 'none' } as ViewStyle, missingApiKey && styles.launcherMissingKey, !missingApiKey && (hovered || clicked) && styles.launcherOpaque]}>
+    <Pressable accessibilityRole="button" accessibilityLabel="Open DeepSeek chat" onPointerDown={Platform.OS === 'web' ? (event: NativePointerEvent) => startLauncherDrag(event.nativeEvent.pageX, event.nativeEvent.pageY) : undefined} onTouchStart={Platform.OS === 'web' ? undefined : (event: GestureResponderEvent) => startLauncherDrag(event.nativeEvent.pageX, event.nativeEvent.pageY)} onPressOut={() => setLauncherPressed(false)} onTouchMove={Platform.OS === 'web' ? undefined : event => moveLauncherTo(event.nativeEvent.pageX, event.nativeEvent.pageY, width, height, insets.top, insets.bottom)} onTouchEnd={Platform.OS === 'web' ? undefined : finishLauncherDrag} onTouchCancel={Platform.OS === 'web' ? undefined : finishLauncherDrag} onPress={() => { if (suppressLauncherPress.current) return; if (missingApiKey) { showMissingApiKeyPrompt(); return; } setOpen(true); }} style={[styles.launcher, launcherPosition ? { left: launcherPosition.x, top: launcherPosition.y } : { right: 15, top: insets.top + 14 }, { touchAction: 'none' } as ViewStyle, missingApiKey && styles.launcherMissingKey, !missingApiKey && launcherPressed && styles.launcherOpaque]}>
       <View style={[styles.launcherRing, missingApiKey && styles.launcherRingMissingKey]}><Ionicons name="hardware-chip-outline" size={25} color={missingApiKey ? '#69726E' : '#D9FFF4'} /></View>
       <View style={[styles.orbitDot, missingApiKey && styles.orbitDotMissingKey]} />
     </Pressable>
-    <Modal visible={open} animationType="slide" onRequestClose={() => { setOpen(false); setClicked(false); }}>
-      <View style={[styles.page, { paddingTop: insets.top }]}>
+    <Modal visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.page, { paddingTop: insets.top }, Platform.OS === 'web' && webViewport && { position: 'absolute', left: 0, right: 0, top: webViewport.top, height: webViewport.height, flex: 0 }]}>
         <View style={styles.header}>
           <View style={styles.headerTitle}><Text style={styles.eyebrow}>DEEPSEEK</Text><Text numberOfLines={1} style={styles.title}>{showHistory ? 'Previous chats' : active?.title ?? 'New chat'}</Text></View>
           <View style={styles.headerActions}>
             <Pressable accessibilityRole="button" accessibilityLabel="New chat" accessibilityState={{ disabled: busy }} disabled={busy} onPress={newChat} style={styles.headerButton}><Ionicons name="add" size={24} color={colors.green} /></Pressable>
             <Pressable accessibilityRole="button" accessibilityLabel={showHistory ? 'Back to chat' : 'Previous chats'} onPress={() => setShowHistory(value => !value)} style={styles.headerButton}><Ionicons name={showHistory ? 'chatbubble-outline' : 'time-outline'} size={22} color={colors.green} /></Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel="Close chat" onPress={() => { setOpen(false); setClicked(false); }} style={styles.close}><Ionicons name="close" size={25} color={colors.ink} /></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Close chat" onPress={() => setOpen(false)} style={styles.close}><Ionicons name="close" size={25} color={colors.ink} /></Pressable>
           </View>
         </View>
         {showHistory ? <ScrollView style={styles.history} contentContainerStyle={styles.historyList}>
@@ -248,7 +285,7 @@ export function ChatOverlay() {
             </View>
           </View>
         </View>}
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   </>;
 }
