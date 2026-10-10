@@ -7,7 +7,7 @@ test('all DeepSeek tasks request Flash even with a saved Pro model', async () =>
   const settings: Settings = {
     language: 'en', apiKey: 'test-key', apiKeyValidated: true,
     apiUrl: 'https://example.test/chat/completions', model: 'deepseek-v4-pro',
-    ttsProvider: 'browser', ttsVoiceURI: '', ttsRate: 1, automaticWordAddition: false, aiChatEnabled: true,
+    ttsProvider: 'browser', ttsVoiceURI: '', ttsRate: 1, automaticWordAddition: false, aiChatEnabled: true, handwritingAfterWrong: true,
   };
   const word: Word = {
     id: 'word', hanzi: '你好', pinyin: 'nǐ hǎo', russian: 'hello',

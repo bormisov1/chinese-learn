@@ -6,7 +6,7 @@ import type { StoreData, Word } from "./types";
 const baseStore = (): StoreData => ({
   storageVersion: 3, words: [], sentences: [], wordSentenceIndex: {}, attempts: [], sentenceDataByLanguage: {}, explanations: {},
   cardRound: 0, roundCompletions: [], mixQueue: [], mixPosition: 0, onboardingComplete: false, languageSelected: false,
-  settings: { language: "en", apiKey: "", apiKeyValidated: false, apiUrl: "https://api.deepseek.com/chat/completions", model: "deepseek-v4-flash", ttsProvider: "browser", ttsVoiceURI: "", ttsRate: 0.85, automaticWordAddition: false, aiChatEnabled: true },
+  settings: { language: "en", apiKey: "", apiKeyValidated: false, apiUrl: "https://api.deepseek.com/chat/completions", model: "deepseek-v4-flash", ttsProvider: "browser", ttsVoiceURI: "", ttsRate: 0.85, automaticWordAddition: false, aiChatEnabled: true, handwritingAfterWrong: true },
 });
 
 const word = (id: string, hanzi: string, correct = 0): Word => ({

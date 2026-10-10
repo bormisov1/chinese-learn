@@ -45,7 +45,7 @@ test('chat progressively decodes JSON answer text and completes an SSE response'
     }), { headers: { 'content-type': 'text/event-stream' } });
   };
   try {
-    const settings: Settings = { language: 'en', apiKey: 'test-key', apiKeyValidated: true, apiUrl: 'https://example.com/chat', model: 'deepseek-v4-flash', ttsProvider: 'browser', ttsVoiceURI: '', ttsRate: 1, automaticWordAddition: false, aiChatEnabled: true };
+    const settings: Settings = { language: 'en', apiKey: 'test-key', apiKeyValidated: true, apiUrl: 'https://example.com/chat', model: 'deepseek-v4-flash', ttsProvider: 'browser', ttsVoiceURI: '', ttsRate: 1, automaticWordAddition: false, aiChatEnabled: true, handwritingAfterWrong: true };
     const reply = await requestChatReply(settings, 'words', [{ role: 'user', content: '你好' }], answer => updates.push(answer));
     assert.ok(updates.includes('Ni'));
     assert.deepEqual(reply, { answer: 'Ni hao', words: [{ hanzi: '你好', pinyin: 'nǐ hǎo', translation: 'hello' }] });
@@ -60,7 +60,7 @@ test('chat accepts SSE replies even when a proxy omits the event-stream content 
     { headers: { 'content-type': 'text/plain' } },
   );
   try {
-    const settings: Settings = { language: 'ru', apiKey: 'test-key', apiKeyValidated: true, apiUrl: 'https://example.com/chat', model: 'deepseek-v4-flash', ttsProvider: 'browser', ttsVoiceURI: '', ttsRate: 1, automaticWordAddition: false, aiChatEnabled: true };
+    const settings: Settings = { language: 'ru', apiKey: 'test-key', apiKeyValidated: true, apiUrl: 'https://example.com/chat', model: 'deepseek-v4-flash', ttsProvider: 'browser', ttsVoiceURI: '', ttsRate: 1, automaticWordAddition: false, aiChatEnabled: true, handwritingAfterWrong: true };
     assert.deepEqual(await requestChatReply(settings, 'none', [{ role: 'user', content: 'Доброе утро' }]), reply);
   } finally { globalThis.fetch = originalFetch; }
 });
@@ -69,7 +69,7 @@ test('chat gives a useful error when DeepSeek cuts off JSON', async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => new Response(JSON.stringify({ choices: [{ message: { content: '{"answer":"unfinished' } }] }));
   try {
-    const settings: Settings = { language: 'en', apiKey: 'test-key', apiKeyValidated: true, apiUrl: 'https://example.com/chat', model: 'deepseek-v4-flash', ttsProvider: 'browser', ttsVoiceURI: '', ttsRate: 1, automaticWordAddition: false, aiChatEnabled: true };
+    const settings: Settings = { language: 'en', apiKey: 'test-key', apiKeyValidated: true, apiUrl: 'https://example.com/chat', model: 'deepseek-v4-flash', ttsProvider: 'browser', ttsVoiceURI: '', ttsRate: 1, automaticWordAddition: false, aiChatEnabled: true, handwritingAfterWrong: true };
     await assert.rejects(requestChatReply(settings, 'none', [{ role: 'user', content: 'Hello' }]), /incomplete reply/);
   } finally { globalThis.fetch = originalFetch; }
 });
@@ -82,7 +82,7 @@ test('first chat request asks for a 2–5 word title with the selected prompt', 
     return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ answer: '你好', words: [{ hanzi: '你好', pinyin: 'nǐ hǎo', translation: 'hello' }] }) } }] }), { status: 200 });
   };
   try {
-    const settings: Settings = { language: 'en', apiKey: 'test-key', apiKeyValidated: true, apiUrl: 'https://example.com/chat', model: 'deepseek-v4-flash', ttsProvider: 'browser', ttsVoiceURI: '', ttsRate: 1, automaticWordAddition: false, aiChatEnabled: true };
+    const settings: Settings = { language: 'en', apiKey: 'test-key', apiKeyValidated: true, apiUrl: 'https://example.com/chat', model: 'deepseek-v4-flash', ttsProvider: 'browser', ttsVoiceURI: '', ttsRate: 1, automaticWordAddition: false, aiChatEnabled: true, handwritingAfterWrong: true };
     const history = [{ role: 'user' as const, content: '你好' }];
     const result = await requestChatReply(settings, 'words', history);
     assert.equal(result.words[0].hanzi, '你好');
