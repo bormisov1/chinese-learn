@@ -77,8 +77,8 @@ cleanup() {
 trap cleanup EXIT
 
 exec 9>"$LOCK_FILE"
-if ! flock -n 9; then
-  log "Another deployment is already running."
+if ! flock -w 1800 9; then
+  log "Timed out waiting for another deployment."
   exit 1
 fi
 

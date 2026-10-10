@@ -28,11 +28,10 @@ const learningNeedComparator = (round: number) => (a: Word, b: Word) =>
   a.createdAt - b.createdAt ||
   a.id.localeCompare(b.id);
 
-const explorationComparator = (round: number) => (a: Word, b: Word) =>
-  attempts(a) - attempts(b) ||
-  roundsWaiting(b, round) - roundsWaiting(a, round) ||
-  a.createdAt - b.createdAt ||
-  a.id.localeCompare(b.id);
+const queueComparator = (round: number) => (a: Word, b: Word) =>
+  Number(Boolean(b.cardRelearning)) - Number(Boolean(a.cardRelearning)) ||
+  Number(Boolean(b.cardIntroducedAt)) - Number(Boolean(a.cardIntroducedAt)) ||
+  learningNeedComparator(round)(a, b);
 
 /** Words waiting to enter the active pool, ordered by learning need. */
 export function getActivePoolQueue(
@@ -44,7 +43,7 @@ export function getActivePoolQueue(
       (word) =>
         !word.cardActive && word.cardSrsLevel < CARD_GRADUATION_LEVEL,
     )
-    .sort(learningNeedComparator(round));
+    .sort(queueComparator(round));
 }
 
 export function fillActivePool(
@@ -63,31 +62,16 @@ export function fillActivePool(
     (word) => !selected.has(word.id) && word.cardSrsLevel < CARD_GRADUATION_LEVEL,
   );
 
-  if (openSlots > 0 && waiting.length) {
-    // Reserve roughly one third of each admission batch for exploration. A
-    // single opened slot also uses this lane, which prevents unseen words from
-    // starving when graduations normally free only one slot at a time.
-    const explorationSlots = Math.min(
-      openSlots,
-      Math.max(1, Math.floor(openSlots / 3)),
-    );
-    const needSlots = openSlots - explorationSlots;
-    const need = [...waiting]
-      .sort(learningNeedComparator(round))
-      .slice(0, needSlots);
-    need.forEach((word) => selected.add(word.id));
-    [...waiting]
-      .filter((word) => !selected.has(word.id))
-      .sort(explorationComparator(round))
-      .slice(0, explorationSlots)
+  if (openSlots > 0)
+    waiting.sort(queueComparator(round)).slice(0, openSlots)
       .forEach((word) => selected.add(word.id));
-  }
 
   return words.map((word, index) =>
     selected.has(word.id)
       ? {
           ...word,
           cardActive: true,
+          ...(word.cardRelearning ? { cardRelearning: false } : {}),
           cardIntroducedAt: word.cardIntroducedAt ?? at + index,
         }
       : word.cardActive
@@ -110,6 +94,8 @@ export function migrateCardPool(
       cardActive:
         word.cardActive ??
         false,
+      cardRelearning: Boolean(word.cardRelearning) && !word.cardActive &&
+        word.cardSrsLevel < CARD_GRADUATION_LEVEL,
       cardLastStudiedRound: word.cardLastStudiedRound,
       cardLastIncorrectAt:
         word.cardLastIncorrectAt ??
@@ -136,6 +122,13 @@ export function migrateCardPool(
 }
 
 export function selectRound(words: Word[], round: number, now = Date.now()) {
+  const relearning = words
+    .filter((word) =>
+      word.cardRelearning && !word.cardActive &&
+      (word.cardLastStudiedRound === undefined ||
+        round - word.cardLastStudiedRound >= 2))
+    .sort((a, b) =>
+      (a.cardLastStudiedRound ?? -1) - (b.cardLastStudiedRound ?? -1));
   const dueReviews = words
     .filter(
       (word) =>
@@ -162,7 +155,10 @@ export function selectRound(words: Word[], round: number, now = Date.now()) {
     CARD_ROUND_SIZE,
     Math.max(1, Math.ceil(activeTotal / 2), Math.min(dueReviews.length, CARD_ROUND_SIZE)),
   );
-  const selected = [...dueReviews, ...active].slice(0, size);
+  // Keep active learners present even when many retention reviews are due.
+  const reviews = [...relearning, ...dueReviews];
+  const reviewSlots = active.length ? Math.max(2, size - active.length) : size;
+  const selected = [...reviews.slice(0, reviewSlots), ...active].slice(0, size);
   if (selected.length) return selected;
   // With a one-word deck a full skipped round is impossible.
   return words.filter((word) => word.cardActive).slice(0, 1);
@@ -175,12 +171,15 @@ export function gradeCard(
   round: number,
   reviewedAt = Date.now(),
 ) {
-  let updated = words.map((word) => {
+  const updated = words.map((word) => {
     if (word.id !== wordId) return word;
-    if (!correct)
+    if (!correct) {
+      const relearning = !word.cardActive &&
+        (word.cardRelearning || word.cardSrsLevel >= CARD_GRADUATION_LEVEL);
       return {
         ...word,
-        cardActive: true,
+        cardActive: Boolean(word.cardActive),
+        cardRelearning: relearning,
         cardIntroducedAt: word.cardIntroducedAt ?? reviewedAt,
         cardLastStudiedRound: round - 1,
         cardSrsLevel: 0,
@@ -190,6 +189,7 @@ export function gradeCard(
         cardLapses: (word.cardLapses ?? 0) + 1,
         cardSrsDueAt: 0,
       };
+    }
 
     const nextLevel = Math.min(8, word.cardSrsLevel + 1);
     const graduated = nextLevel >= CARD_GRADUATION_LEVEL;
@@ -198,7 +198,8 @@ export function gradeCard(
       : 0;
     return {
       ...word,
-      cardActive: !graduated,
+      cardActive: Boolean(word.cardActive) && !graduated,
+      cardRelearning: Boolean(word.cardRelearning) && !graduated,
       cardIntroducedAt: word.cardIntroducedAt ?? reviewedAt,
       cardLastStudiedRound: round,
       cardSrsLevel: nextLevel,
@@ -208,18 +209,5 @@ export function gradeCard(
     };
   });
 
-  // A failed retention review must return to the bounded pool. Pause the
-  // learner that currently needs the least practice if all slots are occupied.
-  const active = updated.filter((word) => word.cardActive);
-  if (active.length > ACTIVE_CARD_LIMIT) {
-    const toPause = active
-      .filter((word) => word.id !== wordId)
-      .sort(learningNeedComparator(round))
-      .at(-1);
-    if (toPause)
-      updated = updated.map((word) =>
-        word.id === toPause.id ? { ...word, cardActive: false } : word,
-      );
-  }
   return fillActivePool(updated, reviewedAt, round);
 }
