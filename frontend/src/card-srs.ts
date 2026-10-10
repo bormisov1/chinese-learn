@@ -151,13 +151,16 @@ export function selectRound(words: Word[], round: number, now = Date.now()) {
         (a.cardIntroducedAt ?? a.createdAt) - (b.cardIntroducedAt ?? b.createdAt),
     );
   const activeTotal = words.filter((word) => word.cardActive).length;
+  const reviews = [...relearning, ...dueReviews];
   const size = Math.min(
     CARD_ROUND_SIZE,
-    Math.max(1, Math.ceil(activeTotal / 2), Math.min(dueReviews.length, CARD_ROUND_SIZE)),
+    Math.max(1, Math.ceil(activeTotal / 2),
+      Math.min(reviews.length + Number(active.length > 0), CARD_ROUND_SIZE)),
   );
   // Keep active learners present even when many retention reviews are due.
-  const reviews = [...relearning, ...dueReviews];
-  const reviewSlots = active.length ? Math.max(2, size - active.length) : size;
+  const reviewSlots = active.length
+    ? Math.min(size - 1, Math.max(2, size - active.length))
+    : size;
   const selected = [...reviews.slice(0, reviewSlots), ...active].slice(0, size);
   if (selected.length) return selected;
   // With a one-word deck a full skipped round is impossible.

@@ -78,3 +78,13 @@ test("relearning continues in rounds without blocking active cards", () => {
   assert.equal(progressed.at(-1)?.cardActive, false);
   assert.ok((progressed.at(-1)?.cardSrsDueAt ?? 0) > 300);
 });
+
+test("a small active pool still gets a card alongside relearning reviews", () => {
+  const active = word("active", { cardActive: true });
+  const reviews = Array.from({ length: 3 }, (_, index) => word(`review-${index}`, {
+    cardRelearning: true, cardSrsIncorrect: 1,
+  }));
+  const round = selectRound([active, ...reviews], 5, 100);
+  assert.equal(round.length, 4);
+  assert.ok(round.some((item) => item.id === "active"));
+});
