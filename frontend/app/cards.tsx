@@ -82,12 +82,11 @@ export default function Cards() {
     [roundEndsAfterCelebration, setRoundEndsAfterCelebration] = useState(false),
     [cardHeights, setCardHeights] = useState<Record<string, number>>({}),
     [roundTilts, setRoundTilts] = useState<Record<string, number>>({}),
-    [handwritingOpen, setHandwritingOpen] = useState(false);
+    [handwritingOpen, setHandwritingOpen] = useState(false),
+    [handwritingCorrect, setHandwritingCorrect] = useState(false);
   const swipe = useRef(new Animated.ValueXY()).current;
   const cardSpin = useRef(new Animated.Value(0)).current;
   const grading = useRef(false);
-  const handwritingSwipeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => { if (handwritingSwipeTimer.current) clearTimeout(handwritingSwipeTimer.current); }, []);
   const pendingTransition = useRef<PendingTransition | null>(null);
   const roundTransitionTimes = useRef<RoundTransitionTimes>({ count: 0, totalMs: 0, maxMs: 0, maxSwipeCallbackMs: 0, maxRenderReadyMs: 0 });
   const total = data.words.length;
@@ -209,6 +208,7 @@ export default function Cards() {
     setRoundEndsAfterCelebration(false);
     setFlipped(false);
     setHandwritingOpen(false);
+    setHandwritingCorrect(false);
     setExampleIndex(0);
     grading.current = false;
     swipe.setValue({ x: 0, y: 0 });
@@ -255,6 +255,7 @@ export default function Cards() {
     } else if (roundComplete) setPhase("complete");
     else setPosition((p) => p + 1);
     setFlipped(false);
+    setHandwritingCorrect(false);
     setExampleIndex(0);
     swipe.setValue({ x: 0, y: 0 });
     cardSpin.setValue(0);
@@ -263,8 +264,6 @@ export default function Cards() {
     const previous = reviewedCards.at(-1);
     const previousPosition = phase === "studying" ? position - 1 : position;
     if (!previous || previous.position !== previousPosition) return;
-    if (handwritingSwipeTimer.current) clearTimeout(handwritingSwipeTimer.current);
-    handwritingSwipeTimer.current = null;
     swipe.stopAnimation();
     cardSpin.stopAnimation();
     grading.current = false;
@@ -282,6 +281,7 @@ export default function Cards() {
     setPosition(previous.position);
     setPhase("studying");
     setFlipped(true);
+    setHandwritingCorrect(false);
     setExampleIndex(0);
     swipe.setValue({ x: 0, y: 0 });
     cardSpin.setValue(0);
@@ -314,11 +314,7 @@ export default function Cards() {
   };
   const finishHandwriting = () => {
     setHandwritingOpen(false);
-    flipCard(true);
-    handwritingSwipeTimer.current = setTimeout(() => {
-      handwritingSwipeTimer.current = null;
-      finishSwipe(true);
-    }, 400);
+    setHandwritingCorrect(true);
   };
   const flipCard = (nextFlipped: boolean) => {
     if (nextFlipped === flipped) return;
@@ -517,6 +513,7 @@ export default function Cards() {
               onFlip={flipCard}
               onGrade={finishSwipe}
               onHandwriting={() => setHandwritingOpen(true)}
+              handwritingCorrect={index === 0 && handwritingCorrect}
               onHeightChange={(height) => setCardHeights((current) =>
                 current[stackWord.id] === height ? current : { ...current, [stackWord.id]: height })}
             />
@@ -571,7 +568,7 @@ function RoundReviewHeader({ eyebrow, title, subtitle, onPreviousCard }: {
 
 function StackCard({ word, depth, roundIndex, initialTilt, active, height, settings, translationLanguage,
   examples, flipped, exampleIndex, onExampleIndexChange, swipe, cardSpin,
-  panHandlers, onFlip, onGrade, onHandwriting, onHeightChange,
+  panHandlers, onFlip, onGrade, onHandwriting, handwritingCorrect, onHeightChange,
 }: {
   word: Word;
   depth: number;
@@ -591,6 +588,7 @@ function StackCard({ word, depth, roundIndex, initialTilt, active, height, setti
   onFlip: (flipped: boolean) => void;
   onGrade: (correct: boolean) => void;
   onHandwriting: () => void;
+  handwritingCorrect: boolean;
   onHeightChange: (height: number) => void;
 }) {
   const t = useTranslation();
@@ -738,9 +736,13 @@ function StackCard({ word, depth, roundIndex, initialTilt, active, height, setti
             </View>
           </View>
           {!showingBack && <Text style={styles.hint}>Tap to reveal</Text>}
-          {active && !showingBack && <Pressable accessibilityRole="button" accessibilityLabel="Write answer by hand" onPress={(event) => { event.stopPropagation(); onHandwriting(); }} style={styles.handwritingButton}>
-            <Ionicons name="pencil-outline" size={24} color={colors.green} />
-          </Pressable>}
+          {active && !showingBack && (handwritingCorrect
+            ? <View pointerEvents="none" accessibilityLabel="Correct handwriting answer" style={styles.handwritingButton}>
+                <Ionicons name="checkmark" size={28} color={colors.green} />
+              </View>
+            : <Pressable accessibilityRole="button" accessibilityLabel="Write answer by hand" onPress={(event) => { event.stopPropagation(); onHandwriting(); }} style={styles.handwritingButton}>
+                <Ionicons name="pencil-outline" size={24} color={colors.green} />
+              </Pressable>)}
         </Pressable>
       </Animated.View>
     </Animated.View>

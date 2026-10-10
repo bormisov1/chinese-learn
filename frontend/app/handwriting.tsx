@@ -130,24 +130,26 @@ export default function Handwriting({ targetHanzi, onBack, onCorrect }: Handwrit
 
   const visible = active.length ? [...strokes, active] : strokes;
   return <View style={[styles.page, onBack && { paddingTop: insets.top, paddingBottom: insets.bottom + 10 }]}>
-    <View style={styles.outputPanel}>
+    <View style={onBack ? styles.outputRow : undefined}>
       {onBack && <Pressable accessibilityRole="button" accessibilityLabel="Back to flashcard" onPress={onBack} style={styles.backAction}>
         <Ionicons name="arrow-back" size={23} color={colors.green} />
       </Pressable>}
-      <Text
-        accessibilityLabel="Handwriting output"
-        selectable
-        numberOfLines={1}
-        style={[styles.outputText, !output && styles.outputPlaceholder]}
-      >{output || 'Your text appears here'}</Text>
-      {correct && <Ionicons accessibilityLabel="Correct Hanzi" name="checkmark-circle" size={28} color={colors.green} />}
-      <View style={styles.outputActions}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Copy output" disabled={!output} onPress={copyOutput} style={[styles.outputAction, !output && styles.disabled]}>
-          <Ionicons name={copied ? 'checkmark-outline' : 'copy-outline'} size={19} color={colors.green} />
-        </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Clear output" disabled={!output} onPress={() => { setOutput(''); setCopied(false); }} style={[styles.outputAction, !output && styles.disabled]}>
-          <Ionicons name="close" size={22} color={colors.green} />
-        </Pressable>
+      <View style={[styles.outputPanel, onBack ? styles.outputPanelWithBack : styles.outputPanelStandalone]}>
+        <Text
+          accessibilityLabel="Handwriting output"
+          selectable
+          numberOfLines={1}
+          style={[styles.outputText, !output && styles.outputPlaceholder]}
+        >{output || 'Your text appears here'}</Text>
+        {correct && <Ionicons accessibilityLabel="Correct Hanzi" name="checkmark-circle" size={28} color={colors.green} />}
+        <View style={styles.outputActions}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Copy output" disabled={!output} onPress={copyOutput} style={[styles.outputAction, !output && styles.disabled]}>
+            <Ionicons name={copied ? 'checkmark-outline' : 'copy-outline'} size={19} color={colors.green} />
+          </Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Clear output" disabled={!output} onPress={() => { setOutput(''); setCopied(false); }} style={[styles.outputAction, !output && styles.disabled]}>
+            <Ionicons name="close" size={22} color={colors.green} />
+          </Pressable>
+        </View>
       </View>
     </View>
 
@@ -197,9 +199,12 @@ export default function Handwriting({ targetHanzi, onBack, onCorrect }: Handwrit
 
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.paper },
-  outputPanel: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 52, marginHorizontal: 16, marginTop: 12, marginBottom: 10, paddingHorizontal: 16, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.card },
+  outputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 12, marginBottom: 10 },
+  outputPanel: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 52, paddingHorizontal: 16, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.card },
+  outputPanelWithBack: { flex: 1, minWidth: 0 },
+  outputPanelStandalone: { marginHorizontal: 16, marginTop: 12, marginBottom: 10 },
   outputActions: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  backAction: { width: 30, height: 36, alignItems: 'center', justifyContent: 'center' },
+  backAction: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   outputAction: { width: 30, height: 36, alignItems: 'center', justifyContent: 'center' },
   outputText: { flex: 1, color: colors.ink, fontSize: 22 },
   outputPlaceholder: { color: colors.muted, fontSize: 16 },
