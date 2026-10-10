@@ -40,6 +40,7 @@ export const emptyStore: StoreData = {
     ttsRate: 0.85,
     automaticWordAddition: false,
     aiChatEnabled: true,
+    handwritingAfterWrong: true,
   },
 };
 
