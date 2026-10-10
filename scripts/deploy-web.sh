@@ -10,6 +10,7 @@ readonly BRANCH_DEPLOYMENT_ROOT=/home/claude/chinese-learn-web-deployments
 readonly ACME_WEBROOT=/var/www/certbot
 readonly NGINX_SITES_AVAILABLE=/etc/nginx/sites-available
 readonly NGINX_SITES_ENABLED=/etc/nginx/sites-enabled
+readonly NGINX_BRANCH_HASH_CONFIG=/etc/nginx/conf.d/chinese-learn-branch-hosts.conf
 
 REPO_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 CURRENT_BRANCH=$(git -C "$REPO_ROOT" symbolic-ref --quiet --short HEAD) || {
@@ -223,6 +224,11 @@ provision_branch_host() {
   local config_path="$NGINX_SITES_AVAILABLE/chinese-learn-$DEPLOY_SLUG"
   local config_staging
   config_staging=$(mktemp)
+
+  # Branch names can make hostnames longer than Nginx's default hash bucket.
+  # The VPS includes conf.d inside its http block.
+  printf 'server_names_hash_bucket_size 128;\nserver_names_hash_max_size 2048;\n' >"$config_staging"
+  sudo install -m 0644 "$config_staging" "$NGINX_BRANCH_HASH_CONFIG"
 
   if ! sudo test -s "/etc/letsencrypt/live/$DEPLOY_HOST/fullchain.pem"; then
     log "Obtaining the initial Let's Encrypt certificate for $DEPLOY_HOST."
