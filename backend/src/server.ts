@@ -220,9 +220,23 @@ function mergeWords(local: Snapshot[], incoming: Snapshot[]) {
     const previous = byKey.get(key);
     if (!previous) { byKey.set(key, word); continue; }
     const newer = Number(word.updatedAt ?? word.createdAt ?? 0) >= Number(previous.updatedAt ?? previous.createdAt ?? 0) ? { ...previous, ...word } : { ...word, ...previous };
-    for (const field of ["exampleCount", "wordShownCount", "srsLevel", "srsCorrect", "srsIncorrect", "cardSrsLevel", "cardSrsCorrect", "cardSrsIncorrect", "cardLapses"]) newer[field] = Math.max(Number(previous[field] ?? 0), Number(word[field] ?? 0));
+    for (const field of ["exampleCount", "wordShownCount", "srsLevel", "srsCorrect", "srsIncorrect", "cardSrsCorrect", "cardSrsIncorrect", "cardLapses"]) newer[field] = Math.max(Number(previous[field] ?? 0), Number(word[field] ?? 0));
     newer.srsDueAt = Math.max(Number(previous.srsDueAt ?? 0), Number(word.srsDueAt ?? 0));
-    newer.cardSrsDueAt = Math.max(Number(previous.cardSrsDueAt ?? 0), Number(word.cardSrsDueAt ?? 0));
+    // Card level and due date can decrease after a mistake. Keep all card
+    // state from the latest review instead of mixing a reset with old levels.
+    const previousFailure = Number(previous.cardLastIncorrectAt ?? 0);
+    const incomingFailure = Number(word.cardLastIncorrectAt ?? 0);
+    const previousCorrect = Number(previous.cardSrsCorrect ?? 0);
+    const incomingCorrect = Number(word.cardSrsCorrect ?? 0);
+    const previousRound = Number(previous.cardLastStudiedRound ?? 0);
+    const incomingRound = Number(word.cardLastStudiedRound ?? 0);
+    const cardSource = incomingFailure !== previousFailure
+      ? (incomingFailure > previousFailure ? word : previous)
+      : incomingCorrect !== previousCorrect
+        ? (incomingCorrect > previousCorrect ? word : previous)
+        : incomingRound >= previousRound ? word : previous;
+    for (const field of ["cardSrsLevel", "cardSrsDueAt", "cardActive", "cardRelearning", "cardLastStudiedRound", "cardLastIncorrectAt"])
+      newer[field] = cardSource[field];
     byKey.set(key, newer);
   }
   return [...byKey.values()];

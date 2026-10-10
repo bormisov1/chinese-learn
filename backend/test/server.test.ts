@@ -8,7 +8,7 @@ test("backend source exposes health and auth/sync endpoints", async () => {
   expect(source).toContain("/v1/sync/bootstrap");
 });
 
-test("sync merges cached explanations across clients and keeps the latest refresh", async () => {
+test("sync merges explanations and preserves a failed card review across stale clients", async () => {
   const { mkdtemp, rm } = await import("node:fs/promises");
   const { tmpdir } = await import("node:os");
   const { join } = await import("node:path");
@@ -44,6 +44,24 @@ test("sync merges cached explanations across clients and keeps the latest refres
     const refreshed = await bootstrap({ explanations: { [key]: cached(30, "greetings") } });
     expect(refreshed.explanations[key].explanation.translation).toBe("greetings");
     expect(refreshed.explanations[other].explanation.translation).toBe("учиться");
+
+    const graduated = { id: "word-1", hanzi: "你好", createdAt: 1,
+      cardSrsLevel: 3, cardSrsCorrect: 3, cardSrsIncorrect: 0,
+      cardSrsDueAt: 50, cardActive: false, cardRelearning: false };
+    await bootstrap({ words: [graduated] });
+    const failed = { ...graduated, cardSrsLevel: 0, cardSrsIncorrect: 1,
+      cardSrsDueAt: 0, cardLastIncorrectAt: 100, cardRelearning: true };
+    const failedSnapshot = await bootstrap({ words: [failed] }) as unknown as { words: typeof failed[] };
+    expect(failedSnapshot.words[0].cardSrsLevel).toBe(0);
+    expect(failedSnapshot.words[0].cardSrsDueAt).toBe(0);
+    expect(failedSnapshot.words[0].cardRelearning).toBe(true);
+    const staleSnapshot = await bootstrap({ words: [graduated] }) as unknown as { words: typeof failed[] };
+    expect(staleSnapshot.words[0].cardSrsLevel).toBe(0);
+    expect(staleSnapshot.words[0].cardRelearning).toBe(true);
+    const progressed = { ...failed, cardSrsLevel: 1, cardSrsCorrect: 4,
+      cardLastStudiedRound: 2 };
+    const progressedSnapshot = await bootstrap({ words: [progressed] }) as unknown as { words: typeof failed[] };
+    expect(progressedSnapshot.words[0].cardSrsLevel).toBe(1);
   } finally {
     process.kill();
     await process.exited;
