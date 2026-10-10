@@ -83,6 +83,7 @@ export default function Cards() {
     [cardHeights, setCardHeights] = useState<Record<string, number>>({}),
     [roundTilts, setRoundTilts] = useState<Record<string, number>>({}),
     [handwritingOpen, setHandwritingOpen] = useState(false),
+    [handwritingAfterWrong, setHandwritingAfterWrong] = useState(false),
     [handwritingCorrect, setHandwritingCorrect] = useState(false);
   const swipe = useRef(new Animated.ValueXY()).current;
   const cardSpin = useRef(new Animated.Value(0)).current;
@@ -208,6 +209,7 @@ export default function Cards() {
     setRoundEndsAfterCelebration(false);
     setFlipped(false);
     setHandwritingOpen(false);
+    setHandwritingAfterWrong(false);
     setHandwritingCorrect(false);
     setExampleIndex(0);
     grading.current = false;
@@ -294,7 +296,7 @@ export default function Cards() {
     }
     setRoundEndsAfterCelebration(false);
   };
-  const finishSwipe = (correct: boolean) => {
+  const animateSwipe = (correct: boolean) => {
     if (grading.current) return;
     grading.current = true;
     if (Platform.OS === "ios") pendingTransition.current = {
@@ -312,9 +314,24 @@ export default function Cards() {
       } else pendingTransition.current = null;
     });
   };
-  const finishHandwriting = () => {
+  const finishSwipe = (correct: boolean) => {
+    if (!correct && data.settings.handwritingAfterWrong) {
+      if (grading.current || handwritingOpen) return;
+      swipe.setValue({ x: 0, y: 0 });
+      setHandwritingAfterWrong(true);
+      setHandwritingOpen(true);
+      return;
+    }
+    animateSwipe(correct);
+  };
+  const closeHandwriting = () => {
     setHandwritingOpen(false);
-    setHandwritingCorrect(true);
+    setHandwritingAfterWrong(false);
+  };
+  const finishHandwriting = () => {
+    closeHandwriting();
+    if (handwritingAfterWrong) animateSwipe(false);
+    else setHandwritingCorrect(true);
   };
   const flipCard = (nextFlipped: boolean) => {
     if (nextFlipped === flipped) return;
@@ -538,8 +555,8 @@ export default function Cards() {
         </View>
       ) : null}
     </ScrollView>
-    {handwritingOpen && <Modal visible animationType="slide" onRequestClose={() => setHandwritingOpen(false)}>
-        <Handwriting targetHanzi={word.hanzi} onBack={() => setHandwritingOpen(false)} onCorrect={finishHandwriting} />
+    {handwritingOpen && <Modal visible animationType="slide" onRequestClose={closeHandwriting}>
+        <Handwriting targetHanzi={word.hanzi} onBack={closeHandwriting} onCorrect={finishHandwriting} />
       </Modal>}
     </>
   );

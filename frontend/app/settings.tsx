@@ -438,6 +438,18 @@ export default function Settings() {
           </Text>
         </View>
       </View>
+      <View style={styles.autoWords}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.privacyTitle}>Practice handwriting after “Wrong”</Text>
+          <Text style={styles.help}>Open handwriting practice before moving to the next card.</Text>
+        </View>
+        <Switch
+          accessibilityLabel={t("Practice handwriting after “Wrong”")}
+          value={data.settings.handwritingAfterWrong}
+          onValueChange={(value) => update("handwritingAfterWrong", value)}
+          trackColor={{ false: colors.line, true: colors.green }}
+        />
+      </View>
       <View style={styles.activeSet}>
         {activeWords.map((word) => (
           <Pressable

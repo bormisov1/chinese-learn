@@ -9,7 +9,7 @@ import type { CachedExplanation, StoreData } from './types';
 const emptyStore: StoreData = {
   storageVersion: 3, words: [], sentences: [], wordSentenceIndex: {}, attempts: [], sentenceDataByLanguage: {}, explanations: {},
   cardRound: 0, roundCompletions: [], mixQueue: [], mixPosition: 0, onboardingComplete: false, languageSelected: false,
-  settings: { language: 'en', apiKey: '', apiKeyValidated: false, apiUrl: '', model: '', ttsProvider: 'browser', ttsVoiceURI: '', ttsRate: 1, automaticWordAddition: false, aiChatEnabled: true },
+  settings: { language: 'en', apiKey: '', apiKeyValidated: false, apiUrl: '', model: '', ttsProvider: 'browser', ttsVoiceURI: '', ttsRate: 1, automaticWordAddition: false, aiChatEnabled: true, handwritingAfterWrong: true },
 };
 
 const entry = (updatedAt: number, translation: string): CachedExplanation => ({
