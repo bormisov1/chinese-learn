@@ -81,7 +81,9 @@ export default function Cards() {
     [roundTilts, setRoundTilts] = useState<Record<string, number>>({}),
     [handwritingOpen, setHandwritingOpen] = useState(false),
     [handwritingAfterWrong, setHandwritingAfterWrong] = useState(false),
-    [handwritingCorrect, setHandwritingCorrect] = useState(false);
+    [handwritingCorrect, setHandwritingCorrect] = useState(false),
+    [poolHandwritingWord, setPoolHandwritingWord] = useState<Word | null>(null),
+    [poolHandwritingCorrectIds, setPoolHandwritingCorrectIds] = useState<string[]>([]);
   const swipe = useRef(new Animated.ValueXY()).current;
   const cardSpin = useRef(new Animated.Value(0)).current;
   const grading = useRef(false);
@@ -201,6 +203,8 @@ export default function Cards() {
     setHandwritingOpen(false);
     setHandwritingAfterWrong(false);
     setHandwritingCorrect(false);
+    setPoolHandwritingWord(null);
+    setPoolHandwritingCorrectIds([]);
     setExampleIndex(0);
     grading.current = false;
     swipe.setValue({ x: 0, y: 0 });
@@ -293,7 +297,7 @@ export default function Cards() {
     });
   };
   const finishSwipe = (correct: boolean) => {
-    if (!correct && data.settings.handwritingAfterWrong) {
+    if (!correct && data.settings.handwritingAfterWrong && !handwritingCorrect) {
       if (grading.current || handwritingOpen) return;
       swipe.setValue({ x: 0, y: 0 });
       setHandwritingAfterWrong(true);
@@ -396,7 +400,8 @@ export default function Cards() {
       .map((id) => data.words.find((w) => w.id === id))
       .filter(Boolean);
     return (
-      <ScrollView style={shell.page} contentContainerStyle={shell.content}>
+      <>
+        <ScrollView style={shell.page} contentContainerStyle={shell.content}>
         <RoundReviewHeader
           eyebrow={`${t("Round")} ${studyRound} ${t("complete")}`}
           title={
@@ -405,7 +410,8 @@ export default function Cards() {
           subtitle={`${roundWords.length - mistaken.length} ${t("correct")} · ${mistaken.length} ${t("mistaken")}`}
           onPreviousCard={previousCard}
         />
-        {graduations.length > 0 && <RoundPoolChanges graduations={graduations} settings={data.settings} />}
+        {graduations.length > 0 && <RoundPoolChanges graduations={graduations} settings={data.settings}
+          handwritingCorrectIds={poolHandwritingCorrectIds} onHandwriting={setPoolHandwritingWord} />}
         <View style={styles.results}>
           {mistaken.length ? (
             <>
@@ -440,7 +446,15 @@ export default function Cards() {
           icon="play"
           onPress={startNextRound}
         />
-      </ScrollView>
+        </ScrollView>
+        {poolHandwritingWord && <Modal visible animationType="slide" onRequestClose={() => setPoolHandwritingWord(null)}>
+          <Handwriting key={poolHandwritingWord.id} targetHanzi={poolHandwritingWord.hanzi} showTarget backLabel="Back to new words"
+            onBack={() => setPoolHandwritingWord(null)} onCorrect={() => {
+              setPoolHandwritingCorrectIds((ids) => ids.includes(poolHandwritingWord.id) ? ids : [...ids, poolHandwritingWord.id]);
+              setPoolHandwritingWord(null);
+            }} />
+        </Modal>}
+      </>
     );
   }
 
@@ -705,16 +719,23 @@ function StackCard({ word, depth, roundIndex, initialTilt, active, height, setti
   );
 }
 
-function RoundPoolChanges({ graduations, settings }: { graduations: Graduation[]; settings: Settings }) {
+function RoundPoolChanges({ graduations, settings, handwritingCorrectIds, onHandwriting }: {
+  graduations: Graduation[];
+  settings: Settings;
+  handwritingCorrectIds: string[];
+  onHandwriting: (word: Word) => void;
+}) {
   const incoming = graduations.flatMap(({ replacement }) => replacement ? [replacement] : []);
   return <>
     <PoolChangeSection title="LEARNED" words={graduations.map(({ learned }) => learned)} settings={settings} />
-    {incoming.length > 0 && <PoolChangeSection title="NEW IN THE ACTIVE POOL" words={incoming} settings={settings} incoming />}
+    {incoming.length > 0 && <PoolChangeSection title="NEW IN THE ACTIVE POOL" words={incoming} settings={settings}
+      incoming handwritingCorrectIds={handwritingCorrectIds} onHandwriting={onHandwriting} />}
   </>;
 }
 
-function PoolChangeSection({ title, words, settings, incoming = false }: {
+function PoolChangeSection({ title, words, settings, incoming = false, handwritingCorrectIds = [], onHandwriting }: {
   title: string; words: Word[]; settings: Settings; incoming?: boolean;
+  handwritingCorrectIds?: string[]; onHandwriting?: (word: Word) => void;
 }) {
   return <View style={[styles.poolChanges, incoming && styles.poolChangesIncoming]}>
     <Text style={[styles.poolChangesTitle, incoming && styles.poolChangesTitleIncoming]}>{title}</Text>
@@ -729,6 +750,14 @@ function PoolChangeSection({ title, words, settings, incoming = false }: {
           <WordGuessStats word={word} />
         </View>
         <SpeakerButton pronunciation={pronunciation} settings={settings} size={20} />
+        {incoming && (handwritingCorrectIds.includes(word.id)
+          ? <View pointerEvents="none" accessibilityLabel={`Correct handwriting answer for ${pronunciation.hanzi}`} style={styles.poolHandwritingButton}>
+              <Ionicons name="checkmark" size={26} color={colors.green} />
+            </View>
+          : <Pressable accessibilityRole="button" accessibilityLabel={`Write ${pronunciation.hanzi} by hand`}
+              onPress={() => onHandwriting?.(word)} style={styles.poolHandwritingButton}>
+              <Ionicons name="pencil-outline" size={23} color={colors.green} />
+            </Pressable>)}
       </View>;
     })}
   </View>;
@@ -908,6 +937,7 @@ const styles = StyleSheet.create({
   },
   poolChangeHanzi: { color: colors.ink, fontSize: 26, fontWeight: "800" },
   poolChangeDetails: { flex: 1, minWidth: 0 },
+  poolHandwritingButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   poolChangePinyin: { color: colors.green, fontSize: 14, fontWeight: "700" },
   poolChangeMeaning: { color: colors.ink, fontSize: 14, marginTop: 2 },
   guessStats: { color: colors.muted, fontSize: 9, marginTop: 4 },
