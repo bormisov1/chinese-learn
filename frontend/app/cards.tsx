@@ -1,7 +1,6 @@
 import { displayTranslation, LANGUAGES, maskTranslatedHanzi, Text, useTranslation } from "@/i18n";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState } from "react";
@@ -26,7 +25,6 @@ import {
   ACTIVE_CARD_LIMIT,
   CARD_GRADUATION_LEVEL,
   CARD_ROUND_SIZE,
-  gradeCard,
   selectRound,
 } from "@/card-srs";
 import { finishExercise } from "@/exercise-progress";
@@ -37,7 +35,7 @@ import { ExplanationButton } from "@/explanation-button";
 import { captureCardReviewUndo, restoreCardReview, type CardReviewUndo } from "@/card-review-undo";
 import Handwriting from "./handwriting";
 
-type Phase = "ready" | "studying" | "celebrating" | "complete";
+type Phase = "ready" | "studying" | "complete";
 type Graduation = { learned: Word; replacement?: Word };
 const findGraduation = (before: Word[], after: Word[], wordId: string): Graduation | undefined => {
   const original = before.find((item) => item.id === wordId);
@@ -79,7 +77,6 @@ export default function Cards() {
     [mistakeIds, setMistakeIds] = useState<string[]>([]),
     [graduations, setGraduations] = useState<Graduation[]>([]),
     [reviewedCards, setReviewedCards] = useState<ReviewedCard[]>([]),
-    [roundEndsAfterCelebration, setRoundEndsAfterCelebration] = useState(false),
     [cardHeights, setCardHeights] = useState<Record<string, number>>({}),
     [roundTilts, setRoundTilts] = useState<Record<string, number>>({}),
     [handwritingOpen, setHandwritingOpen] = useState(false),
@@ -111,12 +108,6 @@ export default function Cards() {
     .map((id) => data.words.find((w) => w.id === id))
     .filter(Boolean) as typeof data.words;
   const word = roundWords[position];
-  const stagedGraduation = useMemo(() => {
-    if (phase !== "studying" || !word?.cardActive ||
-        word.cardSrsLevel !== CARD_GRADUATION_LEVEL - 1) return undefined;
-    const updated = gradeCard(data.words, word.id, true, studyRound, Date.now());
-    return findGraduation(data.words, updated, word.id);
-  }, [phase, data.words, word?.id, word?.cardActive, word?.cardSrsLevel, studyRound]);
   const examples = useMemo(
     () =>
       word
@@ -206,7 +197,6 @@ export default function Cards() {
     setMistakeIds([]);
     setGraduations([]);
     setReviewedCards([]);
-    setRoundEndsAfterCelebration(false);
     setFlipped(false);
     setHandwritingOpen(false);
     setHandwritingAfterWrong(false);
@@ -250,11 +240,8 @@ export default function Cards() {
       completedAt: roundComplete ? reviewedAt : undefined,
       undo,
     }]);
-    if (graduation) {
-      setGraduations((items) => [...items, graduation]);
-      setRoundEndsAfterCelebration(roundComplete);
-      setPhase("celebrating");
-    } else if (roundComplete) setPhase("complete");
+    if (graduation) setGraduations((items) => [...items, graduation]);
+    if (roundComplete) setPhase("complete");
     else setPosition((p) => p + 1);
     setFlipped(false);
     setHandwritingCorrect(false);
@@ -279,7 +266,6 @@ export default function Cards() {
     setReviewedCards((cards) => cards.slice(0, -1));
     if (!previous.correct) setMistakeIds((ids) => ids.slice(0, -1));
     if (previous.graduated) setGraduations((items) => items.slice(0, -1));
-    setRoundEndsAfterCelebration(false);
     setPosition(previous.position);
     setPhase("studying");
     setFlipped(true);
@@ -287,14 +273,6 @@ export default function Cards() {
     setExampleIndex(0);
     swipe.setValue({ x: 0, y: 0 });
     cardSpin.setValue(0);
-  };
-  const continueAfterCelebration = () => {
-    if (roundEndsAfterCelebration) setPhase("complete");
-    else {
-      setPosition((p) => p + 1);
-      setPhase("studying");
-    }
-    setRoundEndsAfterCelebration(false);
   };
   const animateSwipe = (correct: boolean) => {
     if (grading.current) return;
@@ -427,14 +405,7 @@ export default function Cards() {
           subtitle={`${roundWords.length - mistaken.length} ${t("correct")} · ${mistaken.length} ${t("mistaken")}`}
           onPreviousCard={previousCard}
         />
-        {graduations.map((graduation) => (
-          <GraduationCelebration
-            key={graduation.learned.id}
-            graduation={graduation}
-            settings={data.settings}
-            compact
-          />
-        ))}
+        {graduations.length > 0 && <RoundPoolChanges graduations={graduations} settings={data.settings} />}
         <View style={styles.results}>
           {mistaken.length ? (
             <>
@@ -473,87 +444,55 @@ export default function Cards() {
     );
   }
 
-  const celebrating = phase === "celebrating";
-  const visibleGraduation = celebrating
-    ? graduations[graduations.length - 1]
-    : stagedGraduation;
   return (
     <>
     <ScrollView style={shell.page} contentContainerStyle={shell.content}>
-      {celebrating ? (
-        <RoundReviewHeader
-          eyebrow={`${t("Round")} ${studyRound} · ${t("Milestone")}`}
-          title="Word learned!"
-          subtitle="A word graduated from your active card pool."
-          onPreviousCard={previousCard}
-        />
-      ) : (
-        <RoundReviewHeader
-          eyebrow={`${t("Round")} ${studyRound} · ${t("Card")} ${position + 1} ${t("of")} ${roundWords.length}`}
-          title="Flashcards"
-          subtitle={`${word.cardSrsLevel < CARD_GRADUATION_LEVEL ? `${t("Learning step")} ${word.cardSrsLevel + 1} ${t("of")} ${CARD_GRADUATION_LEVEL}` : `${t("Retention level")} ${word.cardSrsLevel}`} · ${mistakeIds.length} ${t("mistaken")}`}
-          onPreviousCard={position > 0 ? previousCard : undefined}
-        />
-      )}
-      {!celebrating ? <>
-        <View style={styles.progress}>
-          <View
-            style={[
-              styles.fill,
-              { width: `${((position + 1) / roundWords.length) * 100}%` },
-            ]}
-          />
-        </View>
-        <View style={[styles.studyStack, {
-          height: (cardHeights[word.id] ?? 300) + (roundWords.length - 1) * CARD_STACK_STEP,
-        }]}>
-          {roundWords.slice(position).map((stackWord, index) => (
-            <StackCard
-              key={stackWord.id}
-              word={stackWord}
-              depth={index}
-              roundIndex={position + index}
-              initialTilt={roundTilts[stackWord.id] ?? 0}
-              active={index === 0}
-              height={cardHeights[stackWord.id] ?? 300}
-              settings={data.settings}
-              translationLanguage={translationLanguage}
-              examples={(data.wordSentenceIndex[stackWord.id] ?? [])
-                .map((id) => data.sentences.find((sentence) => sentence.id === id))
-                .filter(Boolean).slice(0, 3) as Sentence[]}
-              flipped={flipped}
-              exampleIndex={exampleIndex}
-              onExampleIndexChange={setExampleIndex}
-              swipe={swipe}
-              cardSpin={cardSpin}
-              panHandlers={panResponder.panHandlers}
-              onFlip={flipCard}
-              onGrade={finishSwipe}
-              onHandwriting={() => setHandwritingOpen(true)}
-              handwritingCorrect={index === 0 && handwritingCorrect}
-              onHeightChange={(height) => setCardHeights((current) =>
-                current[stackWord.id] === height ? current : { ...current, [stackWord.id]: height })}
-            />
-          ))}
-        </View>
-      </> : null}
-      {visibleGraduation ? (
+      <RoundReviewHeader
+        eyebrow={`${t("Round")} ${studyRound} · ${t("Card")} ${position + 1} ${t("of")} ${roundWords.length}`}
+        title="Flashcards"
+        subtitle={`${word.cardSrsLevel < CARD_GRADUATION_LEVEL ? `${t("Learning step")} ${word.cardSrsLevel + 1} ${t("of")} ${CARD_GRADUATION_LEVEL}` : `${t("Retention level")} ${word.cardSrsLevel}`} · ${mistakeIds.length} ${t("mistaken")}`}
+        onPreviousCard={position > 0 ? previousCard : undefined}
+      />
+      <View style={styles.progress}>
         <View
-          accessible={celebrating}
-          accessibilityElementsHidden={!celebrating}
-          importantForAccessibility={celebrating ? "auto" : "no-hide-descendants"}
-          pointerEvents={celebrating ? "auto" : "none"}
-          style={!celebrating && styles.stagedGraduation}
-        >
-          <SwipeableGraduation
-            key={visibleGraduation.learned.id}
-            graduation={visibleGraduation}
+          style={[
+            styles.fill,
+            { width: `${((position + 1) / roundWords.length) * 100}%` },
+          ]}
+        />
+      </View>
+      <View style={[styles.studyStack, {
+        height: (cardHeights[word.id] ?? 300) + (roundWords.length - 1) * CARD_STACK_STEP,
+      }]}>
+        {roundWords.slice(position).map((stackWord, index) => (
+          <StackCard
+            key={stackWord.id}
+            word={stackWord}
+            depth={index}
+            roundIndex={position + index}
+            initialTilt={roundTilts[stackWord.id] ?? 0}
+            active={index === 0}
+            height={cardHeights[stackWord.id] ?? 300}
             settings={data.settings}
-            active={celebrating}
-            onContinue={continueAfterCelebration}
+            translationLanguage={translationLanguage}
+            examples={(data.wordSentenceIndex[stackWord.id] ?? [])
+              .map((id) => data.sentences.find((sentence) => sentence.id === id))
+              .filter(Boolean).slice(0, 3) as Sentence[]}
+            flipped={flipped}
+            exampleIndex={exampleIndex}
+            onExampleIndexChange={setExampleIndex}
+            swipe={swipe}
+            cardSpin={cardSpin}
+            panHandlers={panResponder.panHandlers}
+            onFlip={flipCard}
+            onGrade={finishSwipe}
+            onHandwriting={() => setHandwritingOpen(true)}
+            handwritingCorrect={index === 0 && handwritingCorrect}
+            onHeightChange={(height) => setCardHeights((current) =>
+              current[stackWord.id] === height ? current : { ...current, [stackWord.id]: height })}
           />
-        </View>
-      ) : null}
+        ))}
+      </View>
     </ScrollView>
     {handwritingOpen && <Modal visible animationType="slide" onRequestClose={closeHandwriting}>
         <Handwriting targetHanzi={word.hanzi} onBack={closeHandwriting} onCorrect={finishHandwriting} />
@@ -766,392 +705,33 @@ function StackCard({ word, depth, roundIndex, initialTilt, active, height, setti
   );
 }
 
-function SwipeableGraduation({
-  graduation,
-  settings,
-  active,
-  onContinue,
-}: {
-  graduation: Graduation;
-  settings: Settings;
-  active: boolean;
-  onContinue: () => void;
-}) {
-  const t = useTranslation();
-  const swipe = useRef(new Animated.ValueXY()).current;
-  const swipeHint = useRef(new Animated.Value(0)).current;
-  const learnedEntry = useRef(new Animated.Value(0)).current;
-  const replacementEntry = useRef(new Animated.Value(0)).current;
-  const { width: screenWidth } = useWindowDimensions();
-  const continuing = useRef(false);
-  const [showingReplacement, setShowingReplacement] = useState(false);
-  useLayoutEffect(() => {
-    learnedEntry.setValue(0);
-    replacementEntry.setValue(0);
-    if (!active) {
-      swipe.stopAnimation();
-      swipe.setValue({ x: 0, y: 0 });
-      continuing.current = false;
-      setShowingReplacement(false);
-      return;
-    }
-    const entrance = Animated.parallel([
-      Animated.timing(learnedEntry, {
-        toValue: 1,
-        duration: 460,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(replacementEntry, {
-        toValue: 1,
-        duration: 520,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]);
-    entrance.start();
-    return () => entrance.stop();
-  }, [active, graduation.learned.id]);
-  useEffect(() => {
-    if (!active || !graduation.replacement || showingReplacement) return;
-    const animation = Animated.sequence([
-      Animated.delay(450),
-      Animated.timing(swipeHint, {
-        toValue: -20,
-        duration: 280,
-        useNativeDriver: true,
-      }),
-      Animated.timing(swipeHint, {
-        toValue: 0,
-        duration: 360,
-        useNativeDriver: true,
-      }),
-      Animated.delay(650),
-      Animated.timing(swipeHint, {
-        toValue: 20,
-        duration: 280,
-        useNativeDriver: true,
-      }),
-      Animated.timing(swipeHint, {
-        toValue: 0,
-        duration: 360,
-        useNativeDriver: true,
-      }),
-    ]);
-    animation.start();
-    return () => {
-      animation.stop();
-      swipeHint.setValue(0);
-    };
-  }, [active, graduation.replacement?.id, showingReplacement]);
-  const continueInDirection = (direction: number) => {
-    if (continuing.current) return;
-    continuing.current = true;
-    Animated.timing(swipe, {
-      toValue: { x: direction * 520, y: 0 },
-      duration: 180,
-      useNativeDriver: true,
-    }).start(({ finished }) => {
-      if (finished) onContinue();
-      else continuing.current = false;
-    });
-  };
-  const revealReplacement = (direction: number) => {
-    if (continuing.current) return;
-    continuing.current = true;
-    swipeHint.stopAnimation();
-    Animated.timing(swipe, {
-      toValue: { x: direction * 520, y: 0 },
-      duration: 180,
-      useNativeDriver: true,
-    }).start(({ finished }) => {
-      if (!finished) {
-        continuing.current = false;
-        return;
-      }
-      swipe.setValue({ x: 0, y: 0 });
-      setShowingReplacement(true);
-      continuing.current = false;
-    });
-  };
-  const panResponder = PanResponder.create({
-    onMoveShouldSetPanResponder: (_, gesture) =>
-      Math.hypot(gesture.dx, gesture.dy) > 8,
-    onMoveShouldSetPanResponderCapture: (_, gesture) =>
-      Math.hypot(gesture.dx, gesture.dy) > 8,
-    onPanResponderGrant: () => {
-      swipeHint.stopAnimation();
-      swipeHint.setValue(0);
-      swipe.stopAnimation();
-    },
-    onPanResponderMove: (_, gesture) => {
-      swipe.setValue({ x: gesture.dx, y: gesture.dy });
-    },
-    onPanResponderRelease: (_, gesture) => {
-      if (
-        graduation.replacement &&
-        !showingReplacement &&
-        Math.abs(gesture.dx) > 100
-      ) {
-        revealReplacement(gesture.dx < 0 ? -1 : 1);
-      } else if (
-        (!graduation.replacement || showingReplacement) &&
-        Math.abs(gesture.dx) > 100
-      ) {
-        continueInDirection(gesture.dx < 0 ? -1 : 1);
-      } else {
-        Animated.spring(swipe, {
-          toValue: { x: 0, y: 0 },
-          useNativeDriver: true,
-          speed: 22,
-          bounciness: 7,
-        }).start();
-      }
-    },
-    onPanResponderTerminationRequest: () => false,
-    onPanResponderTerminate: () => {
-      Animated.spring(swipe, {
-        toValue: { x: 0, y: 0 },
-        useNativeDriver: true,
-      }).start();
-    },
-  });
-  const tintOpacity = swipe.x.interpolate({
-    inputRange: [-240, -170, -110, -60, 0, 60, 110, 170, 240],
-    outputRange: [1, 0.48, 0.16, 0.04, 0, 0.04, 0.16, 0.48, 1],
-    extrapolate: "clamp",
-  });
-  const learnedEntranceX = learnedEntry.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-screenWidth - 80, 0],
-  });
-  const replacementEntranceX = replacementEntry.interpolate({
-    inputRange: [0, 1],
-    outputRange: [screenWidth + 80, 0],
-  });
-  return (
-    <>
-      <View style={styles.graduationStack}>
-        {graduation.replacement && !showingReplacement ? (
-          <Animated.View
-            accessible={false}
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants"
-            pointerEvents="none"
-            style={[
-              styles.graduationUnderlay,
-              { transform: [{ translateX: replacementEntranceX }] },
-            ]}
-          >
-            <ActivePoolCard
-              word={graduation.replacement}
-              settings={settings}
-            />
-          </Animated.View>
-        ) : null}
-        <Animated.View
-          {...panResponder.panHandlers}
-          accessible
-          accessibilityRole="button"
-          accessibilityLabel={showingReplacement
-            ? "New word in the active pool. Swipe any direction to continue"
-            : graduation.replacement
-              ? "Word learned. Swipe either direction to see the new active pool word"
-              : "Word learned. Swipe any direction to continue"}
-          accessibilityActions={[{
-            name: "activate",
-            label: graduation.replacement && !showingReplacement
-              ? "Show new active pool word"
-              : "Continue",
-          }]}
-          onAccessibilityAction={() => {
-            if (graduation.replacement && !showingReplacement) revealReplacement(1);
-            else continueInDirection(1);
-          }}
-          style={[
-            webDragSurface,
-            styles.graduationTopCard,
-            {
-              transform: [
-                {
-                  translateX: Animated.add(
-                    Animated.add(swipe.x, swipeHint),
-                    learnedEntranceX,
-                  ),
-                },
-                { translateY: swipe.y },
-                {
-                  rotate: swipe.x.interpolate({
-                    inputRange: [-240, 0, 240],
-                    outputRange: ["-8deg", "0deg", "8deg"],
-                    extrapolate: "clamp",
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          {showingReplacement && graduation.replacement ? (
-            <ActivePoolCard
-              word={graduation.replacement}
-              settings={settings}
-              swipeTintOpacity={tintOpacity}
-            />
-          ) : (
-            <GraduationCelebration
-              graduation={graduation}
-              settings={settings}
-              showPoolUpdate={!graduation.replacement}
-              standalone
-              swipeTintOpacity={graduation.replacement ? undefined : tintOpacity}
-            />
-          )}
-        </Animated.View>
-      </View>
-      <Text style={styles.graduationSwipeHint}>
-        {graduation.replacement && !showingReplacement
-          ? `← ${t("Swipe either direction to meet the new active word")} →`
-          : `← ${t("Swipe any direction to continue")} →`}
-      </Text>
-    </>
-  );
+function RoundPoolChanges({ graduations, settings }: { graduations: Graduation[]; settings: Settings }) {
+  const incoming = graduations.flatMap(({ replacement }) => replacement ? [replacement] : []);
+  return <>
+    <PoolChangeSection title="LEARNED" words={graduations.map(({ learned }) => learned)} settings={settings} />
+    {incoming.length > 0 && <PoolChangeSection title="NEW IN THE ACTIVE POOL" words={incoming} settings={settings} incoming />}
+  </>;
 }
 
-function GraduationCelebration({
-  graduation,
-  settings,
-  compact = false,
-  showPoolUpdate = true,
-  standalone = false,
-  swipeTintOpacity,
-}: {
-  graduation: Graduation;
-  settings: Settings;
-  compact?: boolean;
-  showPoolUpdate?: boolean;
-  standalone?: boolean;
-  swipeTintOpacity?: Animated.AnimatedInterpolation<number>;
+function PoolChangeSection({ title, words, settings, incoming = false }: {
+  title: string; words: Word[]; settings: Settings; incoming?: boolean;
 }) {
-  const learned = resolveWordPronunciation(
-    graduation.learned,
-    displayTranslation(graduation.learned.russian, settings.language),
-  );
-  const replacement = graduation.replacement
-    ? resolveWordPronunciation(
-        graduation.replacement,
-        displayTranslation(graduation.replacement.russian, settings.language),
-      )
-    : undefined;
-  return (
-    <View style={[
-      styles.celebration,
-      compact && styles.celebrationCompact,
-      standalone && styles.celebrationStandalone,
-    ]}>
-      {swipeTintOpacity ? (
-        <Animated.View
-          pointerEvents="none"
-          style={[styles.correctSwipeTint, { opacity: swipeTintOpacity }]}
-        />
-      ) : null}
-      <Text style={styles.confetti}>🎉</Text>
-      <Text style={styles.celebrationTitle}>LEARNED</Text>
-      <View style={styles.graduationWordRow}>
-        <ExplanationButton kind="word" text={learned.hanzi} />
-        <Text style={styles.learnedHanzi}>{learned.hanzi}</Text>
-        <SpeakerButton
-          pronunciation={learned}
-          settings={settings}
-          size={24}
-        />
-      </View>
-      <Text style={styles.learnedPinyin}>{learned.pinyin}</Text>
-      <Text style={styles.learnedRussian}>{learned.meaning}</Text>
-      <WordGuessStats word={graduation.learned} />
-      {showPoolUpdate && graduation.replacement && replacement ? (
-        <View
-          style={[
-            styles.replacement,
-            compact && styles.replacementCompact,
-          ]}
-        >
-          {swipeTintOpacity ? (
-            <Animated.View
-              pointerEvents="none"
-              style={[styles.correctSwipeTint, { opacity: swipeTintOpacity }]}
-            />
-          ) : null}
-          <Text style={styles.replacementLabel}>NEW IN THE ACTIVE POOL</Text>
-          <Text style={styles.confetti}>👀</Text>
-          <Text style={styles.learnTitle}>LEARN</Text>
-          <View style={styles.graduationWordRow}>
-            <ExplanationButton kind="word" text={replacement.hanzi} />
-            <Text style={styles.learnedHanzi}>
-              {replacement.hanzi}
-            </Text>
-            <SpeakerButton
-              pronunciation={replacement}
-              settings={settings}
-              size={24}
-            />
-          </View>
-          <Text style={styles.learnedPinyin}>{replacement.pinyin}</Text>
-          <Text style={styles.learnedRussian}>
-            {replacement.meaning}
-          </Text>
-          <WordGuessStats word={graduation.replacement} />
+  return <View style={[styles.poolChanges, incoming && styles.poolChangesIncoming]}>
+    <Text style={[styles.poolChangesTitle, incoming && styles.poolChangesTitleIncoming]}>{title}</Text>
+    {words.map((word) => {
+      const pronunciation = resolveWordPronunciation(word, displayTranslation(word.russian, settings.language));
+      return <View key={word.id} style={styles.poolChangeRow}>
+        <ExplanationButton kind="word" text={pronunciation.hanzi} size={19} />
+        <Text style={styles.poolChangeHanzi}>{pronunciation.hanzi}</Text>
+        <View style={styles.poolChangeDetails}>
+          <Text style={styles.poolChangePinyin}>{pronunciation.pinyin}</Text>
+          <Text style={styles.poolChangeMeaning}>{pronunciation.meaning}</Text>
+          <WordGuessStats word={word} />
         </View>
-      ) : showPoolUpdate ? (
-        <Text style={styles.deckComplete}>No queued word is waiting to replace it.</Text>
-      ) : null}
-    </View>
-  );
-}
-
-function ActivePoolCard({
-  word,
-  settings,
-  swipeTintOpacity,
-}: {
-  word: Word;
-  settings: Settings;
-  swipeTintOpacity?: Animated.AnimatedInterpolation<number>;
-}) {
-  const pronunciation = resolveWordPronunciation(
-    word,
-    displayTranslation(word.russian, settings.language),
-  );
-  return (
-    <View
-      style={[
-        styles.celebration,
-        styles.celebrationStandalone,
-        styles.activePoolCard,
-      ]}
-    >
-      {swipeTintOpacity ? (
-        <Animated.View
-          pointerEvents="none"
-          style={[styles.correctSwipeTint, { opacity: swipeTintOpacity }]}
-        />
-      ) : null}
-      <Text style={styles.replacementLabel}>NEW IN THE ACTIVE POOL</Text>
-      <Text style={styles.confetti}>👀</Text>
-      <Text style={styles.learnTitle}>LEARN</Text>
-      <View style={styles.graduationWordRow}>
-        <ExplanationButton kind="word" text={pronunciation.hanzi} />
-        <Text style={styles.learnedHanzi}>{pronunciation.hanzi}</Text>
-        <SpeakerButton
-          pronunciation={pronunciation}
-          settings={settings}
-          size={24}
-        />
-      </View>
-      <Text style={styles.learnedPinyin}>{pronunciation.pinyin}</Text>
-      <Text style={styles.learnedRussian}>{pronunciation.meaning}</Text>
-      <WordGuessStats word={word} />
-    </View>
-  );
+        <SpeakerButton pronunciation={pronunciation} settings={settings} size={20} />
+      </View>;
+    })}
+  </View>;
 }
 
 function WordGuessStats({ word }: { word: Word }) {
@@ -1306,91 +886,30 @@ function ExampleCarousel({
 }
 
 const styles = StyleSheet.create({
-  celebration: {
+  poolChanges: {
     marginBottom: 16,
-    borderRadius: 22,
-    backgroundColor: "#FFF4D6",
+    borderRadius: 18,
+    backgroundColor: colors.pale,
     borderWidth: 1,
-    borderColor: "#E8C76A",
-    padding: 26,
-    alignItems: "center",
-    overflow: "hidden",
+    borderColor: "#C9DBCF",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
-  celebrationCompact: { padding: 20 },
-  celebrationStandalone: { minHeight: 360, justifyContent: "center" },
-  activePoolCard: {
-    backgroundColor: "#EAF6FF",
-    borderColor: "#B9DDF5",
-  },
-  graduationStack: { position: "relative" },
-  stagedGraduation: {
-    position: "absolute",
-    top: 0,
-    left: 22,
-    right: 22,
-    opacity: 0,
-  },
-  graduationUnderlay: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  graduationTopCard: { zIndex: 1 },
-  graduationSwipeHint: {
-    color: colors.muted,
-    fontSize: 13,
-    fontWeight: "700",
-    textAlign: "center",
-    marginBottom: 16,
-  },
-  confetti: { fontSize: 42, marginBottom: 8 },
-  celebrationTitle: {
-    color: colors.coral,
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 1.8,
-  },
-  graduationWordRow: {
+  poolChangesIncoming: { backgroundColor: "#FFF1EC", borderColor: "#E9C9BD" },
+  poolChangesTitle: { color: colors.green, fontSize: 11, fontWeight: "800", letterSpacing: 1.4, marginBottom: 4 },
+  poolChangesTitleIncoming: { color: colors.coral },
+  poolChangeRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-  },
-  learnedHanzi: { color: colors.ink, fontSize: 54, fontWeight: "800", marginTop: 8 },
-  learnedPinyin: { color: colors.green, fontSize: 18, fontWeight: "700" },
-  learnedRussian: {
-    color: colors.ink,
-    fontSize: 18,
-    fontWeight: "600",
-    textAlign: "center",
-    marginTop: 8,
-  },
-  replacement: {
-    alignSelf: "stretch",
-    marginTop: 22,
-    marginHorizontal: -26,
-    marginBottom: -26,
-    paddingVertical: 18,
-    paddingHorizontal: 12,
-    borderBottomLeftRadius: 21,
-    borderBottomRightRadius: 21,
-    backgroundColor: "#EAF6FF",
+    gap: 9,
+    paddingVertical: 10,
     borderTopWidth: 1,
-    borderColor: "#B9DDF5",
-    alignItems: "center",
+    borderTopColor: colors.line,
   },
-  replacementCompact: { marginHorizontal: -20, marginBottom: -20 },
-  replacementLabel: {
-    color: colors.muted,
-    fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 1.4,
-    marginBottom: 10,
-  },
-  learnTitle: {
-    color: colors.green,
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 1.8,
-  },
-  deckComplete: { color: colors.muted, textAlign: "center", marginTop: 20 },
+  poolChangeHanzi: { color: colors.ink, fontSize: 26, fontWeight: "800" },
+  poolChangeDetails: { flex: 1, minWidth: 0 },
+  poolChangePinyin: { color: colors.green, fontSize: 14, fontWeight: "700" },
+  poolChangeMeaning: { color: colors.ink, fontSize: 14, marginTop: 2 },
   guessStats: { color: colors.muted, fontSize: 9, marginTop: 4 },
   exampleChinese: {
     flex: 1,
