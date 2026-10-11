@@ -51,3 +51,58 @@ test('all DeepSeek tasks request Flash even with a saved Pro model', async () =>
     globalThis.fetch = originalFetch;
   }
 });
+
+test('retries without streaming when fetch cannot expose the explanation stream', async () => {
+  const settings: Settings = {
+    language: 'en', apiKey: 'test-key', apiKeyValidated: true,
+    apiUrl: 'https://example.test/chat/completions', model: 'deepseek-v4-pro',
+    ttsProvider: 'browser', ttsVoiceURI: '', ttsRate: 1, automaticWordAddition: false, aiChatEnabled: true, handwritingAfterWrong: true,
+  };
+  const explanation = {
+    pinyin: 'bāng zhù', translation: 'help', summary: 'To help someone.', grammar: 'Verb.',
+    parts: [{ text: '帮助', pinyin: 'bāng zhù', meaning: 'help', characters: [
+      { hanzi: '帮', pinyin: 'bāng', meaning: 'help', semanticComponent: '巾', phoneticComponent: '邦', memoryAssociation: 'Helping hand.' },
+      { hanzi: '助', pinyin: 'zhù', meaning: 'assist', semanticComponent: '力', phoneticComponent: '且', memoryAssociation: 'Extra strength.' },
+    ] }],
+  };
+  const originalFetch = globalThis.fetch;
+  const streams: boolean[] = [];
+  globalThis.fetch = async (_input, init) => {
+    const stream = JSON.parse(String(init?.body)).stream as boolean;
+    streams.push(stream);
+    return stream
+      ? { ok: true, headers: new Headers({ 'content-type': 'text/event-stream' }), body: null } as Response
+      : new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(explanation) } }] }), { status: 200 });
+  };
+  try {
+    assert.deepEqual(await explainWordOrSentence(settings, 'word', '帮助'), explanation);
+    assert.deepEqual(streams, [true, false]);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test('requests ordinary JSON explanations in React Native', async () => {
+  const settings: Settings = {
+    language: 'en', apiKey: 'test-key', apiKeyValidated: true,
+    apiUrl: 'https://example.test/chat/completions', model: 'deepseek-v4-pro',
+    ttsProvider: 'browser', ttsVoiceURI: '', ttsRate: 1, automaticWordAddition: false, aiChatEnabled: true, handwritingAfterWrong: true,
+  };
+  const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  const originalFetch = globalThis.fetch;
+  let requestedStream: boolean | undefined;
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { product: 'ReactNative' } });
+  globalThis.fetch = async (_input, init) => {
+    requestedStream = JSON.parse(String(init?.body)).stream;
+    return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({
+      pinyin: 'nǐ', translation: 'you', summary: 'Pronoun.', grammar: 'Pronoun.',
+      parts: [{ text: '你', pinyin: 'nǐ', meaning: 'you', characters: [{ hanzi: '你', pinyin: 'nǐ', meaning: 'you', semanticComponent: '亻', phoneticComponent: '尔', memoryAssociation: 'A person.' }] }],
+    }) } }] }), { status: 200 });
+  };
+  try {
+    assert.equal((await explainWordOrSentence(settings, 'word', '你')).translation, 'you');
+    assert.equal(requestedStream, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalNavigator) Object.defineProperty(globalThis, 'navigator', originalNavigator);
+    else Reflect.deleteProperty(globalThis, 'navigator');
+  }
+});
