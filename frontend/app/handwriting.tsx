@@ -14,11 +14,13 @@ import type { Point, Stroke } from '@/handwriting/types';
 
 type HandwritingProps = {
   targetHanzi?: string;
+  showTarget?: boolean;
+  backLabel?: string;
   onBack?: () => void;
   onCorrect?: () => void;
 };
 
-export default function Handwriting({ targetHanzi, onBack, onCorrect }: HandwritingProps) {
+export default function Handwriting({ targetHanzi, showTarget = false, backLabel = 'Back to flashcard', onBack, onCorrect }: HandwritingProps) {
   const insets = useSafeAreaInsets();
   const [output, setOutput] = useState('');
   const [strokes, setStrokes] = useState<Stroke[]>([]);
@@ -131,7 +133,7 @@ export default function Handwriting({ targetHanzi, onBack, onCorrect }: Handwrit
   const visible = active.length ? [...strokes, active] : strokes;
   return <View style={[styles.page, onBack && { paddingTop: insets.top, paddingBottom: insets.bottom + 10 }]}>
     <View style={onBack ? styles.outputRow : undefined}>
-      {onBack && <Pressable accessibilityRole="button" accessibilityLabel="Back to flashcard" onPress={onBack} style={styles.backAction}>
+      {onBack && <Pressable accessibilityRole="button" accessibilityLabel={backLabel} onPress={onBack} style={styles.backAction}>
         <Ionicons name="arrow-back" size={23} color={colors.green} />
       </Pressable>}
       <View style={[styles.outputPanel, onBack ? styles.outputPanelWithBack : styles.outputPanelStandalone]}>
@@ -152,6 +154,11 @@ export default function Handwriting({ targetHanzi, onBack, onCorrect }: Handwrit
         </View>
       </View>
     </View>
+
+    {showTarget && targetHanzi && <View style={styles.targetPanel}>
+      <Text style={styles.targetLabel}>Write the Hanzi</Text>
+      <Text numberOfLines={1} adjustsFontSizeToFit style={styles.targetHanzi}>{targetHanzi}</Text>
+    </View>}
 
     <View style={styles.drawingFrame}>
       <View
@@ -208,6 +215,9 @@ const styles = StyleSheet.create({
   outputAction: { width: 30, height: 36, alignItems: 'center', justifyContent: 'center' },
   outputText: { flex: 1, color: colors.ink, fontSize: 22 },
   outputPlaceholder: { color: colors.muted, fontSize: 16 },
+  targetPanel: { alignItems: 'center', marginHorizontal: 16, marginBottom: 10, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 16, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line },
+  targetLabel: { color: colors.muted, fontSize: 11, fontWeight: '800', letterSpacing: 1.4 },
+  targetHanzi: { color: colors.ink, fontSize: 48, lineHeight: 60, fontWeight: '700', textAlign: 'center' },
   drawingFrame: { flex: 1, marginHorizontal: 16, marginBottom: 10, borderRadius: 18, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.card, overflow: 'hidden' },
   canvas: { flex: 1, touchAction: 'none' } as any,
   placeholder: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
