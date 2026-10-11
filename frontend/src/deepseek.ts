@@ -54,16 +54,23 @@ export const evaluateChinese = (settings: Settings, sentence: Sentence, answer: 
 export const explain = (settings: Settings, sentence: Sentence, words: Word[]) => call<Explanation>(settings, 'Explain Mandarin to the learner in their selected language. JSON only.', explainPrompt(settings.language, sentence.chinese, words.filter(w => sentence.wordIds.includes(w.id))));
 export async function explainWordOrSentence(settings: Settings, kind: 'word' | 'sentence', text: string, onPartial?: (partial: Partial<WordExplanation>) => void): Promise<WordExplanation> {
   if (!settings.apiKey) throw new Error('Add your DeepSeek API key in Settings.');
-  let response: Response;
-  try {
-    response = await fetch(settings.apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settings.apiKey}` },
-      body: JSON.stringify({ model: DEEPSEEK_FLASH_MODEL, response_format: { type: 'json_object' }, stream: true,
-        messages: [{ role: 'system', content: 'You are a precise Mandarin teacher. Follow the JSON schema and respond in the learner language. JSON only.' }, { role: 'user', content: wordExplanationPrompt(settings.language, kind, text) }], temperature: 0.2 }),
-    });
-  } catch { throw new Error('Could not reach DeepSeek. Check the API endpoint, network, and browser console.'); }
-  if (!response.ok) throw new Error(`DeepSeek error ${response.status}`);
+  // React Native fetch exposes no readable response body for SSE on iOS.
+  const nativeRuntime = typeof navigator !== 'undefined' && navigator.product === 'ReactNative';
+  const request = async (stream: boolean) => {
+    let response: Response;
+    try {
+      response = await fetch(settings.apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settings.apiKey}` },
+        body: JSON.stringify({ model: DEEPSEEK_FLASH_MODEL, response_format: { type: 'json_object' }, stream,
+          messages: [{ role: 'system', content: 'You are a precise Mandarin teacher. Follow the JSON schema and respond in the learner language. JSON only.' }, { role: 'user', content: wordExplanationPrompt(settings.language, kind, text) }], temperature: 0.2 }),
+      });
+    } catch { throw new Error('Could not reach DeepSeek. Check the API endpoint, network, and browser console.'); }
+    if (!response.ok) throw new Error(`DeepSeek error ${response.status}`);
+    return response;
+  };
+  let response = await request(!nativeRuntime);
+  if (!nativeRuntime && !response.body) response = await request(false);
   const result = response.headers.get('content-type')?.includes('text/event-stream')
     ? await readExplanationStream(response, onPartial)
     : JSON.parse((await response.json()).choices?.[0]?.message?.content ?? '{}');
