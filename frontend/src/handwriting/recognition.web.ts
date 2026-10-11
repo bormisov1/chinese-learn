@@ -1,4 +1,5 @@
 import type { Stroke } from './types';
+import { coordinatesForHanziLookup } from './recognition-web-coordinates';
 
 type Match = { hanzi: string; score: number };
 let worker: Worker | null = null;
@@ -35,13 +36,15 @@ export function prepareRecognition(): Promise<void> {
 }
 
 export function recognizeStrokes(strokes: Stroke[], _width: number, _height: number): Promise<string[]> {
+  const coordinates = coordinatesForHanziLookup(strokes);
+  if (!coordinates.length) return Promise.resolve([]);
   const lookup = lookupQueue.then(async () => {
     await prepareRecognition();
     if (!worker) throw new Error('Browser handwriting recognizer is unavailable.');
     return new Promise<string[]>((resolve, reject) => {
       pending = resolve;
       rejectPending = reject;
-      worker!.postMessage({ strokes: strokes.map(stroke => stroke.map(([x, y]) => [x, y])), limit: 12 });
+      worker!.postMessage({ strokes: coordinates, limit: 12 });
     });
   });
   lookupQueue = lookup.then(() => undefined, () => undefined);
