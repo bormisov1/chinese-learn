@@ -7,6 +7,7 @@ type CardProgress = Pick<Word,
   | "cardSrsDueAt"
   | "cardIntroducedAt"
   | "cardActive"
+  | "cardRelearning"
   | "cardLastStudiedRound"
   | "cardLastIncorrectAt"
   | "cardLapses"
@@ -21,6 +22,7 @@ const progress = (word: Word): CardProgress => ({
   cardSrsDueAt: word.cardSrsDueAt,
   cardIntroducedAt: word.cardIntroducedAt,
   cardActive: word.cardActive,
+  cardRelearning: word.cardRelearning,
   cardLastStudiedRound: word.cardLastStudiedRound,
   cardLastIncorrectAt: word.cardLastIncorrectAt,
   cardLapses: word.cardLapses,

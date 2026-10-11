@@ -48,7 +48,7 @@ test("undoing a graduation restores the studied card and its replacement", () =>
   assert.equal(restored[0].exampleCount, 3);
 });
 
-test("undoing a failed retention review restores lapses and the paused card", () => {
+test("undoing a failed retention review restores the separate relearning state", () => {
   const before = [
     ...Array.from({ length: 12 }, (_, index) => word(`active-${index}`)),
     word("retention", {
@@ -60,7 +60,10 @@ test("undoing a failed retention review restores lapses and the paused card", ()
   ];
   const after = gradeCard(before, "retention", false, 4, 1000);
   assert.equal(after.find((item) => item.id === "retention")?.cardSrsIncorrect, 1);
+  assert.equal(after.find((item) => item.id === "retention")?.cardRelearning, true);
+  assert.equal(after.find((item) => item.id === "retention")?.cardActive, false);
   assert.equal(after.filter((item) => item.cardActive).length, 12);
+  assert.deepEqual(after.slice(0, 12), before.slice(0, 12));
 
   const restored = restoreCardReview(after, captureCardReviewUndo(before, after));
   assert.deepEqual(JSON.parse(JSON.stringify(restored)), before);

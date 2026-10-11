@@ -92,6 +92,7 @@ function mergeWord(current: Word, imported: Word): Word {
     cardSrsDueAt: earliestDue(current.cardSrsDueAt, imported.cardSrsDueAt),
     cardIntroducedAt: minOptional(current.cardIntroducedAt, imported.cardIntroducedAt),
     cardActive: current.cardActive || imported.cardActive,
+    cardRelearning: current.cardRelearning || imported.cardRelearning,
     cardLastStudiedRound: maxDefined(current.cardLastStudiedRound, imported.cardLastStudiedRound),
     cardLastIncorrectAt: maxDefined(current.cardLastIncorrectAt, imported.cardLastIncorrectAt),
     cardLapses: Math.max(current.cardLapses ?? 0, imported.cardLapses ?? 0),

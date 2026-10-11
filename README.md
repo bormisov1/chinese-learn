@@ -39,13 +39,19 @@ Run `bun test` from `backend/`.
 
 ## Web deployment
 
-After merging a feature PR into `dev`, connect to the VPS, update its checkout
-of `dev`, and run `./scripts/deploy-web.sh` there. The script builds committed
-HEAD from `frontend/` and deploys the web export to
-`https://dev.zh.x.bormisov.com`. It also publishes the backend architecture
-page from `backend/docs/`. `master` targets `https://zh.x.bormisov.com`.
-The script is VPS-only; it needs the server's Node 22.13.0, Nginx, Certbot,
-and sudo environment.
+Pushes to any branch run `.github/workflows/web-deploy.yml`. Its dedicated
+SSH key invokes `scripts/ci-deploy-web.sh` on the VPS, which fetches the exact
+pushed commit and runs `scripts/deploy-web.sh` from that branch's worktree.
+`dev` deploys to `https://dev.zh.x.bormisov.com`, `master` to
+`https://zh.x.bormisov.com`, and other branches to a hostname based on their
+branch name (for example, `feat/cards` becomes
+`https://feat-cards.zh.x.bormisov.com`). The script also publishes the backend
+architecture page from `backend/docs/`. The web build uses committed HEAD only.
+The deploy scripts are VPS-only; they need the server's Node 22.13.0, Nginx,
+Certbot, and sudo environment. The workflow requires the repository secret
+`WEB_DEPLOY_SSH_KEY`, paired with a VPS `authorized_keys` entry restricted to
+the installed CI deploy command. Branch pushes deploy web assets; backend
+service restarts remain a separate step after backend code changes.
 # iOS TestFlight CI
 
 The GitHub Actions workflow in `.github/workflows/ios-testflight.yml` builds the iOS app on a standard macOS runner and uploads it to TestFlight whenever `master` receives a commit (including a merge from `dev`). Builds of this workflow queue behind earlier iOS builds. It can also be started manually from the Actions tab. The workflow uses Expo prebuild locally on the runner, without EAS Build or EAS Submit.

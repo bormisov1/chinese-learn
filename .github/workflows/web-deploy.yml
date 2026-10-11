@@ -1,0 +1,35 @@
+name: Deploy web
+
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: startsWith(github.ref, 'refs/heads/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy committed branch on VPS
+        env:
+          WEB_DEPLOY_SSH_KEY: ${{ secrets.WEB_DEPLOY_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$WEB_DEPLOY_SSH_KEY"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$WEB_DEPLOY_SSH_KEY" > "$HOME/.ssh/chinese-learn-deploy"
+          chmod 600 "$HOME/.ssh/chinese-learn-deploy"
+          ssh -F /dev/null -i "$HOME/.ssh/chinese-learn-deploy" \
+            -o IdentitiesOnly=yes -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$GITHUB_WORKSPACE/.github/web-deploy-known-hosts" \
+            claude@151.247.209.112 deploy "$GITHUB_REF_NAME" "$GITHUB_SHA"

@@ -17,6 +17,8 @@ export type Word = {
   cardSrsDueAt: number;
   cardIntroducedAt?: number;
   cardActive?: boolean;
+  /** A failed retention card that is being reviewed while waiting for an active slot. */
+  cardRelearning?: boolean;
   cardLastStudiedRound?: number;
   cardLastIncorrectAt?: number;
   cardLapses?: number;
