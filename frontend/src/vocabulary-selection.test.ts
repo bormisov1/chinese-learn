@@ -13,7 +13,7 @@ test('removing a selected word unlinks its sentence references and survives a un
     words: [word('one', '你好'), word('two', '学习')],
     sentences: [{ id: 'sentence', chinese: '你好 学习', pinyin: '', russian: '', wordIds: ['one', 'two'], sentenceShownCount: 0 }],
     wordSentenceIndex: { one: ['sentence'], two: ['sentence'] },
-    attempts: [], sentenceDataByLanguage: {}, explanations: {}, cardRound: 0, roundCompletions: [], mixQueue: [], mixPosition: 0,
+    attempts: [], sentenceDataByLanguage: {}, explanations: {}, cardRound: 0, roundCompletions: [], cardGraduations: [], mixQueue: [], mixPosition: 0,
     onboardingComplete: true,
     languageSelected: true,
     settings: { language: 'en', apiKey: '', apiKeyValidated: false, apiUrl: '', model: '', ttsProvider: '', ttsVoiceURI: '', ttsRate: 1, automaticWordAddition: false, aiChatEnabled: true, handwritingAfterWrong: true },

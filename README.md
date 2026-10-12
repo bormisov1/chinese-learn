@@ -8,7 +8,7 @@ An Expo frontend and one Bun/SQLite backend for Chinese vocabulary study.
 | --- | --- |
 | [`frontend/`](frontend/) | Expo routes (`app/`), client code (`src/`), static assets, dictionaries, data scripts, and native build config |
 | [`backend/`](backend/) | The sole HTTP server (`src/server.ts`), API tests, SQLite data, server deployment files, observability, and backend docs |
-| [`scripts/deploy-web.sh`](scripts/deploy-web.sh) | VPS web deployment entry point required by the project workflow |
+| [`scripts/deploy-web.sh`](scripts/deploy-web.sh) | Web deployment script used by the project workflow |
 
 The name `backend` refers only to the Bun service. The frontend HTTP adapter is
 [`frontend/src/api-client.ts`](frontend/src/api-client.ts); it sends requests to
@@ -40,16 +40,16 @@ Run `bun test` from `backend/`.
 ## Web deployment
 
 Pushes to any branch run `.github/workflows/web-deploy.yml`. Its dedicated
-SSH key invokes `scripts/ci-deploy-web.sh` on the VPS, which fetches the exact
+SSH key invokes `scripts/ci-deploy-web.sh` on the deployment host, which fetches the exact
 pushed commit and runs `scripts/deploy-web.sh` from that branch's worktree.
 `dev` deploys to `https://dev.zh.x.bormisov.com`, `master` to
 `https://zh.x.bormisov.com`, and other branches to a hostname based on their
 branch name (for example, `feat/cards` becomes
 `https://feat-cards.zh.x.bormisov.com`). The script also publishes the backend
 architecture page from `backend/docs/`. The web build uses committed HEAD only.
-The deploy scripts are VPS-only; they need the server's Node 22.13.0, Nginx,
+The deploy scripts run on the deployment host; they need Node 22.13.0, Nginx,
 Certbot, and sudo environment. The workflow requires the repository secret
-`WEB_DEPLOY_SSH_KEY`, paired with a VPS `authorized_keys` entry restricted to
+`WEB_DEPLOY_SSH_KEY`, paired with an `authorized_keys` entry restricted to
 the installed CI deploy command. Branch pushes deploy web assets; backend
 service restarts remain a separate step after backend code changes.
 # iOS TestFlight CI

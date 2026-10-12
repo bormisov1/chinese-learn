@@ -45,6 +45,13 @@ test("sync merges explanations and preserves a failed card review across stale c
     expect(refreshed.explanations[key].explanation.translation).toBe("greetings");
     expect(refreshed.explanations[other].explanation.translation).toBe("учиться");
 
+    const firstGraduation = { round: 1, wordId: "word-1", at: 100 };
+    await bootstrap({ cardGraduations: [firstGraduation] });
+    const graduationMerge = await bootstrap({ cardGraduations: [{ round: 2, wordId: "word-2", at: 200 }] }) as unknown as { cardGraduations: typeof firstGraduation[] };
+    expect(graduationMerge.cardGraduations).toHaveLength(2);
+    const staleGraduationMerge = await bootstrap({ cardGraduations: [firstGraduation] }) as unknown as { cardGraduations: typeof firstGraduation[] };
+    expect(staleGraduationMerge.cardGraduations).toHaveLength(2);
+
     const graduated = { id: "word-1", hanzi: "你好", createdAt: 1,
       cardSrsLevel: 3, cardSrsCorrect: 3, cardSrsIncorrect: 0,
       cardSrsDueAt: 50, cardActive: false, cardRelearning: false };

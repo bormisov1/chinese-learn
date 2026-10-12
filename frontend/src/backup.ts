@@ -1,5 +1,5 @@
 import { fillActivePool, migrateCardPool } from "./card-srs";
-import { migrateRoundCompletions } from "./round-history";
+import { migrateCardGraduations, migrateRoundCompletions } from "./round-history";
 import { mergeExplanations } from "./word-explanations";
 import type {
   AppLanguage,
@@ -270,6 +270,14 @@ export function mergeBackupData(current: StoreData, backup: BackupFile): { data:
     if (!existing || existing.completedAt < completion.completedAt) rounds.set(completion.round, completion);
   }
 
+  const cardGraduations = new Map((current.cardGraduations ?? []).map((event) => [`${event.round}:${event.wordId}`, event]));
+  for (const event of migrateCardGraduations(imported.cardGraduations)) {
+    const mapped = { ...event, wordId: wordIdMap.get(event.wordId) ?? event.wordId };
+    const key = `${mapped.round}:${mapped.wordId}`;
+    const previous = cardGraduations.get(key);
+    if (!previous || mapped.at > previous.at) cardGraduations.set(key, mapped);
+  }
+
   const merged: StoreData = {
     ...current,
     words: migrateCardPool(words, Math.max(current.cardRound, imported.cardRound ?? 0)),
@@ -277,6 +285,7 @@ export function mergeBackupData(current: StoreData, backup: BackupFile): { data:
     explanations: mergeExplanations(current.explanations, imported.explanations),
     cardRound: Math.max(current.cardRound, imported.cardRound ?? 0),
     roundCompletions: [...rounds.values()].sort((a, b) => a.round - b.round),
+    cardGraduations: [...cardGraduations.values()].sort((a, b) => a.at - b.at),
     onboardingComplete: current.onboardingComplete || imported.onboardingComplete,
     languageSelected: current.languageSelected || imported.languageSelected,
   };
