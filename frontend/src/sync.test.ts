@@ -13,7 +13,7 @@ const store = (overrides: Partial<StoreData> = {}) => ({
   attempts: [],
   sentenceDataByLanguage: {},
   cardRound: 0,
-  roundCompletions: [],
+  roundCompletions: [], cardGraduations: [],
   mixQueue: [],
   mixPosition: 0,
   onboardingComplete: false,

@@ -4,7 +4,7 @@ import { StoreData } from "./types";
 import { migrateCardPool } from "./card-srs";
 import { isAppLanguage } from "./i18n";
 import russianSupplement from "./data/hsk-russian-supplement.json";
-import { migrateRoundCompletions } from "./round-history";
+import { migrateCardGraduations, migrateRoundCompletions } from "./round-history";
 
 const KEY = "hanzi-deck:v1";
 const STORAGE_VERSION = 3;
@@ -25,6 +25,7 @@ export const emptyStore: StoreData = {
   explanations: {},
   cardRound: 0,
   roundCompletions: [],
+  cardGraduations: [],
   mixQueue: [],
   mixPosition: 0,
   onboardingComplete: false,
@@ -91,6 +92,7 @@ export async function loadStore(): Promise<StoreData> {
         : [],
       cardRound: parsed.cardRound ?? 0,
       roundCompletions: migrateRoundCompletions(parsed.roundCompletions),
+      cardGraduations: migrateCardGraduations(parsed.cardGraduations),
       mixQueue: parsed.mixQueue ?? [],
       mixPosition: parsed.mixPosition ?? 0,
       sentenceDataByLanguage: parsed.sentenceDataByLanguage ?? {},

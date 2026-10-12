@@ -99,6 +99,11 @@ export type RoundCompletion = {
   round: number;
   completedAt: number;
 };
+export type CardGraduation = {
+  round: number;
+  wordId: string;
+  at: number;
+};
 export type StoreData = {
   storageVersion: number;
   words: Word[];
@@ -111,6 +116,7 @@ export type StoreData = {
   explanations: Record<string, CachedExplanation>;
   cardRound: number;
   roundCompletions: RoundCompletion[];
+  cardGraduations: CardGraduation[];
   mixQueue: string[];
   mixPosition: number;
   onboardingComplete: boolean;
