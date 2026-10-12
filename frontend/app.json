@@ -29,7 +29,7 @@
         "expo-image-picker",
         {
           "photosPermission": "Choose vocabulary screenshots to import.",
-          "cameraPermission": false,
+          "cameraPermission": "Take photos of Chinese text to add vocabulary.",
           "microphonePermission": false
         }
       ],
