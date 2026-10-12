@@ -11,8 +11,9 @@ import { useStore } from "@/context";
 import { Button, Header, shell } from "@/ui";
 import { colors } from "@/theme";
 import { CARD_GRADUATION_LEVEL } from "@/card-srs";
-import { roundsByDay } from "@/round-history";
+import { graduationsByDay, roundsByDay } from "@/round-history";
 import { ExplanationButton } from "@/explanation-button";
+import { StatsExport } from "@/stats-export";
 
 export default function Home() {
   const { data, error } = useStore();
@@ -24,8 +25,11 @@ export default function Home() {
   const passedProgress = `${passedWords} ${passedWords === 1 ? t("word") : t("words")} ${t("passed")} · ${data.cardRound} ${data.cardRound === 1 ? t("round") : t("rounds")} ${t("passed")}`;
   const aiEnabled = data.settings.apiKeyValidated;
   const roundDays = roundsByDay(data.roundCompletions);
+  const graduationDays = graduationsByDay(data.cardGraduations ?? []);
   const sevenDayRounds = roundDays.reduce((sum, item) => sum + item.count, 0);
+  const sevenDayGraduations = graduationDays.reduce((sum, item) => sum + item.count, 0);
   const maxDailyRounds = Math.max(1, ...roundDays.map((item) => item.count));
+  const maxDailyGraduations = Math.max(1, ...graduationDays.map((item) => item.count));
   const modes = [
     { label: "Cards", icon: "albums-outline", href: "/cards", enabled: true },
     { label: "Sentences", icon: "create-outline", href: "/practice", enabled: aiEnabled },
@@ -45,12 +49,12 @@ export default function Home() {
       <View style={styles.roundChart}>
         <View style={styles.chartHeading}>
           <View>
-            <Text style={styles.chartEyebrow}>ROUNDS</Text>
-            <Text style={styles.chartTitle}>Last 7 days</Text>
+            <Text style={styles.chartEyebrow}>{t("ROUNDS")}</Text>
+            <Text style={styles.chartTitle}>{t("Last 7 days")}</Text>
           </View>
           <View style={styles.chartTotal}>
             <Text style={styles.chartTotalNumber}>{sevenDayRounds}</Text>
-            <Text style={styles.chartTotalLabel}>completed</Text>
+            <Text style={styles.chartTotalLabel}>{t("completed")}</Text>
           </View>
         </View>
         <View style={styles.chartBars}>
@@ -81,6 +85,29 @@ export default function Home() {
             );
           })}
         </View>
+      </View>
+      <View style={styles.roundChart}>
+        <View style={styles.chartHeading}>
+          <View>
+            <Text style={styles.chartEyebrow}>{t("ACTIVE POOL")}</Text>
+            <Text style={styles.chartTitle}>{t("Words graduated · last 7 days")}</Text>
+          </View>
+          <View style={styles.chartTotal}>
+            <Text style={styles.chartTotalNumber}>{sevenDayGraduations}</Text>
+            <Text style={styles.chartTotalLabel}>{t("graduated")}</Text>
+          </View>
+        </View>
+        <View style={styles.chartBars}>
+          {graduationDays.map((item) => {
+            const height = item.count ? Math.max(8, item.count / maxDailyGraduations * 70) : 3;
+            return <View key={item.date} style={styles.chartDay}>
+              <Text style={styles.chartCount}>{item.count || ""}</Text>
+              <View style={styles.chartTrack}><View style={[styles.graduationBar, item.today && styles.graduationBarToday, { height }]} /></View>
+              <Text style={[styles.chartLabel, item.today && styles.chartLabelToday]}>{new Date(item.date).toLocaleDateString(undefined, { weekday: "narrow" })}</Text>
+            </View>;
+          })}
+        </View>
+        <StatsExport rounds={roundDays} graduations={graduationDays} />
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {!data.words.length ? (
@@ -197,6 +224,8 @@ const styles = StyleSheet.create({
   },
   chartBar: { width: "100%", borderRadius: 10, backgroundColor: colors.green },
   chartBarToday: { backgroundColor: colors.coral },
+  graduationBar: { width: "100%", borderRadius: 10, backgroundColor: colors.coral },
+  graduationBarToday: { backgroundColor: colors.green },
   chartLabel: { color: colors.muted, fontSize: 11, fontWeight: "700", marginTop: 6 },
   chartLabelToday: { color: colors.coral, fontWeight: "900" },
   importAction: { marginTop: 18 },

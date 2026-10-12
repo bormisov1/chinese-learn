@@ -29,7 +29,7 @@ import {
 } from "@/card-srs";
 import { finishExercise } from "@/exercise-progress";
 import { resolveSentencePronunciation, resolveWordPronunciation } from "@/pronunciation";
-import { recordRoundCompletion, undoRoundCompletion } from "@/round-history";
+import { recordCardGraduation, recordRoundCompletion, undoCardGraduation, undoRoundCompletion } from "@/round-history";
 import { flushTelemetry, track } from "@/telemetry";
 import { ExplanationButton } from "@/explanation-button";
 import { captureCardReviewUndo, restoreCardReview, type CardReviewUndo } from "@/card-review-undo";
@@ -49,7 +49,7 @@ const findGraduation = (before: Word[], after: Word[], wordId: string): Graduati
   );
   return { learned, replacement };
 };
-type ReviewedCard = { position: number; correct: boolean; graduated: boolean; completedAt?: number; undo: CardReviewUndo };
+type ReviewedCard = { position: number; correct: boolean; graduatedWordId?: string; completedAt?: number; undo: CardReviewUndo };
 type PendingTransition = { kind: "start" | "card"; startedAt: number; swipeCallbackAt?: number; lastCard?: boolean };
 type RoundTransitionTimes = { count: number; totalMs: number; maxMs: number; maxSwipeCallbackMs: number; maxRenderReadyMs: number };
 const transitionNow = () => globalThis.performance?.now?.() ?? Date.now();
@@ -83,7 +83,7 @@ export default function Cards() {
     [handwritingAfterWrong, setHandwritingAfterWrong] = useState(false),
     [handwritingCorrect, setHandwritingCorrect] = useState(false),
     [poolHandwritingWord, setPoolHandwritingWord] = useState<Word | null>(null),
-    [poolHandwritingCorrectIds, setPoolHandwritingCorrectIds] = useState<string[]>([]);
+    [summaryHandwritingCorrectIds, setSummaryHandwritingCorrectIds] = useState<string[]>([]);
   const swipe = useRef(new Animated.ValueXY()).current;
   const cardSpin = useRef(new Animated.Value(0)).current;
   const grading = useRef(false);
@@ -204,7 +204,7 @@ export default function Cards() {
     setHandwritingAfterWrong(false);
     setHandwritingCorrect(false);
     setPoolHandwritingWord(null);
-    setPoolHandwritingCorrectIds([]);
+    setSummaryHandwritingCorrectIds([]);
     setExampleIndex(0);
     grading.current = false;
     swipe.setValue({ x: 0, y: 0 });
@@ -229,9 +229,13 @@ export default function Cards() {
         { kind: "card", wordId: word.id, correct, round: studyRound },
         reviewedAt,
       );
-      return roundComplete
-        ? recordRoundCompletion(progressed, studyRound, reviewedAt)
+      const graduated = findGraduation(d.words, progressed.words, word.id);
+      const withGraduation = graduated
+        ? recordCardGraduation(progressed, studyRound, word.id, reviewedAt)
         : progressed;
+      return roundComplete
+        ? recordRoundCompletion(withGraduation, studyRound, reviewedAt)
+        : withGraduation;
     });
     if (!correct) setMistakeIds((ids) => [...ids, word.id]);
     void track("card_reviewed", { round: studyRound, result: correct ? "correct" : "incorrect", mode: "cards" });
@@ -240,7 +244,7 @@ export default function Cards() {
     setReviewedCards((cards) => [...cards, {
       position,
       correct,
-      graduated: !!graduation,
+      graduatedWordId: graduation?.learned.id,
       completedAt: roundComplete ? reviewedAt : undefined,
       undo,
     }]);
@@ -263,13 +267,16 @@ export default function Cards() {
     patch((current) => ({
       ...current,
       words: restoreCardReview(current.words, previous.undo),
+      cardGraduations: previous.graduatedWordId
+        ? undoCardGraduation(current.cardGraduations, studyRound, previous.graduatedWordId)
+        : current.cardGraduations,
       roundCompletions: previous.completedAt === undefined
         ? current.roundCompletions
         : undoRoundCompletion(current.roundCompletions, studyRound, previous.completedAt),
     }));
     setReviewedCards((cards) => cards.slice(0, -1));
     if (!previous.correct) setMistakeIds((ids) => ids.slice(0, -1));
-    if (previous.graduated) setGraduations((items) => items.slice(0, -1));
+    if (previous.graduatedWordId) setGraduations((items) => items.slice(0, -1));
     setPosition(previous.position);
     setPhase("studying");
     setFlipped(true);
@@ -411,7 +418,7 @@ export default function Cards() {
           onPreviousCard={previousCard}
         />
         {graduations.length > 0 && <RoundPoolChanges graduations={graduations} settings={data.settings}
-          handwritingCorrectIds={poolHandwritingCorrectIds} onHandwriting={setPoolHandwritingWord} />}
+          handwritingCorrectIds={summaryHandwritingCorrectIds} onHandwriting={setPoolHandwritingWord} />}
         <View style={styles.results}>
           {mistaken.length ? (
             <>
@@ -421,7 +428,7 @@ export default function Cards() {
                 return <View key={w!.id} style={styles.mistake}>
                   <ExplanationButton kind="word" text={pronunciation.hanzi} size={19} />
                   <Pressable onPress={() => copyText(pronunciation.hanzi)}>
-                    <Text style={styles.mistakeHanzi}>{pronunciation.hanzi}</Text>
+                    <Text style={styles.mistakeHanzi} numberOfLines={1} adjustsFontSizeToFit>{pronunciation.hanzi}</Text>
                   </Pressable>
                   <SpeakerButton pronunciation={pronunciation} settings={data.settings} />
                   <View style={{ flex: 1 }}>
@@ -429,6 +436,14 @@ export default function Cards() {
                     <Text style={styles.mistakeRussian}>{pronunciation.meaning}</Text>
                     <WordGuessStats word={w!} />
                   </View>
+                  {summaryHandwritingCorrectIds.includes(w!.id)
+                    ? <View pointerEvents="none" accessibilityLabel={`Correct handwriting answer for ${pronunciation.hanzi}`} style={styles.poolHandwritingButton}>
+                        <Ionicons name="checkmark" size={26} color={colors.green} />
+                      </View>
+                    : <Pressable accessibilityRole="button" accessibilityLabel={`Write ${pronunciation.hanzi} by hand`}
+                        onPress={() => setPoolHandwritingWord(w!)} style={styles.poolHandwritingButton}>
+                        <Ionicons name="pencil-outline" size={23} color={colors.green} />
+                      </Pressable>}
                 </View>;
               })}
             </>
@@ -448,9 +463,9 @@ export default function Cards() {
         />
         </ScrollView>
         {poolHandwritingWord && <Modal visible animationType="slide" onRequestClose={() => setPoolHandwritingWord(null)}>
-          <Handwriting key={poolHandwritingWord.id} targetHanzi={poolHandwritingWord.hanzi} showTarget backLabel="Back to new words"
+          <Handwriting key={poolHandwritingWord.id} targetHanzi={poolHandwritingWord.hanzi} showTarget backLabel="Back to round summary"
             onBack={() => setPoolHandwritingWord(null)} onCorrect={() => {
-              setPoolHandwritingCorrectIds((ids) => ids.includes(poolHandwritingWord.id) ? ids : [...ids, poolHandwritingWord.id]);
+              setSummaryHandwritingCorrectIds((ids) => ids.includes(poolHandwritingWord.id) ? ids : [...ids, poolHandwritingWord.id]);
               setPoolHandwritingWord(null);
             }} />
         </Modal>}
@@ -991,13 +1006,13 @@ const styles = StyleSheet.create({
   mistake: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 16,
+    gap: 8,
     paddingVertical: 12,
     borderTopWidth: 1,
     borderTopColor: colors.line,
   },
   mistakeHanzi: {
-    width: 70,
+    width: 60,
     color: colors.ink,
     fontSize: 30,
     fontWeight: "800",

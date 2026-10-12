@@ -5,7 +5,7 @@ import type { StoreData, Word } from "./types";
 
 const baseStore = (): StoreData => ({
   storageVersion: 3, words: [], sentences: [], wordSentenceIndex: {}, attempts: [], sentenceDataByLanguage: {}, explanations: {},
-  cardRound: 0, roundCompletions: [], mixQueue: [], mixPosition: 0, onboardingComplete: false, languageSelected: false,
+  cardRound: 0, roundCompletions: [], cardGraduations: [], mixQueue: [], mixPosition: 0, onboardingComplete: false, languageSelected: false,
   settings: { language: "en", apiKey: "", apiKeyValidated: false, apiUrl: "https://api.deepseek.com/chat/completions", model: "deepseek-v4-flash", ttsProvider: "browser", ttsVoiceURI: "", ttsRate: 0.85, automaticWordAddition: false, aiChatEnabled: true, handwritingAfterWrong: true },
 });
 
@@ -32,6 +32,7 @@ test("backup merge unions words, remaps sentence word IDs, and keeps strongest p
   const imported = {
     ...baseStore(),
     words: [word("old", "你好", 1), word("new", "学习", 2)],
+    cardGraduations: [{ round: 4, wordId: "old", at: 1000 }, { round: 5, wordId: "new", at: 2000 }],
     sentences: [{ id: "sentence", chinese: "你好 学习", pinyin: "Nǐ hǎo xuéxí", russian: "hello study", wordIds: ["old", "new"], sentenceShownCount: 1 }],
     wordSentenceIndex: {}, attempts: [{ sentenceId: "sentence", answer: "hello study", at: 20 }],
     settings: { ...baseStore().settings, language: "en" as const },
@@ -45,4 +46,8 @@ test("backup merge unions words, remaps sentence word IDs, and keeps strongest p
   assert.equal(result.summary.sentencesAdded, 1);
   assert.equal(result.summary.attemptsAdded, 1);
   assert.equal(result.data.settings.apiKey, "keep-me");
+  assert.deepEqual(result.data.cardGraduations, [
+    { round: 4, wordId: "current", at: 1000 },
+    { round: 5, wordId: "new", at: 2000 },
+  ]);
 });

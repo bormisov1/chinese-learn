@@ -11,6 +11,7 @@ import { Platform,
 import { useStore } from '@/context';
 import { colors } from '@/theme';
 import { Button, Header, shell } from '@/ui';
+import { coordinatesForHanziLookup } from '@/handwriting/recognition-web-coordinates';
 
 const SIZE = 360;
 type Point = [number, number];
@@ -86,8 +87,10 @@ export default function WritingExperiment() {
   };
   const check = () => {
     if (!target || !strokes.length || !workerRef.current || !recognizerReady) return;
+    const coordinates = coordinatesForHanziLookup(strokes.map(stroke => stroke.points));
+    if (!coordinates.length) return;
     pendingShape.current = shapeScore(); setRecognizing(true); setVerdict(undefined);
-    workerRef.current.postMessage({ strokes: strokes.map(stroke => stroke.points), limit: 5 });
+    workerRef.current.postMessage({ strokes: coordinates, limit: 5 });
   };
   const next = () => { clear(); setIndex(i => (i + 1) % Math.max(1, candidates.length)); };
 

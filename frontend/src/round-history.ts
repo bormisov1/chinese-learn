@@ -1,4 +1,4 @@
-import type { RoundCompletion, StoreData } from "./types";
+import type { CardGraduation, RoundCompletion, StoreData } from "./types";
 
 const DAY_COUNT = 7;
 
@@ -17,6 +17,24 @@ export function migrateRoundCompletions(
       Number.isFinite(item?.completedAt) &&
       item.completedAt > 0,
   );
+}
+
+export function migrateCardGraduations(events: CardGraduation[] | undefined): CardGraduation[] {
+  if (!Array.isArray(events)) return [];
+  return events.filter((item) =>
+    Number.isInteger(item?.round) && item.round > 0 &&
+    typeof item?.wordId === "string" && !!item.wordId &&
+    Number.isFinite(item?.at) && item.at > 0,
+  );
+}
+
+export function recordCardGraduation(data: StoreData, round: number, wordId: string, at = Date.now()): StoreData {
+  if (data.cardGraduations.some((item) => item.round === round && item.wordId === wordId)) return data;
+  return { ...data, cardGraduations: [...data.cardGraduations, { round, wordId, at }] };
+}
+
+export function undoCardGraduation(events: CardGraduation[], round: number, wordId: string): CardGraduation[] {
+  return events.filter((item) => item.round !== round || item.wordId !== wordId);
 }
 
 export function recordRoundCompletion(
@@ -59,6 +77,17 @@ export function roundsByDay(
         (item) => item.completedAt >= start && item.completedAt < end,
       ).length,
       today: index === DAY_COUNT - 1,
+    };
+  });
+}
+
+export function graduationsByDay(events: CardGraduation[], now = Date.now()) {
+  return roundsByDay([], now).map((day) => {
+    const end = new Date(day.date);
+    end.setDate(end.getDate() + 1);
+    return {
+      ...day,
+      count: events.filter((item) => item.at >= day.date && item.at < end.getTime()).length,
     };
   });
 }

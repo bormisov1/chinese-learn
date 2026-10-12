@@ -259,6 +259,7 @@ function mergeSnapshot(server: Snapshot, client: Snapshot): Snapshot {
   merged.sentences = mergeList(Array.isArray(server.sentences) ? server.sentences as Snapshot[] : [], Array.isArray(client.sentences) ? client.sentences as Snapshot[] : [], keyForSentence);
   merged.attempts = mergeList(Array.isArray(server.attempts) ? server.attempts as Snapshot[] : [], Array.isArray(client.attempts) ? client.attempts as Snapshot[] : [], item => `${item.sentenceId}:${item.at}:${item.direction ?? ""}`);
   merged.roundCompletions = mergeList(Array.isArray(server.roundCompletions) ? server.roundCompletions as Snapshot[] : [], Array.isArray(client.roundCompletions) ? client.roundCompletions as Snapshot[] : [], item => String(item.round));
+  merged.cardGraduations = mergeList(Array.isArray(server.cardGraduations) ? server.cardGraduations as Snapshot[] : [], Array.isArray(client.cardGraduations) ? client.cardGraduations as Snapshot[] : [], item => `${item.round}:${item.wordId}`);
   const explanations: Snapshot = { ...safeJson(server.explanations) };
   for (const [key, value] of Object.entries(safeJson(client.explanations))) {
     const previous = safeJson(explanations[key]);
