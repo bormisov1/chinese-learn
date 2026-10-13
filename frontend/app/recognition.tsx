@@ -1,145 +1,245 @@
 import { Ionicons } from '@expo/vector-icons';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useStore } from '@/context';
 import { Text, useTranslation } from '@/i18n';
-import { recognizePhoto } from '@/photo-ocr';
+import { containedBox, recognizedWord } from '@/photo-ocr-layout';
+import { recognizePhoto, type PhotoOcrResult } from '@/photo-ocr';
 import { colors } from '@/theme';
-import { parseTextVocabulary } from '@/text-vocabulary';
 import { Button, Header, shell } from '@/ui';
+
+type Frame = { uri: string; result: PhotoOcrResult };
+type ViewSize = { width: number; height: number };
+
+async function discardCameraPhoto(uri: string) {
+  if (Platform.OS === 'web' || !uri.startsWith('file://')) return;
+  try {
+    const { File } = await import('expo-file-system');
+    new File(uri).delete();
+  } catch {
+    // Camera cache files can already be removed by the operating system.
+  }
+}
 
 export default function Recognition() {
   const { data, dictionary, dictionaryLoading, dictionaryError, retryDictionary, importWords } = useStore();
   const t = useTranslation();
-  const [imageUri, setImageUri] = useState<string | null>(null);
-  const [recognizedText, setRecognizedText] = useState('');
-  const [selection, setSelection] = useState<Set<string> | null>(null);
+  const translateRef = useRef(t);
+  translateRef.current = t;
+  const camera = useRef<CameraView>(null);
+  const currentCameraPhoto = useRef<string | null>(null);
+  const permissionRequested = useRef(false);
+  const [permission, requestPermission] = useCameraPermissions();
+  const [focused, setFocused] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [mode, setMode] = useState<'camera' | 'photo'>('camera');
+  const [paused, setPaused] = useState(false);
+  const [frame, setFrame] = useState<Frame | null>(null);
+  const [viewSize, setViewSize] = useState<ViewSize>({ width: 0, height: 0 });
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [scanning, setScanning] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
-  const busyRef = useRef(false);
-  const startedRef = useRef(false);
 
-  const capture = useCallback(async (source: 'camera' | 'library') => {
-    if (busyRef.current) return;
-    busyRef.current = true;
+  useFocusEffect(useCallback(() => {
+    setFocused(true);
+    return () => { setFocused(false); setCameraReady(false); };
+  }, []));
+
+  useEffect(() => () => {
+    if (currentCameraPhoto.current) void discardCameraPhoto(currentCameraPhoto.current);
+  }, []);
+
+  useEffect(() => {
+    if (!focused || !permission || permission.granted || !permission.canAskAgain || permissionRequested.current) return;
+    permissionRequested.current = true;
+    void requestPermission();
+  }, [focused, permission, requestPermission]);
+
+  useEffect(() => {
+    if (!focused || mode !== 'camera' || paused || !permission?.granted || !cameraReady) return;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const scan = async () => {
+      if (!camera.current || stopped) return;
+      setScanning(true);
+      let capturedUri: string | null = null;
+      try {
+        // Show each captured frame together with its own OCR boxes so taps stay aligned.
+        const photo = await camera.current.takePictureAsync({ quality: 0.6, shutterSound: false });
+        if (!photo) return;
+        capturedUri = photo.uri;
+        if (stopped) return;
+        const result = await recognizePhoto(photo.uri);
+        if (!stopped) {
+          const previous = currentCameraPhoto.current;
+          currentCameraPhoto.current = photo.uri;
+          setFrame({ uri: photo.uri, result });
+          setMessage('');
+          capturedUri = null;
+          if (previous) setTimeout(() => { void discardCameraPhoto(previous); }, 1000);
+        }
+      } catch (error) {
+        if (!stopped) setMessage(error instanceof Error ? error.message : translateRef.current('Could not recognize this photo.'));
+      } finally {
+        if (capturedUri) void discardCameraPhoto(capturedUri);
+        if (!stopped) {
+          setScanning(false);
+          timer = setTimeout(scan, 700);
+        }
+      }
+    };
+    timer = setTimeout(scan, 0);
+    return () => { stopped = true; clearTimeout(timer); setScanning(false); };
+  }, [cameraReady, focused, mode, paused, permission?.granted]);
+
+  const choosePhoto = async () => {
+    if (busy) return;
+    const wasPaused = paused;
+    setPaused(true);
     setBusy(true);
     setMessage('');
     try {
-      if (source === 'camera') {
-        const permission = await ImagePicker.requestCameraPermissionsAsync();
-        if (!permission.granted) {
-          setMessage(t('Camera access is needed to recognize text.'));
-          return;
-        }
+      const chosen = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+      if (chosen.canceled || !chosen.assets?.[0]) {
+        setPaused(wasPaused);
+        return;
       }
-      const result = source === 'camera'
-        ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 1 })
-        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
-      if (result.canceled || !result.assets?.[0]) return;
-      const uri = result.assets[0].uri;
-      setImageUri(uri);
-      setRecognizedText('');
-      setSelection(null);
-      const text = await recognizePhoto(uri);
-      setRecognizedText(text.trim());
-      if (!text.trim()) setMessage(t('No text was found. Try another photo.'));
+      const photo = chosen.assets[0];
+      setMode('photo');
+      setSelected(new Set());
+      const previous = currentCameraPhoto.current;
+      currentCameraPhoto.current = null;
+      setFrame({ uri: photo.uri, result: { width: photo.width || 1, height: photo.height || 1, words: [] } });
+      if (previous) setTimeout(() => { void discardCameraPhoto(previous); }, 1000);
+      const result = await recognizePhoto(photo.uri);
+      setFrame({ uri: photo.uri, result });
+      if (!result.words.length) setMessage(t('No text was found. Try another photo.'));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : t('Could not recognize this photo.'));
     } finally {
-      busyRef.current = false;
       setBusy(false);
     }
-  }, [t]);
+  };
 
-  useEffect(() => {
-    if (Platform.OS === 'web' || startedRef.current) return;
-    startedRef.current = true;
-    void capture('camera');
-  }, [capture]);
-
-  // OCR often inserts spaces between individual Hanzi. Keep line breaks as word boundaries.
-  const parsed = useMemo(() => parseTextVocabulary(recognizedText.replace(/(?<=\p{Script=Han})[ \t]+(?=\p{Script=Han})/gu, ''), dictionary), [recognizedText, dictionary]);
-  const existing = useMemo(() => new Set(data.words.map(word => word.hanzi)), [data.words]);
-  const available = parsed.words.filter(word => !existing.has(word.hanzi));
-  const selected = selection ?? new Set(available.map(word => word.hanzi));
-  const selectedWords = available.filter(word => selected.has(word.hanzi));
-
-  const toggle = (hanzi: string) => {
-    const next = new Set(selected);
-    if (next.has(hanzi)) next.delete(hanzi);
-    else next.add(hanzi);
-    setSelection(next);
+  const showCamera = () => {
+    setFrame(null);
+    setMode('camera');
+    setPaused(false);
+    setCameraReady(false);
+    setSelected(new Set());
     setMessage('');
   };
-  const addSelected = () => {
-    const count = importWords(selectedWords);
-    setSelection(new Set());
-    setMessage(count ? `${t('Added')} ${count} ${t('words to your deck.')}` : t('No new words to add.'));
+
+  const existing = useMemo(() => new Set(data.words.map(word => word.hanzi)), [data.words]);
+  const selectedWords = [...selected].flatMap(hanzi => {
+    const word = dictionary?.get(hanzi);
+    return word && !existing.has(hanzi) ? [word] : [];
+  });
+  const highlights = frame?.result.words.flatMap((item, index) => {
+    const hanzi = recognizedWord(item.text);
+    const box = containedBox(item.box, frame.result.width, frame.result.height, viewSize.width, viewSize.height);
+    return hanzi && box ? [{ id: index, hanzi, box, entry: dictionary?.get(hanzi) }] : [];
+  }) ?? [];
+  const foundCount = new Set(highlights.map(item => item.hanzi)).size;
+
+  const toggle = (hanzi: string) => {
+    setSelected(current => {
+      const next = new Set(current);
+      if (next.has(hanzi)) next.delete(hanzi);
+      else next.add(hanzi);
+      return next;
+    });
+    setMessage('');
   };
 
-  return <ScrollView style={shell.page} contentContainerStyle={shell.content} keyboardShouldPersistTaps="handled">
-    <Header eyebrow="CAMERA" title="Recognition" subtitle="Photograph a sign or label, then choose words to add." />
+  const addSelected = () => {
+    const count = importWords(selectedWords);
+    setSelected(new Set());
+    setMessage(count ? t('Added') + ' ' + count + ' ' + t('words to your deck.') : t('No new words to add.'));
+  };
+
+  return <ScrollView style={shell.page} contentContainerStyle={shell.content}>
+    <Header eyebrow="CAMERA" title="Recognition" subtitle="Point at text, freeze a frame, then tap words on the image." />
     <View style={styles.actions}>
-      <View style={styles.action}><Button label="Take photo" icon="camera-outline" disabled={busy} onPress={() => void capture('camera')} /></View>
-      <View style={styles.action}><Button label="Choose photo" icon="images-outline" secondary disabled={busy} onPress={() => void capture('library')} /></View>
+      <View style={styles.action}>
+        {mode === 'camera'
+          ? <Button label={paused ? 'Resume' : 'Freeze'} icon={paused ? 'play-outline' : 'pause-outline'} disabled={!frame || !permission?.granted} onPress={() => setPaused(value => !value)} />
+          : <Button label="Use camera" icon="camera-outline" onPress={showCamera} />}
+      </View>
+      <View style={styles.action}><Button label="Choose photo" icon="images-outline" secondary disabled={busy} onPress={() => void choosePhoto()} /></View>
     </View>
-    {busy ? <View style={styles.progress}><ActivityIndicator color={colors.green} /><Text style={styles.help}>Recognizing text…</Text></View> : null}
+
+    <View style={styles.cameraShell} onLayout={event => setViewSize(event.nativeEvent.layout)}>
+      {focused && mode === 'camera' && permission?.granted
+        ? <CameraView ref={camera} style={StyleSheet.absoluteFillObject} facing="back" active={focused} onCameraReady={() => setCameraReady(true)} />
+        : null}
+      {frame ? <Image source={{ uri: frame.uri }} style={StyleSheet.absoluteFillObject} resizeMode="contain" accessibilityLabel="Recognized camera frame" /> : null}
+      {highlights.map(({ id, hanzi, box, entry }) => {
+        const added = existing.has(hanzi);
+        const selectable = Boolean(entry) && !added;
+        const checked = selected.has(hanzi);
+        return <Pressable
+          key={id}
+          accessibilityRole="button"
+          accessibilityLabel={hanzi + (entry ? ', ' + entry.pinyin + ', ' + entry.russian : ', ' + t('Not in dictionary'))}
+          accessibilityState={{ selected: checked, disabled: !selectable }}
+          disabled={!selectable}
+          hitSlop={6}
+          onPress={() => toggle(hanzi)}
+          style={[styles.highlight, { left: box.x, top: box.y, width: box.width, height: box.height }, checked && styles.highlightSelected, !selectable && styles.highlightUnavailable]}
+        />;
+      })}
+      {mode === 'camera' && !permission?.granted
+        ? <View style={styles.cameraMessage}>
+          <Ionicons name="camera-outline" size={36} color={colors.white} />
+          <Text style={styles.cameraMessageText}>{permission?.canAskAgain === false ? 'Enable camera access in device settings.' : 'Camera access is needed to recognize text.'}</Text>
+          {permission?.canAskAgain ? <Button label="Enable camera" secondary onPress={() => void requestPermission()} /> : null}
+        </View>
+        : null}
+      {!frame && mode === 'camera' && permission?.granted ? <View style={styles.cameraMessage}><ActivityIndicator color={colors.white} /><Text style={styles.cameraMessageText}>Point the camera at Chinese text.</Text></View> : null}
+      {(scanning || busy) && permission?.granted ? <View style={styles.scanBadge}><ActivityIndicator size="small" color={colors.white} /><Text style={styles.scanBadgeText}>Recognizing text…</Text></View> : null}
+      {paused && mode === 'camera' ? <View style={styles.freezeBadge}><Ionicons name="pause" size={13} color={colors.white} /><Text style={styles.scanBadgeText}>Frozen</Text></View> : null}
+    </View>
+
     {message ? <Text style={styles.message}>{message}</Text> : null}
-    {imageUri ? <Image source={{ uri: imageUri }} style={styles.preview} resizeMode="contain" accessibilityLabel="Photo being recognized" /> : null}
     {dictionaryLoading ? <Text style={styles.help}>Loading dictionary…</Text> : null}
     {dictionaryError && !dictionary ? <View style={styles.error}><Text style={styles.message}>{dictionaryError}</Text><Button label="Retry dictionary" secondary onPress={retryDictionary} /></View> : null}
-    {recognizedText ? <View style={styles.panel}>
-      <Text style={styles.heading}>Recognized text</Text>
-      <Text style={styles.help}>Correct any mistakes before choosing words.</Text>
-      <TextInput
-        accessibilityLabel="Recognized Chinese text"
-        multiline
-        onChangeText={value => { setRecognizedText(value); setSelection(null); setMessage(''); }}
-        style={styles.textInput}
-        value={recognizedText}
-      />
-      <Text style={[styles.heading, styles.wordsHeading]}>Choose words to add</Text>
-      {parsed.words.length ? parsed.words.map(word => {
-        const alreadyAdded = existing.has(word.hanzi);
-        const checked = !alreadyAdded && selected.has(word.hanzi);
-        return <Pressable
-          key={word.hanzi}
-          accessibilityRole="checkbox"
-          accessibilityLabel={`${word.hanzi}, ${word.pinyin}, ${word.russian}`}
-          accessibilityState={{ checked, disabled: alreadyAdded }}
-          disabled={alreadyAdded}
-          onPress={() => toggle(word.hanzi)}
-          style={[styles.wordRow, alreadyAdded && styles.addedRow]}
-        >
-          <Ionicons name={alreadyAdded ? 'checkmark-circle' : checked ? 'checkbox' : 'square-outline'} size={24} color={alreadyAdded ? colors.muted : colors.green} />
-          <View style={styles.wordText}><Text style={styles.hanzi}>{word.hanzi}</Text><Text style={styles.pinyin}>{word.pinyin}</Text><Text style={styles.meaning} numberOfLines={2}>{word.russian}</Text></View>
-          {alreadyAdded ? <Text style={styles.alreadyAdded}>Added</Text> : null}
-        </Pressable>;
-      }) : <Text style={styles.help}>No dictionary words found in this photo.</Text>}
-      {parsed.unmatchedCharacters > 0 ? <Text style={styles.help}>{`${t('Unmatched Chinese characters will be skipped:')} ${parsed.unmatchedCharacters}`}</Text> : null}
-      <Button label={`${t('Add selected')} (${selectedWords.length})`} icon="add-circle-outline" disabled={!selectedWords.length} onPress={addSelected} />
-    </View> : null}
+    <View style={styles.panel}>
+      <Text style={styles.heading}>{foundCount ? t('Tap highlighted words to select them.') : t('Move closer to readable Chinese text.')}</Text>
+      <Text style={styles.help}>{mode === 'camera' && !paused ? t('Freeze the frame to keep the words in place.') : t('Each highlight follows one OCR word.')}</Text>
+      {selectedWords.length ? <View style={styles.selectedList}>{selectedWords.map(word =>
+        <Pressable key={word.hanzi} onPress={() => toggle(word.hanzi)} accessibilityRole="button" accessibilityLabel={word.hanzi + ', ' + word.pinyin + ', ' + word.russian} style={styles.selectedChip}>
+          <Text style={styles.selectedHanzi}>{word.hanzi}</Text><Text style={styles.selectedMeaning} numberOfLines={1}>{word.russian}</Text><Ionicons name="close" size={14} color={colors.green} />
+        </Pressable>,
+      )}</View> : null}
+      <Button label={t('Add selected') + ' (' + selectedWords.length + ')'} icon="add-circle-outline" disabled={!selectedWords.length || busy} onPress={addSelected} />
+    </View>
   </ScrollView>;
 }
 
 const styles = StyleSheet.create({
-  actions: { flexDirection: 'row', gap: 10 },
+  actions: { flexDirection: 'row', gap: 10, marginBottom: 12 },
   action: { flex: 1 },
-  progress: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 14 },
-  preview: { width: '100%', height: 230, backgroundColor: colors.card, borderRadius: 16, marginTop: 16 },
-  panel: { backgroundColor: colors.card, borderRadius: 16, borderColor: colors.line, borderWidth: 1, padding: 16, marginTop: 16, gap: 10 },
+  cameraShell: { width: '100%', height: 390, overflow: 'hidden', borderRadius: 18, backgroundColor: '#19231E' },
+  cameraMessage: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 14, backgroundColor: '#19231E' },
+  cameraMessageText: { color: colors.white, textAlign: 'center', fontSize: 16, lineHeight: 23 },
+  highlight: { position: 'absolute', borderColor: '#F7D56B', borderWidth: 2, borderRadius: 5, backgroundColor: 'rgba(247, 213, 107, 0.19)' },
+  highlightSelected: { borderColor: '#70E3A1', backgroundColor: 'rgba(55, 140, 92, 0.48)' },
+  highlightUnavailable: { borderColor: '#FFFFFF', backgroundColor: 'rgba(50, 50, 50, 0.26)', opacity: 0.62 },
+  scanBadge: { position: 'absolute', left: 12, top: 12, flexDirection: 'row', gap: 7, alignItems: 'center', backgroundColor: 'rgba(20, 32, 25, 0.75)', borderRadius: 20, paddingHorizontal: 11, paddingVertical: 7 },
+  freezeBadge: { position: 'absolute', right: 12, top: 12, flexDirection: 'row', gap: 6, alignItems: 'center', backgroundColor: 'rgba(20, 32, 25, 0.75)', borderRadius: 20, paddingHorizontal: 11, paddingVertical: 7 },
+  scanBadgeText: { color: colors.white, fontWeight: '700', fontSize: 12 },
+  panel: { backgroundColor: colors.card, borderRadius: 16, borderColor: colors.line, borderWidth: 1, padding: 16, marginTop: 14, gap: 12 },
   heading: { color: colors.ink, fontSize: 17, fontWeight: '800' },
-  wordsHeading: { marginTop: 10 },
   help: { color: colors.muted, lineHeight: 20 },
-  message: { color: colors.green, marginVertical: 12, lineHeight: 20 },
+  message: { color: colors.green, marginTop: 12, lineHeight: 20 },
   error: { alignItems: 'flex-start', gap: 8 },
-  textInput: { minHeight: 90, color: colors.ink, backgroundColor: colors.paper, borderColor: colors.line, borderWidth: 1, borderRadius: 12, padding: 12, textAlignVertical: 'top', fontSize: 16 },
-  wordRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderTopColor: colors.line, borderTopWidth: 1, paddingVertical: 11 },
-  addedRow: { opacity: 0.55 },
-  wordText: { flex: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 7 },
-  hanzi: { color: colors.ink, fontWeight: '800', fontSize: 20 },
-  pinyin: { color: colors.green, fontSize: 13 },
-  meaning: { color: colors.muted, fontSize: 13, flexBasis: '100%' },
-  alreadyAdded: { color: colors.muted, fontSize: 12 },
+  selectedList: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  selectedChip: { maxWidth: '100%', flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: colors.pale, borderColor: colors.green, borderWidth: 1, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 7 },
+  selectedHanzi: { color: colors.ink, fontSize: 18, fontWeight: '800' },
+  selectedMeaning: { color: colors.green, fontSize: 12, flexShrink: 1 },
 });
