@@ -1,7 +1,7 @@
 import ExpoModulesCore
-import MLImage
 import MLKitTextRecognitionCommon
 import MLKitTextRecognitionChinese
+import MLKitVision
 import UIKit
 
 public class HanziPhotoOcrModule: Module {
