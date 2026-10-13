@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["HanziPhotoOcrModule"]
+  },
+  "android": {
+    "modules": ["com.bormisov.hanzideck.photoocr.HanziPhotoOcrModule"]
+  }
+}
