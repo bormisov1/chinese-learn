@@ -27,7 +27,24 @@ class HanziPhotoOcrModule : Module() {
       val recognizer = TextRecognition.getClient(ChineseTextRecognizerOptions.Builder().build())
       recognizer.process(image)
         .addOnSuccessListener { result ->
-          promise.resolve(result.textBlocks.flatMap { block -> block.lines.map { it.text } })
+          val words = result.textBlocks.flatMap { block ->
+            block.lines.flatMap { line ->
+              line.elements.mapNotNull { element ->
+                element.boundingBox?.let { box ->
+                  mapOf(
+                    "text" to element.text,
+                    "box" to mapOf("x" to box.left, "y" to box.top, "width" to box.width(), "height" to box.height())
+                  )
+                }
+              }
+            }
+          }
+          val sideways = image.rotationDegrees % 180 != 0
+          promise.resolve(mapOf(
+            "width" to if (sideways) image.height else image.width,
+            "height" to if (sideways) image.width else image.height,
+            "words" to words
+          ))
         }
         .addOnFailureListener { error ->
           promise.reject("E_RECOGNITION", error.message, error)

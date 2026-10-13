@@ -23,8 +23,18 @@ public class HanziPhotoOcrModule: Module {
           promise.reject("E_RECOGNITION", error.localizedDescription)
           return
         }
-        let lines = result?.blocks.flatMap { block in block.lines.map { $0.text } } ?? []
-        promise.resolve(lines)
+        let words = result?.blocks.flatMap { block in
+          block.lines.flatMap { line in
+            line.elements.map { element -> [String: Any] in
+              let frame = element.frame
+              return [
+                "text": element.text,
+                "box": ["x": frame.minX, "y": frame.minY, "width": frame.width, "height": frame.height]
+              ]
+            }
+          }
+        } ?? []
+        promise.resolve(["width": image.size.width, "height": image.size.height, "words": words])
       }
     }
   }
