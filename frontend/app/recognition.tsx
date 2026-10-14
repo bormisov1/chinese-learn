@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useStore } from '@/context';
 import { Text, useTranslation } from '@/i18n';
-import { containedBox, recognizedWord } from '@/photo-ocr-layout';
+import { containedBox, coveredBox, groupOcrCharacters, recognizedWord } from '@/photo-ocr-layout';
 import { recognizePhoto, type PhotoOcrResult } from '@/photo-ocr';
 import { colors } from '@/theme';
 import { Button, Header, shell } from '@/ui';
@@ -68,7 +68,7 @@ export default function Recognition() {
       setScanning(true);
       let capturedUri: string | null = null;
       try {
-        // Show each captured frame together with its own OCR boxes so taps stay aligned.
+        // OCR runs on occasional captures; the camera preview keeps drawing live frames.
         const photo = await camera.current.takePictureAsync({ quality: 0.6, shutterSound: false });
         if (!photo) return;
         capturedUri = photo.uri;
@@ -139,11 +139,15 @@ export default function Recognition() {
     const word = dictionary?.get(hanzi);
     return word && !existing.has(hanzi) ? [word] : [];
   });
-  const highlights = frame?.result.words.flatMap((item, index) => {
+  const groupedWords = useMemo(() => groupOcrCharacters(frame?.result.words ?? [], dictionary), [frame, dictionary]);
+  const highlights = groupedWords.flatMap((item, index) => {
     const hanzi = recognizedWord(item.text);
-    const box = containedBox(item.box, frame.result.width, frame.result.height, viewSize.width, viewSize.height);
+    if (!frame) return [];
+    const box = mode === 'camera'
+      ? coveredBox(item.box, frame.result.width, frame.result.height, viewSize.width, viewSize.height)
+      : containedBox(item.box, frame.result.width, frame.result.height, viewSize.width, viewSize.height);
     return hanzi && box ? [{ id: index, hanzi, box, entry: dictionary?.get(hanzi) }] : [];
-  }) ?? [];
+  });
   const foundCount = new Set(highlights.map(item => item.hanzi)).size;
 
   const toggle = (hanzi: string) => {
@@ -175,9 +179,9 @@ export default function Recognition() {
 
     <View style={styles.cameraShell} onLayout={event => setViewSize(event.nativeEvent.layout)}>
       {focused && mode === 'camera' && permission?.granted
-        ? <CameraView ref={camera} style={StyleSheet.absoluteFillObject} facing="back" active={focused} onCameraReady={() => setCameraReady(true)} />
+        ? <CameraView ref={camera} style={StyleSheet.absoluteFillObject} facing="back" active={focused && !paused} onCameraReady={() => setCameraReady(true)} />
         : null}
-      {frame ? <Image source={{ uri: frame.uri }} style={StyleSheet.absoluteFillObject} resizeMode="contain" accessibilityLabel="Recognized camera frame" /> : null}
+      {frame && (paused || mode === 'photo') ? <Image source={{ uri: frame.uri }} style={StyleSheet.absoluteFillObject} resizeMode={mode === 'camera' ? 'cover' : 'contain'} accessibilityLabel="Recognized camera frame" /> : null}
       {highlights.map(({ id, hanzi, box, entry }) => {
         const added = existing.has(hanzi);
         const selectable = Boolean(entry) && !added;
@@ -200,7 +204,7 @@ export default function Recognition() {
           {permission?.canAskAgain ? <Button label="Enable camera" secondary onPress={() => void requestPermission()} /> : null}
         </View>
         : null}
-      {!frame && mode === 'camera' && permission?.granted ? <View style={styles.cameraMessage}><ActivityIndicator color={colors.white} /><Text style={styles.cameraMessageText}>Point the camera at Chinese text.</Text></View> : null}
+      {!frame && mode === 'camera' && permission?.granted ? <View pointerEvents="none" style={styles.hintBadge}><Text style={styles.scanBadgeText}>Point the camera at Chinese text.</Text></View> : null}
       {(scanning || busy) && permission?.granted ? <View style={styles.scanBadge}><ActivityIndicator size="small" color={colors.white} /><Text style={styles.scanBadgeText}>Recognizing text…</Text></View> : null}
       {paused && mode === 'camera' ? <View style={styles.freezeBadge}><Ionicons name="pause" size={13} color={colors.white} /><Text style={styles.scanBadgeText}>Frozen</Text></View> : null}
     </View>
@@ -210,7 +214,7 @@ export default function Recognition() {
     {dictionaryError && !dictionary ? <View style={styles.error}><Text style={styles.message}>{dictionaryError}</Text><Button label="Retry dictionary" secondary onPress={retryDictionary} /></View> : null}
     <View style={styles.panel}>
       <Text style={styles.heading}>{foundCount ? t('Tap highlighted words to select them.') : t('Move closer to readable Chinese text.')}</Text>
-      <Text style={styles.help}>{mode === 'camera' && !paused ? t('Freeze the frame to keep the words in place.') : t('Each highlight follows one OCR word.')}</Text>
+      <Text style={styles.help}>{mode === 'camera' && !paused ? t('The camera stays live while highlights update. Freeze to select precisely.') : t('Adjacent characters can form dictionary words.')}</Text>
       {selectedWords.length ? <View style={styles.selectedList}>{selectedWords.map(word =>
         <Pressable key={word.hanzi} onPress={() => toggle(word.hanzi)} accessibilityRole="button" accessibilityLabel={word.hanzi + ', ' + word.pinyin + ', ' + word.russian} style={styles.selectedChip}>
           <Text style={styles.selectedHanzi}>{word.hanzi}</Text><Text style={styles.selectedMeaning} numberOfLines={1}>{word.russian}</Text><Ionicons name="close" size={14} color={colors.green} />
@@ -227,6 +231,7 @@ const styles = StyleSheet.create({
   cameraShell: { width: '100%', height: 390, overflow: 'hidden', borderRadius: 18, backgroundColor: '#19231E' },
   cameraMessage: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 14, backgroundColor: '#19231E' },
   cameraMessageText: { color: colors.white, textAlign: 'center', fontSize: 16, lineHeight: 23 },
+  hintBadge: { position: 'absolute', left: 12, right: 12, bottom: 12, alignItems: 'center', backgroundColor: 'rgba(20, 32, 25, 0.75)', borderRadius: 20, paddingHorizontal: 11, paddingVertical: 8 },
   highlight: { position: 'absolute', borderColor: '#F7D56B', borderWidth: 2, borderRadius: 5, backgroundColor: 'rgba(247, 213, 107, 0.19)' },
   highlightSelected: { borderColor: '#70E3A1', backgroundColor: 'rgba(55, 140, 92, 0.48)' },
   highlightUnavailable: { borderColor: '#FFFFFF', backgroundColor: 'rgba(50, 50, 50, 0.26)', opacity: 0.62 },
