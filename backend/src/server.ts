@@ -54,7 +54,7 @@ const requestBuckets = [0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10];
 const telemetryNames = new Set([
   "app_opened", "first_app_opened", "login_started", "login_succeeded", "login_failed",
   "language_switched", "language_switch_failed", "words_added", "round_started",
-  "round_completed", "card_reviewed", "sentence_practice_completed", "listening_item_completed",
+  "round_completed", "card_reviewed", "card_graduation_undone", "sentence_practice_completed", "listening_item_completed",
   "mix_item_completed", "sync_bootstrap", "study_mode_selected", "card_transition_timed",
 ]);
 const metricLabel = (value: string) => value.replace(/[^a-zA-Z0-9_.:-]/g, "_").slice(0, 80) || "unknown";
@@ -113,6 +113,7 @@ function recordTelemetry(event: Snapshot) {
   for (const key of ["platform", "provider", "source", "language", "from", "to", "mode", "kind", "result", "round", "count", "size", "firstTime", "chatId", "fullName", "username", "durationMs", "completionMs", "averageMs", "maxMs", "maxSwipeCallbackMs", "maxRenderReadyMs"]) {
     if (properties[key] !== undefined) boundedProperties[key] = typeof properties[key] === "number" ? Math.max(0, Math.min(100000, Math.trunc(Number(properties[key])))) : String(properties[key]).slice(0, 40);
   }
+  if (name === "card_reviewed" && typeof properties.graduated === "boolean") boundedProperties.graduated = properties.graduated;
   const eventId = String(event.eventId ?? "");
   if (!eventId) return false;
   const insert = db.query("INSERT OR IGNORE INTO analytics_events(event_id, name, occurred_at, received_at, platform, app_version, install_id_hash, properties_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
@@ -121,7 +122,10 @@ function recordTelemetry(event: Snapshot) {
   const labels: Record<string, string> = { event: name };
   for (const key of ["platform", "provider", "language", "from", "to", "source", "mode", "kind", "result", "firstTime"]) if (boundedProperties[key] !== undefined) labels[key] = String(boundedProperties[key]);
   if (boundedProperties.round !== undefined) labels.round = String(boundedProperties.round);
+  if (boundedProperties.graduated !== undefined) labels.graduated = String(boundedProperties.graduated);
   inc("client_events_total", labels);
+  if (name === "card_reviewed" && boundedProperties.graduated === true) inc("card_graduations_total", { mode: "cards" });
+  if (name === "card_graduation_undone") inc("card_graduations_undone_total", { mode: "cards" });
   if (name === "card_transition_timed" && String(event.platform) === "ios") {
     const kind = boundedProperties.kind;
     const durations = kind === "round_start"

@@ -11,7 +11,8 @@
     {"type":"timeseries","title":"Languages switched to","gridPos":{"h":8,"w":12,"x":0,"y":16},"targets":[{"expr":"sum by (to) (rate(client_events_total{event=\"language_switched\"}[15m]))","legendFormat":"{{to}}","refId":"A"}]},
     {"type":"timeseries","title":"Words added and study mode","gridPos":{"h":8,"w":12,"x":12,"y":16},"targets":[{"expr":"sum(rate(client_events_total{event=\"words_added\"}[15m]))","legendFormat":"words added","refId":"A"},{"expr":"sum by (mode) (rate(client_events_total{event=\"study_mode_selected\"}[15m]))","legendFormat":"mode {{mode}}","refId":"B"}]},
     {"type":"timeseries","title":"Login results","gridPos":{"h":8,"w":12,"x":0,"y":24},"targets":[{"expr":"sum by (event) (rate(client_events_total{event=~\"login_started|login_succeeded|login_failed\"}[15m]))","legendFormat":"{{event}}","refId":"A"}]},
-    {"type":"timeseries","title":"Practice completions","gridPos":{"h":8,"w":12,"x":12,"y":24},"targets":[{"expr":"sum by (event,kind,result) (rate(client_events_total{event=~\"sentence_practice_completed|listening_item_completed|mix_item_completed|card_reviewed\"}[15m]))","legendFormat":"{{event}} {{kind}} {{result}}","refId":"A"}]}
+    {"type":"timeseries","title":"Practice completions","gridPos":{"h":8,"w":12,"x":12,"y":24},"targets":[{"expr":"sum by (event,kind,result) (rate(client_events_total{event=~\"sentence_practice_completed|listening_item_completed|mix_item_completed|card_reviewed\"}[15m]))","legendFormat":"{{event}} {{kind}} {{result}}","refId":"A"}]},
+    {"type":"stat","title":"Graduated words (last 7 days)","gridPos":{"h":4,"w":12,"x":0,"y":32},"targets":[{"expr":"clamp_min((sum(increase(card_graduations_total[7d])) or vector(0)) - (sum(increase(card_graduations_undone_total[7d])) or vector(0)), 0)","refId":"A"}]}
   ],
   "schemaVersion": 39,
   "tags": ["hanzi-deck", "product", "backend"],
