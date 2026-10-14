@@ -69,6 +69,26 @@ test("sync merges explanations and preserves a failed card review across stale c
       cardLastStudiedRound: 2 };
     const progressedSnapshot = await bootstrap({ words: [progressed] }) as unknown as { words: typeof failed[] };
     expect(progressedSnapshot.words[0].cardSrsLevel).toBe(1);
+
+    const event = (eventId: string, name: string, properties: Record<string, unknown>) => ({
+      eventId, name, properties, occurredAt: Date.now(), platform: "web", appVersion: "test", installId: "test-install",
+    });
+    const firstReview = event(crypto.randomUUID(), "card_reviewed", { mode: "cards", result: "correct", graduated: true });
+    const telemetryResponse = await fetch(`${base}/v1/telemetry/batch`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ events: [
+        firstReview,
+        event(crypto.randomUUID(), "card_reviewed", { mode: "cards", result: "correct", graduated: false }),
+        event(crypto.randomUUID(), "card_reviewed", { mode: "cards", result: "correct", graduated: true }),
+        firstReview,
+        event(crypto.randomUUID(), "card_graduation_undone", { mode: "cards" }),
+      ] }),
+    });
+    expect(telemetryResponse.ok).toBe(true);
+    const metrics = await (await fetch(`${base}/metrics`)).text();
+    expect(metrics).toContain('card_graduations_total{mode="cards"} 2');
+    expect(metrics).toContain('card_graduations_undone_total{mode="cards"} 1');
+    expect(metrics).toContain('client_events_total{event="card_reviewed",graduated="true",mode="cards",result="correct"} 2');
   } finally {
     process.kill();
     await process.exited;

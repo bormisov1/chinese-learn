@@ -23,6 +23,16 @@ The Android matcher and its data are copied from the adjacent handwriting
 example. Its HanziLookupJS code is GPL v3 and the stroke data is under the
 Arphic Public License; both license texts are in `src/handwriting/vendor`.
 
+The Recognition tab keeps the camera preview live on iOS, Android, and web while
+OCR boxes update from occasional captures. Learners can freeze the last scanned
+frame, tap words, and add selected dictionary entries; existing photos can also
+be scanned. Adjacent single-character OCR elements on one line are grouped into
+dictionary words, while multi-character OCR elements remain intact. Mobile OCR
+uses the bundled Chinese model of Google ML Kit Text Recognition v2 through the
+local `modules/hanzi-photo-ocr` Expo module;
+web uses Tesseract.js. Mobile recognition requires a new native build and is
+unavailable in Expo Go.
+
 On first launch the app suggests a supported language from the browser locale and asks the learner to confirm it. The language can be changed later in Settings. A change first downloads and validates the target dictionary, then atomically updates the language and saved word meanings. Download failures leave the current language and study data untouched. Generated sentences are cleared after confirmation because their translations belong to the previous language; vocabulary and SRS progress are preserved.
 
 Word meanings are remembered per language, so custom or dictionary-missing meanings return when the learner switches back.

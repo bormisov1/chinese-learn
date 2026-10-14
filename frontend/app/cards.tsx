@@ -238,9 +238,9 @@ export default function Cards() {
         : withGraduation;
     });
     if (!correct) setMistakeIds((ids) => [...ids, word.id]);
-    void track("card_reviewed", { round: studyRound, result: correct ? "correct" : "incorrect", mode: "cards" });
-    if (roundComplete) void track("round_completed", { round: studyRound, size: roundWords.length, mode: "cards" });
     const graduation = findGraduation(data.words, updatedWords, word.id);
+    void track("card_reviewed", { round: studyRound, result: correct ? "correct" : "incorrect", mode: "cards", graduated: !!graduation });
+    if (roundComplete) void track("round_completed", { round: studyRound, size: roundWords.length, mode: "cards" });
     setReviewedCards((cards) => [...cards, {
       position,
       correct,
@@ -277,6 +277,7 @@ export default function Cards() {
     setReviewedCards((cards) => cards.slice(0, -1));
     if (!previous.correct) setMistakeIds((ids) => ids.slice(0, -1));
     if (previous.graduatedWordId) setGraduations((items) => items.slice(0, -1));
+    if (previous.graduatedWordId) void track("card_graduation_undone", { round: studyRound, mode: "cards" });
     setPosition(previous.position);
     setPhase("studying");
     setFlipped(true);
