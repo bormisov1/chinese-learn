@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { clipOverlappingWords, containedBox, recognizedWord } from './photo-ocr-layout';
+import { clipOverlappingWords, containedBox, coveredBox, groupOcrCharacters, recognizedWord } from './photo-ocr-layout';
+
+const box = (text: string, x: number, y = 10, width = 18) => ({ text, box: { x, y, width, height: 20 } });
+const dictionary = (...words: string[]) => new Map(words.map(hanzi => [hanzi, { hanzi, pinyin: hanzi, russian: hanzi }]));
 
 test('OCR elements remain whole words even when characters have dictionary entries', () => {
   assert.equal(recognizedWord('喜欢'), '喜欢');
@@ -19,6 +22,35 @@ test('OCR boxes align with contained portrait photos and clip to the view', () =
     x: 0, y: 0, width: 10, height: 20,
   });
   assert.equal(containedBox({ x: 1000, y: 0, width: 20, height: 20 }, 400, 400, 200, 200), null);
+});
+
+test('camera overlay boxes use the same center crop as the live preview', () => {
+  assert.deepEqual(coveredBox({ x: 100, y: 200, width: 100, height: 50 }, 400, 800, 300, 500), {
+    x: 75, y: 100, width: 75, height: 37.5,
+  });
+  assert.equal(coveredBox({ x: 0, y: 0, width: 20, height: 20 }, 400, 800, 300, 500), null);
+});
+
+test('separate characters in one sentence become complete dictionary words', () => {
+  const source = [box('我', 0), box('喜', 20), box('欢', 40), box('學', 60), box('習', 80), box('中', 100), box('文', 120)];
+  const grouped = groupOcrCharacters(source, dictionary('我', '喜', '欢', '喜欢', '学', '习', '学习', '中', '文', '中文'));
+  assert.deepEqual(grouped.map(word => word.text), ['我', '喜欢', '学习', '中文']);
+  assert.deepEqual(grouped[1].box, { x: 20, y: 10, width: 38, height: 20 });
+});
+
+test('a multi-character OCR element stays intact while adjacent single characters group', () => {
+  const grouped = groupOcrCharacters([box('喜欢', 0, 10, 38), box('学', 40), box('习', 60)], dictionary('喜', '欢', '喜欢', '学', '习', '学习'));
+  assert.deepEqual(grouped.map(word => word.text), ['喜欢', '学习']);
+});
+
+test('character grouping stops at a line break or a wide gap', () => {
+  const grouped = groupOcrCharacters([box('学', 0), box('习', 20, 60), box('中', 100), box('文', 160)], dictionary('学', '习', '学习', '中', '文', '中文'));
+  assert.deepEqual(grouped.map(word => word.text), ['学', '习', '中', '文']);
+});
+
+test('balanced dictionary words win over an ambiguous long prefix', () => {
+  const grouped = groupOcrCharacters([box('研', 0), box('究', 20), box('生', 40), box('命', 60)], dictionary('研究', '研究生', '生命', '命'));
+  assert.deepEqual(grouped.map(word => word.text), ['研究', '生命']);
 });
 
 test('wide Tesseract word boxes stop at the next OCR word without splitting their text', () => {
