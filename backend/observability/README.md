@@ -22,6 +22,13 @@ are retained. Telegram login telemetry additionally stores the verified chat ID,
 full name, and username as requested; learner text, words, answers, and API
 keys are not collected.
 
+Card reviews include a boolean `graduated` value. `/metrics` exposes
+`card_graduations_total` and `card_graduations_undone_total`; subtract their
+increases to count completed graduations in a time window. These aggregate
+counters do not identify words or learners, and start when the updated client
+records its first graduation. Personal seven-day charts still use the learner's
+synced `cardGraduations` history.
+
 iOS card rounds also send two `card_transition_timed` events: `round_start`
 records the time from pressing Start until two frames after the first card
 commits; `round_summary` records the average and worst card transition, plus
