@@ -24,8 +24,9 @@ example. Its HanziLookupJS code is GPL v3 and the stroke data is under the
 Arphic Public License; both license texts are in `src/handwriting/vendor`.
 
 The Recognition tab keeps the camera preview live on iOS, Android, and web while
-OCR boxes update from occasional captures. Learners can freeze the last scanned
-frame, tap words, and add selected dictionary entries; existing photos can also
+OCR boxes update from occasional captures. Freezing takes a fresh photo, runs
+final OCR on that exact frame, and lets learners tap words and add selected
+dictionary entries; existing photos can also
 be scanned. Adjacent single-character OCR elements on one line are grouped into
 dictionary words, while multi-character OCR elements remain intact. Mobile OCR
 uses the bundled Chinese model of Google ML Kit Text Recognition v2 through the

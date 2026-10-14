@@ -31,6 +31,9 @@ export default function Recognition() {
   translateRef.current = t;
   const camera = useRef<CameraView>(null);
   const currentCameraPhoto = useRef<string | null>(null);
+  const scanGeneration = useRef(0);
+  const scanTask = useRef<Promise<void> | null>(null);
+  const freezeGeneration = useRef(0);
   const permissionRequested = useRef(false);
   const [permission, requestPermission] = useCameraPermissions();
   const [focused, setFocused] = useState(false);
@@ -42,11 +45,22 @@ export default function Recognition() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [scanning, setScanning] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [capturingFreeze, setCapturingFreeze] = useState(false);
   const [message, setMessage] = useState('');
 
   useFocusEffect(useCallback(() => {
     setFocused(true);
-    return () => { setFocused(false); setCameraReady(false); };
+    return () => {
+      scanGeneration.current++;
+      freezeGeneration.current++;
+      setFocused(false);
+      setCameraReady(false);
+      setCapturingFreeze(false);
+      setBusy(false);
+      setPaused(false);
+      setFrame(null);
+      setSelected(new Set());
+    };
   }, []));
 
   useEffect(() => () => {
@@ -61,10 +75,18 @@ export default function Recognition() {
 
   useEffect(() => {
     if (!focused || mode !== 'camera' || paused || !permission?.granted || !cameraReady) return;
+    const generation = ++scanGeneration.current;
     let stopped = false;
     let timer: ReturnType<typeof setTimeout>;
+    const schedule = (delay: number) => {
+      timer = setTimeout(() => {
+        const task = scan();
+        scanTask.current = task;
+        void task.finally(() => { if (scanTask.current === task) scanTask.current = null; });
+      }, delay);
+    };
     const scan = async () => {
-      if (!camera.current || stopped) return;
+      if (!camera.current || stopped || generation !== scanGeneration.current) return;
       setScanning(true);
       let capturedUri: string | null = null;
       try {
@@ -72,9 +94,9 @@ export default function Recognition() {
         const photo = await camera.current.takePictureAsync({ quality: 0.6, shutterSound: false });
         if (!photo) return;
         capturedUri = photo.uri;
-        if (stopped) return;
+        if (stopped || generation !== scanGeneration.current) return;
         const result = await recognizePhoto(photo.uri);
-        if (!stopped) {
+        if (!stopped && generation === scanGeneration.current) {
           const previous = currentCameraPhoto.current;
           currentCameraPhoto.current = photo.uri;
           setFrame({ uri: photo.uri, result });
@@ -83,21 +105,72 @@ export default function Recognition() {
           if (previous) setTimeout(() => { void discardCameraPhoto(previous); }, 1000);
         }
       } catch (error) {
-        if (!stopped) setMessage(error instanceof Error ? error.message : translateRef.current('Could not recognize this photo.'));
+        if (!stopped && generation === scanGeneration.current) setMessage(error instanceof Error ? error.message : translateRef.current('Could not recognize this photo.'));
       } finally {
         if (capturedUri) void discardCameraPhoto(capturedUri);
-        if (!stopped) {
+        if (!stopped && generation === scanGeneration.current) {
           setScanning(false);
-          timer = setTimeout(scan, 700);
+          schedule(700);
         }
       }
     };
-    timer = setTimeout(scan, 0);
-    return () => { stopped = true; clearTimeout(timer); setScanning(false); };
+    schedule(0);
+    return () => { stopped = true; scanGeneration.current++; clearTimeout(timer); setScanning(false); };
   }, [cameraReady, focused, mode, paused, permission?.granted]);
+
+  const freeze = async () => {
+    if (!camera.current || !cameraReady || busy || capturingFreeze) return;
+    const generation = ++freezeGeneration.current;
+    scanGeneration.current++;
+    setPaused(true);
+    setCapturingFreeze(true);
+    setFrame(null);
+    setSelected(new Set());
+    setMessage('');
+    let capturedUri: string | null = null;
+    try {
+      // Let an in-flight scan finish before taking the frame that will be shown.
+      await scanTask.current;
+      if (generation !== freezeGeneration.current || !camera.current) return;
+      const photo = await camera.current.takePictureAsync({ quality: 0.8, shutterSound: false });
+      if (!photo) throw new Error(translateRef.current('Could not recognize this photo.'));
+      capturedUri = photo.uri;
+      if (generation !== freezeGeneration.current) return;
+      setCapturingFreeze(false);
+      const previous = currentCameraPhoto.current;
+      currentCameraPhoto.current = photo.uri;
+      setFrame({ uri: photo.uri, result: { width: photo.width, height: photo.height, words: [] } });
+      capturedUri = null;
+      if (previous) setTimeout(() => { void discardCameraPhoto(previous); }, 1000);
+      setBusy(true);
+      const result = await recognizePhoto(photo.uri);
+      if (generation === freezeGeneration.current) {
+        setFrame({ uri: photo.uri, result });
+        if (!result.words.length) setMessage(translateRef.current('No text was found. Try another photo.'));
+      }
+    } catch (error) {
+      if (generation === freezeGeneration.current) setMessage(error instanceof Error ? error.message : translateRef.current('Could not recognize this photo.'));
+    } finally {
+      if (capturedUri) void discardCameraPhoto(capturedUri);
+      if (generation === freezeGeneration.current) {
+        setCapturingFreeze(false);
+        setBusy(false);
+      }
+    }
+  };
+
+  const resume = () => {
+    freezeGeneration.current++;
+    setPaused(false);
+    setFrame(null);
+    setSelected(new Set());
+    setMessage('');
+  };
 
   const choosePhoto = async () => {
     if (busy) return;
+    freezeGeneration.current++;
+    scanGeneration.current++;
     const wasPaused = paused;
     setPaused(true);
     setBusy(true);
@@ -126,6 +199,7 @@ export default function Recognition() {
   };
 
   const showCamera = () => {
+    freezeGeneration.current++;
     setFrame(null);
     setMode('camera');
     setPaused(false);
@@ -171,7 +245,7 @@ export default function Recognition() {
     <View style={styles.actions}>
       <View style={styles.action}>
         {mode === 'camera'
-          ? <Button label={paused ? 'Resume' : 'Freeze'} icon={paused ? 'play-outline' : 'pause-outline'} disabled={!frame || !permission?.granted} onPress={() => setPaused(value => !value)} />
+          ? <Button label={paused ? 'Resume' : 'Freeze'} icon={paused ? 'play-outline' : 'pause-outline'} disabled={!cameraReady || !permission?.granted || capturingFreeze || busy} onPress={paused ? resume : () => void freeze()} />
           : <Button label="Use camera" icon="camera-outline" onPress={showCamera} />}
       </View>
       <View style={styles.action}><Button label="Choose photo" icon="images-outline" secondary disabled={busy} onPress={() => void choosePhoto()} /></View>
@@ -179,12 +253,12 @@ export default function Recognition() {
 
     <View style={styles.cameraShell} onLayout={event => setViewSize(event.nativeEvent.layout)}>
       {focused && mode === 'camera' && permission?.granted
-        ? <CameraView ref={camera} style={StyleSheet.absoluteFillObject} facing="back" active={focused && !paused} onCameraReady={() => setCameraReady(true)} />
+        ? <CameraView ref={camera} style={StyleSheet.absoluteFillObject} facing="back" active={focused && (!paused || capturingFreeze)} onCameraReady={() => setCameraReady(true)} />
         : null}
       {frame && (paused || mode === 'photo') ? <Image source={{ uri: frame.uri }} style={StyleSheet.absoluteFillObject} resizeMode={mode === 'camera' ? 'cover' : 'contain'} accessibilityLabel="Recognized camera frame" /> : null}
       {highlights.map(({ id, hanzi, box, entry }) => {
         const added = existing.has(hanzi);
-        const selectable = Boolean(entry) && !added;
+        const selectable = Boolean(entry) && !added && (paused || mode === 'photo') && !busy;
         const checked = selected.has(hanzi);
         return <Pressable
           key={id}
