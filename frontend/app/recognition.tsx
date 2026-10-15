@@ -6,7 +6,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useStore } from '@/context';
 import { Text, useTranslation } from '@/i18n';
-import { containedBox, coveredBox, groupOcrCharacters, recognizedWord } from '@/photo-ocr-layout';
+import { breakdownRecognizedWord, containedBox, coveredBox, groupOcrCharacters, recognizedWord } from '@/photo-ocr-layout';
 import { recognizePhoto, type PhotoOcrResult } from '@/photo-ocr';
 import { colors } from '@/theme';
 import { Button, Header, shell } from '@/ui';
@@ -226,8 +226,9 @@ export default function Recognition() {
     const hanzi = recognizedWord(item.text);
     return hanzi ? [hanzi] : [];
   }))], [groupedWords]);
+  const recognizedComponents = new Set(recognizedExpressions.flatMap(hanzi => breakdownRecognizedWord(hanzi, dictionary).map(word => word.hanzi)));
   // Keep selected expressions visible if a later live scan misses them.
-  const visibleExpressions = [...new Set([...recognizedExpressions, ...selected, ...(pendingRemoval ? [pendingRemoval] : [])])];
+  const visibleExpressions = [...new Set([...recognizedExpressions, ...[...selected].filter(hanzi => !recognizedComponents.has(hanzi)), ...(pendingRemoval && !recognizedComponents.has(pendingRemoval) ? [pendingRemoval] : [])])];
   const highlights = groupedWords.flatMap((item, index) => {
     const hanzi = recognizedWord(item.text);
     if (!frame) return [];
@@ -258,6 +259,41 @@ export default function Recognition() {
     patch(current => removeVocabularyWord(current, pendingRemoval));
     setPendingRemoval(null);
     setMessage('');
+  };
+
+  const expressionRow = (hanzi: string, key: string, component = false) => {
+    const saved = savedWords.get(hanzi);
+    const entry = dictionary?.get(hanzi);
+    const added = Boolean(saved);
+    const checked = selected.has(hanzi);
+    const available = Boolean(entry) || added;
+    const status = added ? t('In your deck') : checked ? t('Selected') : available ? t('Select') : t('Not in dictionary');
+    return <Fragment key={key}><Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${hanzi}, ${status}, ${entry?.pinyin ?? saved?.pinyin ?? ''}, ${entry?.russian ?? saved?.russian ?? ''}`}
+      accessibilityState={{ selected: checked, disabled: !available || busy }}
+      disabled={!available || busy}
+      onPress={() => added ? setPendingRemoval(hanzi) : toggle(hanzi)}
+      style={[styles.expressionRow, component && styles.componentRow, checked && styles.expressionSelected, added && styles.expressionAdded, !available && styles.expressionUnavailable]}
+    >
+      <Text style={styles.expressionHanzi}>{hanzi}</Text>
+      <View style={styles.expressionDetails}>
+        <Text style={styles.expressionPinyin} numberOfLines={1}>{entry?.pinyin ?? saved?.pinyin}</Text>
+        <Text style={styles.expressionMeaning} numberOfLines={2}>{entry?.russian ?? saved?.russian ?? t('Not in dictionary')}</Text>
+      </View>
+      <View style={styles.expressionStatus}>
+        <Ionicons name={added ? 'trash-outline' : checked ? 'checkmark-circle' : available ? 'add-circle-outline' : 'remove-circle-outline'} size={21} color={added ? colors.red : available ? colors.green : colors.muted} />
+        <Text style={[styles.expressionStatusText, added && styles.expressionRemoveText]}>{status}</Text>
+      </View>
+    </Pressable>
+    {pendingRemoval === hanzi ? <View style={styles.confirmRemoval}>
+      <Text style={styles.heading}>{t('Remove')} {hanzi}?</Text>
+      <Text style={styles.help}>{t('Do you really want to remove this word from your vocabulary?')}</Text>
+      <View style={styles.confirmActions}>
+        <Button label="Cancel" secondary onPress={() => setPendingRemoval(null)} />
+        <Pressable accessibilityRole="button" accessibilityLabel={`${t('Remove')} ${hanzi}`} onPress={confirmRemoval} style={styles.removeButton}><Text style={styles.removeButtonText}>{t('Remove')}</Text></Pressable>
+      </View>
+    </View> : null}</Fragment>;
   };
 
   return <ScrollView style={shell.page} contentContainerStyle={shell.content}>
@@ -302,38 +338,14 @@ export default function Recognition() {
       <Text style={styles.heading}>{visibleExpressions.length ? t('Recognized expressions') : t('Move closer to readable Chinese text.')}</Text>
       <Text style={styles.help}>{t('Tap an expression to select it, or a saved word to remove it.')}</Text>
       {visibleExpressions.length ? <View style={styles.expressionList}>{visibleExpressions.map(hanzi => {
-        const saved = savedWords.get(hanzi);
-        const entry = dictionary?.get(hanzi);
-        const added = Boolean(saved);
-        const checked = selected.has(hanzi);
-        const available = Boolean(entry) || added;
-        const status = added ? t('In your deck') : checked ? t('Selected') : available ? t('Select') : t('Not in dictionary');
-        return <Fragment key={hanzi}><Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`${hanzi}, ${status}, ${entry?.pinyin ?? saved?.pinyin ?? ''}, ${entry?.russian ?? saved?.russian ?? ''}`}
-          accessibilityState={{ selected: checked, disabled: !available || busy }}
-          disabled={!available || busy}
-          onPress={() => added ? setPendingRemoval(hanzi) : toggle(hanzi)}
-          style={[styles.expressionRow, checked && styles.expressionSelected, added && styles.expressionAdded, !available && styles.expressionUnavailable]}
-        >
-          <Text style={styles.expressionHanzi}>{hanzi}</Text>
-          <View style={styles.expressionDetails}>
-            <Text style={styles.expressionPinyin} numberOfLines={1}>{entry?.pinyin ?? saved?.pinyin}</Text>
-            <Text style={styles.expressionMeaning} numberOfLines={2}>{entry?.russian ?? saved?.russian ?? t('Not in dictionary')}</Text>
-          </View>
-          <View style={styles.expressionStatus}>
-            <Ionicons name={added ? 'trash-outline' : checked ? 'checkmark-circle' : available ? 'add-circle-outline' : 'remove-circle-outline'} size={21} color={added ? colors.red : available ? colors.green : colors.muted} />
-            <Text style={[styles.expressionStatusText, added && styles.expressionRemoveText]}>{status}</Text>
-          </View>
-        </Pressable>
-        {pendingRemoval === hanzi ? <View style={styles.confirmRemoval}>
-          <Text style={styles.heading}>{t('Remove')} {hanzi}?</Text>
-          <Text style={styles.help}>{t('Do you really want to remove this word from your vocabulary?')}</Text>
-          <View style={styles.confirmActions}>
-            <Button label="Cancel" secondary onPress={() => setPendingRemoval(null)} />
-            <Pressable accessibilityRole="button" accessibilityLabel={`${t('Remove')} ${hanzi}`} onPress={confirmRemoval} style={styles.removeButton}><Text style={styles.removeButtonText}>{t('Remove')}</Text></Pressable>
-          </View>
-        </View> : null}</Fragment>;
+        const parts = breakdownRecognizedWord(hanzi, dictionary);
+        return <View key={hanzi} style={styles.expressionGroup}>
+          {expressionRow(hanzi, hanzi)}
+          {parts.length ? <View style={styles.components}>
+            <Text style={styles.componentHeading}>{t('Dictionary components')}</Text>
+            {[...new Set(parts.map(part => part.hanzi))].map(part => expressionRow(part, part, true))}
+          </View> : null}
+        </View>;
       })}</View> : null}
       <Button label={t('Add selected') + ' (' + selectedWords.length + ')'} icon="add-circle-outline" disabled={!selectedWords.length || busy} onPress={addSelected} />
     </View>
@@ -359,7 +371,11 @@ const styles = StyleSheet.create({
   message: { color: colors.green, marginTop: 12, lineHeight: 20 },
   error: { alignItems: 'flex-start', gap: 8 },
   expressionList: { gap: 8 },
+  expressionGroup: { gap: 6 },
+  components: { gap: 6, paddingLeft: 16, borderLeftWidth: 2, borderLeftColor: colors.line, marginLeft: 12 },
+  componentHeading: { color: colors.muted, fontSize: 11, fontWeight: '700' },
   expressionRow: { minHeight: 65, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white },
+  componentRow: { minHeight: 58 },
   expressionSelected: { borderColor: colors.green, backgroundColor: colors.pale },
   expressionAdded: { backgroundColor: colors.pale },
   expressionUnavailable: { opacity: 0.6 },
