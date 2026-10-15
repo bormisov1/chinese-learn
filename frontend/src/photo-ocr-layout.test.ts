@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { clipOverlappingWords, containedBox, coveredBox, groupOcrCharacters, recognizedWord } from './photo-ocr-layout';
+import { breakdownRecognizedWord, clipOverlappingWords, containedBox, coveredBox, groupOcrCharacters, recognizedWord } from './photo-ocr-layout';
 
 const box = (text: string, x: number, y = 10, width = 18) => ({ text, box: { x, y, width, height: 20 } });
 const dictionary = (...words: string[]) => new Map(words.map(hanzi => [hanzi, { hanzi, pinyin: hanzi, russian: hanzi }]));
@@ -12,6 +12,28 @@ test('OCR elements remain whole words even when characters have dictionary entri
   assert.equal(recognizedWord('「學習」'), '学习');
   assert.equal(recognizedWord('ABC'), null);
   assert.equal(recognizedWord('你好，世界'), null);
+});
+
+test('unknown OCR phrase breaks into adjacent dictionary words without overlaps', () => {
+  const parts = breakdownRecognizedWord('研究生命', dictionary('研究', '研究生', '生命', '命', '研', '究'));
+  assert.deepEqual(parts.map(word => word.hanzi), ['研究', '生命']);
+});
+
+test('breakdown prefers earlier consecutive words when alternatives cover the same amount', () => {
+  const parts = breakdownRecognizedWord('甲乙丙丁戊', dictionary('甲乙', '乙丙', '丙丁', '丁戊'));
+  assert.deepEqual(parts.map(word => word.hanzi), ['甲乙', '丙丁']);
+});
+
+test('breakdown keeps multi-character words adjacent instead of inserting a single character', () => {
+  const parts = breakdownRecognizedWord('甲乙丙丁戊', dictionary('甲乙', '丙丁', '丙', '丁戊'));
+  assert.deepEqual(parts.map(word => word.hanzi), ['甲乙', '丙丁']);
+});
+
+test('breakdown uses available single characters but preserves whole dictionary matches', () => {
+  const words = dictionary('喜欢', '学', '习', '中', '文');
+  assert.deepEqual(breakdownRecognizedWord('喜欢', words), []);
+  assert.deepEqual(breakdownRecognizedWord('「學習中文」', words).map(word => word.hanzi), ['学', '习', '中', '文']);
+  assert.deepEqual(breakdownRecognizedWord('ABC', words), []);
 });
 
 test('OCR boxes align with contained portrait photos and clip to the view', () => {
