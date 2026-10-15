@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useStore } from '@/context';
 import { Text, useTranslation } from '@/i18n';
@@ -10,6 +10,7 @@ import { containedBox, coveredBox, groupOcrCharacters, recognizedWord } from '@/
 import { recognizePhoto, type PhotoOcrResult } from '@/photo-ocr';
 import { colors } from '@/theme';
 import { Button, Header, shell } from '@/ui';
+import { removeVocabularyWord } from '@/vocabulary-selection';
 
 type Frame = { uri: string; result: PhotoOcrResult };
 type ViewSize = { width: number; height: number };
@@ -25,7 +26,7 @@ async function discardCameraPhoto(uri: string) {
 }
 
 export default function Recognition() {
-  const { data, dictionary, dictionaryLoading, dictionaryError, retryDictionary, importWords } = useStore();
+  const { data, dictionary, dictionaryLoading, dictionaryError, retryDictionary, importWords, patch } = useStore();
   const t = useTranslation();
   const translateRef = useRef(t);
   translateRef.current = t;
@@ -43,6 +44,7 @@ export default function Recognition() {
   const [frame, setFrame] = useState<Frame | null>(null);
   const [viewSize, setViewSize] = useState<ViewSize>({ width: 0, height: 0 });
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [busy, setBusy] = useState(false);
   const [capturingFreeze, setCapturingFreeze] = useState(false);
@@ -60,6 +62,7 @@ export default function Recognition() {
       setPaused(false);
       setFrame(null);
       setSelected(new Set());
+      setPendingRemoval(null);
     };
   }, []));
 
@@ -126,6 +129,7 @@ export default function Recognition() {
     setCapturingFreeze(true);
     setFrame(null);
     setSelected(new Set());
+    setPendingRemoval(null);
     setMessage('');
     let capturedUri: string | null = null;
     try {
@@ -164,6 +168,7 @@ export default function Recognition() {
     setPaused(false);
     setFrame(null);
     setSelected(new Set());
+    setPendingRemoval(null);
     setMessage('');
   };
 
@@ -184,6 +189,7 @@ export default function Recognition() {
       const photo = chosen.assets[0];
       setMode('photo');
       setSelected(new Set());
+      setPendingRemoval(null);
       const previous = currentCameraPhoto.current;
       currentCameraPhoto.current = null;
       setFrame({ uri: photo.uri, result: { width: photo.width || 1, height: photo.height || 1, words: [] } });
@@ -205,15 +211,23 @@ export default function Recognition() {
     setPaused(false);
     setCameraReady(false);
     setSelected(new Set());
+    setPendingRemoval(null);
     setMessage('');
   };
 
-  const existing = useMemo(() => new Set(data.words.map(word => word.hanzi)), [data.words]);
+  const savedWords = useMemo(() => new Map(data.words.map(word => [word.hanzi, word])), [data.words]);
+  const existing = useMemo(() => new Set(savedWords.keys()), [savedWords]);
   const selectedWords = [...selected].flatMap(hanzi => {
     const word = dictionary?.get(hanzi);
     return word && !existing.has(hanzi) ? [word] : [];
   });
   const groupedWords = useMemo(() => groupOcrCharacters(frame?.result.words ?? [], dictionary), [frame, dictionary]);
+  const recognizedExpressions = useMemo(() => [...new Set(groupedWords.flatMap(item => {
+    const hanzi = recognizedWord(item.text);
+    return hanzi ? [hanzi] : [];
+  }))], [groupedWords]);
+  // Keep selected expressions visible if a later live scan misses them.
+  const visibleExpressions = [...new Set([...recognizedExpressions, ...selected, ...(pendingRemoval ? [pendingRemoval] : [])])];
   const highlights = groupedWords.flatMap((item, index) => {
     const hanzi = recognizedWord(item.text);
     if (!frame) return [];
@@ -222,7 +236,6 @@ export default function Recognition() {
       : containedBox(item.box, frame.result.width, frame.result.height, viewSize.width, viewSize.height);
     return hanzi && box ? [{ id: index, hanzi, box, entry: dictionary?.get(hanzi) }] : [];
   });
-  const foundCount = new Set(highlights.map(item => item.hanzi)).size;
 
   const toggle = (hanzi: string) => {
     setSelected(current => {
@@ -240,8 +253,15 @@ export default function Recognition() {
     setMessage(count ? t('Added') + ' ' + count + ' ' + t('words to your deck.') : t('No new words to add.'));
   };
 
+  const confirmRemoval = () => {
+    if (!pendingRemoval) return;
+    patch(current => removeVocabularyWord(current, pendingRemoval));
+    setPendingRemoval(null);
+    setMessage('');
+  };
+
   return <ScrollView style={shell.page} contentContainerStyle={shell.content}>
-    <Header eyebrow="CAMERA" title="Recognition" subtitle="Point at text, freeze a frame, then tap words on the image." />
+    <Header eyebrow="CAMERA" title="Recognition" subtitle="Point at text, then choose expressions below the camera." />
     <View style={styles.actions}>
       <View style={styles.action}>
         {mode === 'camera'
@@ -256,21 +276,13 @@ export default function Recognition() {
         ? <CameraView ref={camera} style={StyleSheet.absoluteFillObject} facing="back" active={focused && (!paused || capturingFreeze)} onCameraReady={() => setCameraReady(true)} />
         : null}
       {frame && (paused || mode === 'photo') ? <Image source={{ uri: frame.uri }} style={StyleSheet.absoluteFillObject} resizeMode={mode === 'camera' ? 'cover' : 'contain'} accessibilityLabel="Recognized camera frame" /> : null}
-      {highlights.map(({ id, hanzi, box, entry }) => {
-        const added = existing.has(hanzi);
-        const selectable = Boolean(entry) && !added && (paused || mode === 'photo') && !busy;
-        const checked = selected.has(hanzi);
-        return <Pressable
+      {highlights.map(({ id, hanzi, box, entry }) =>
+        <View
           key={id}
-          accessibilityRole="button"
-          accessibilityLabel={hanzi + (entry ? ', ' + entry.pinyin + ', ' + entry.russian : ', ' + t('Not in dictionary'))}
-          accessibilityState={{ selected: checked, disabled: !selectable }}
-          disabled={!selectable}
-          hitSlop={6}
-          onPress={() => toggle(hanzi)}
-          style={[styles.highlight, { left: box.x, top: box.y, width: box.width, height: box.height }, checked && styles.highlightSelected, !selectable && styles.highlightUnavailable]}
-        />;
-      })}
+          pointerEvents="none"
+          style={[styles.highlight, { left: box.x, top: box.y, width: box.width, height: box.height }, selected.has(hanzi) && styles.highlightSelected, !entry && !existing.has(hanzi) && styles.highlightUnavailable]}
+        />,
+      )}
       {mode === 'camera' && !permission?.granted
         ? <View style={styles.cameraMessage}>
           <Ionicons name="camera-outline" size={36} color={colors.white} />
@@ -287,13 +299,42 @@ export default function Recognition() {
     {dictionaryLoading ? <Text style={styles.help}>Loading dictionary…</Text> : null}
     {dictionaryError && !dictionary ? <View style={styles.error}><Text style={styles.message}>{dictionaryError}</Text><Button label="Retry dictionary" secondary onPress={retryDictionary} /></View> : null}
     <View style={styles.panel}>
-      <Text style={styles.heading}>{foundCount ? t('Tap highlighted words to select them.') : t('Move closer to readable Chinese text.')}</Text>
-      <Text style={styles.help}>{mode === 'camera' && !paused ? t('The camera stays live while highlights update. Freeze to select precisely.') : t('Adjacent characters can form dictionary words.')}</Text>
-      {selectedWords.length ? <View style={styles.selectedList}>{selectedWords.map(word =>
-        <Pressable key={word.hanzi} onPress={() => toggle(word.hanzi)} accessibilityRole="button" accessibilityLabel={word.hanzi + ', ' + word.pinyin + ', ' + word.russian} style={styles.selectedChip}>
-          <Text style={styles.selectedHanzi}>{word.hanzi}</Text><Text style={styles.selectedMeaning} numberOfLines={1}>{word.russian}</Text><Ionicons name="close" size={14} color={colors.green} />
-        </Pressable>,
-      )}</View> : null}
+      <Text style={styles.heading}>{visibleExpressions.length ? t('Recognized expressions') : t('Move closer to readable Chinese text.')}</Text>
+      <Text style={styles.help}>{t('Tap an expression to select it, or a saved word to remove it.')}</Text>
+      {visibleExpressions.length ? <View style={styles.expressionList}>{visibleExpressions.map(hanzi => {
+        const saved = savedWords.get(hanzi);
+        const entry = dictionary?.get(hanzi);
+        const added = Boolean(saved);
+        const checked = selected.has(hanzi);
+        const available = Boolean(entry) || added;
+        const status = added ? t('In your deck') : checked ? t('Selected') : available ? t('Select') : t('Not in dictionary');
+        return <Fragment key={hanzi}><Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${hanzi}, ${status}, ${entry?.pinyin ?? saved?.pinyin ?? ''}, ${entry?.russian ?? saved?.russian ?? ''}`}
+          accessibilityState={{ selected: checked, disabled: !available || busy }}
+          disabled={!available || busy}
+          onPress={() => added ? setPendingRemoval(hanzi) : toggle(hanzi)}
+          style={[styles.expressionRow, checked && styles.expressionSelected, added && styles.expressionAdded, !available && styles.expressionUnavailable]}
+        >
+          <Text style={styles.expressionHanzi}>{hanzi}</Text>
+          <View style={styles.expressionDetails}>
+            <Text style={styles.expressionPinyin} numberOfLines={1}>{entry?.pinyin ?? saved?.pinyin}</Text>
+            <Text style={styles.expressionMeaning} numberOfLines={2}>{entry?.russian ?? saved?.russian ?? t('Not in dictionary')}</Text>
+          </View>
+          <View style={styles.expressionStatus}>
+            <Ionicons name={added ? 'trash-outline' : checked ? 'checkmark-circle' : available ? 'add-circle-outline' : 'remove-circle-outline'} size={21} color={added ? colors.red : available ? colors.green : colors.muted} />
+            <Text style={[styles.expressionStatusText, added && styles.expressionRemoveText]}>{status}</Text>
+          </View>
+        </Pressable>
+        {pendingRemoval === hanzi ? <View style={styles.confirmRemoval}>
+          <Text style={styles.heading}>{t('Remove')} {hanzi}?</Text>
+          <Text style={styles.help}>{t('Do you really want to remove this word from your vocabulary?')}</Text>
+          <View style={styles.confirmActions}>
+            <Button label="Cancel" secondary onPress={() => setPendingRemoval(null)} />
+            <Pressable accessibilityRole="button" accessibilityLabel={`${t('Remove')} ${hanzi}`} onPress={confirmRemoval} style={styles.removeButton}><Text style={styles.removeButtonText}>{t('Remove')}</Text></Pressable>
+          </View>
+        </View> : null}</Fragment>;
+      })}</View> : null}
       <Button label={t('Add selected') + ' (' + selectedWords.length + ')'} icon="add-circle-outline" disabled={!selectedWords.length || busy} onPress={addSelected} />
     </View>
   </ScrollView>;
@@ -317,8 +358,20 @@ const styles = StyleSheet.create({
   help: { color: colors.muted, lineHeight: 20 },
   message: { color: colors.green, marginTop: 12, lineHeight: 20 },
   error: { alignItems: 'flex-start', gap: 8 },
-  selectedList: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  selectedChip: { maxWidth: '100%', flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: colors.pale, borderColor: colors.green, borderWidth: 1, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 7 },
-  selectedHanzi: { color: colors.ink, fontSize: 18, fontWeight: '800' },
-  selectedMeaning: { color: colors.green, fontSize: 12, flexShrink: 1 },
+  expressionList: { gap: 8 },
+  expressionRow: { minHeight: 65, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white },
+  expressionSelected: { borderColor: colors.green, backgroundColor: colors.pale },
+  expressionAdded: { backgroundColor: colors.pale },
+  expressionUnavailable: { opacity: 0.6 },
+  expressionHanzi: { color: colors.ink, fontSize: 21, fontWeight: '800', minWidth: 38 },
+  expressionDetails: { flex: 1, minWidth: 0, gap: 2 },
+  expressionPinyin: { color: colors.green, fontSize: 13 },
+  expressionMeaning: { color: colors.muted, fontSize: 12, lineHeight: 16 },
+  expressionStatus: { alignItems: 'center', width: 72, gap: 2 },
+  expressionStatusText: { color: colors.green, fontSize: 10, fontWeight: '700', textAlign: 'center' },
+  expressionRemoveText: { color: colors.red },
+  confirmRemoval: { gap: 10, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.paper },
+  confirmActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  removeButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 18, borderRadius: 10, backgroundColor: colors.red },
+  removeButtonText: { color: colors.white, fontWeight: '800' },
 });
