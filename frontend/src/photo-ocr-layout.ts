@@ -1,6 +1,7 @@
 import OpenCC from 'opencc-js/t2cn';
 import type { OcrBox, OcrWord } from './photo-ocr';
 import type { Dictionary } from './dictionary';
+import type { ImportedWord } from './types';
 
 const toSimplifiedChinese = OpenCC.Converter({ from: 'tw', to: 'cn' });
 const maximumLengths = new WeakMap<Dictionary, number>();
@@ -9,6 +10,55 @@ const maximumLengths = new WeakMap<Dictionary, number>();
 export function recognizedWord(text: string): string | null {
   const trimmed = text.trim().replace(/^[^\p{Script=Han}]+|[^\p{Script=Han}]+$/gu, '');
   return /^[\p{Script=Han}]+$/u.test(trimmed) ? toSimplifiedChinese(trimmed) : null;
+}
+
+type Breakdown = { words: ImportedWord[]; multiCharacters: number; adjacentMultiPairs: number; matchedCharacters: number; lengths: number[] };
+
+/** Find non-overlapping dictionary entries inside an OCR expression absent from the dictionary. */
+export function breakdownRecognizedWord(text: string, dictionary: Dictionary | null): ImportedWord[] {
+  const hanzi = recognizedWord(text);
+  if (!dictionary || !hanzi || dictionary.has(hanzi)) return [];
+  const characters = [...hanzi];
+  const matches: [Breakdown, Breakdown][] = Array(characters.length + 1);
+  const empty: Breakdown = { words: [], multiCharacters: 0, adjacentMultiPairs: 0, matchedCharacters: 0, lengths: [] };
+  matches[characters.length] = [empty, empty];
+  const better = (candidate: Breakdown, current: Breakdown) => {
+    if (candidate.multiCharacters !== current.multiCharacters) return candidate.multiCharacters > current.multiCharacters;
+    if (candidate.adjacentMultiPairs !== current.adjacentMultiPairs) return candidate.adjacentMultiPairs > current.adjacentMultiPairs;
+    if (candidate.matchedCharacters !== current.matchedCharacters) return candidate.matchedCharacters > current.matchedCharacters;
+    if (candidate.words.length !== current.words.length) return candidate.words.length < current.words.length;
+    for (let index = 0; index < candidate.lengths.length; index++) {
+      if (candidate.lengths[index] !== current.lengths[index]) return candidate.lengths[index] > current.lengths[index];
+    }
+    // On a tie, take the match at this position instead of skipping its first character.
+    return true;
+  };
+  const limit = maximumWordLength(dictionary);
+  for (let start = characters.length - 1; start >= 0; start--) {
+    const choices: [Breakdown, Breakdown] = [empty, empty];
+    for (const previousMulti of [0, 1] as const) {
+      // Skipping an unmatched character breaks a run of adjacent words.
+      let best = matches[start + 1][0];
+      for (let length = 1; length <= Math.min(limit, characters.length - start); length++) {
+        const item = dictionary.get(characters.slice(start, start + length).join(''));
+        if (!item) continue;
+        const multi = length > 1;
+        const tail = matches[start + length][multi ? 1 : 0];
+        const lengths = [...tail.lengths, length].sort((a, b) => b - a);
+        const candidate: Breakdown = {
+          words: [item, ...tail.words],
+          multiCharacters: (multi ? length : 0) + tail.multiCharacters,
+          adjacentMultiPairs: (multi && previousMulti ? 1 : 0) + tail.adjacentMultiPairs,
+          matchedCharacters: length + tail.matchedCharacters,
+          lengths,
+        };
+        if (better(candidate, best)) best = candidate;
+      }
+      choices[previousMulti] = best;
+    }
+    matches[start] = choices;
+  }
+  return matches[0][0].words;
 }
 
 type Match = { words: OcrWord[]; matchedCharacters: number; wordLengths: number[] };
