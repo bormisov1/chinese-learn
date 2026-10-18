@@ -23,7 +23,7 @@ export const CHAT_PRESETS: { id: ChatPreset; label: string; prompt: string }[] =
   { id: 'words', label: 'Explain words', prompt: 'Explain each word and hanzi in following with pinyin' },
   { id: 'hanzi', label: 'Hanzi components', prompt: 'For following hanzi explain its components, what has meaning, what gives sound, what can be used as association to remember' },
   { id: 'reply', label: 'Suggest a reply', prompt: 'Suggest a reply to following' },
-  { id: 'correct', label: 'Correct & translate', prompt: 'Correct the following text. Translate any English parts into natural Chinese so the complete corrected text is in Chinese. Show the corrected Chinese text first, then explain each correction and translation.' },
+  { id: 'correct', label: 'Correct & translate', prompt: 'Correct the text and translate English into natural Chinese. Show the corrected Chinese first, then briefly explain changes. Whenever you write Hanzi, put its pinyin immediately after it; never show Hanzi without pinyin.' },
 ];
 
 export function addableChatWords(words: ChatWord[], question: string): ChatWord[] {
