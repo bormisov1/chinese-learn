@@ -118,7 +118,7 @@ jobs:
               const eligibleBuild = builds.find(build => build.attributes.processingState === 'VALID' &&
                 !build.attributes.expired && build.attributes.buildAudienceType !== 'INTERNAL_ONLY');
               if (!eligibleBuild) throw new Error('No valid build is eligible for external TestFlight testing.');
-              const groupBuilds = (await api(`/v1/betaGroups/${group.id}/relationships/builds?limit=1000`)).data;
+              const groupBuilds = (await api(`/v1/betaGroups/${group.id}/relationships/builds?limit=200`)).data;
               if (!groupBuilds.some(build => build.id === eligibleBuild.id)) {
                 await api(`/v1/betaGroups/${group.id}/relationships/builds`, {
                   method: 'POST',
