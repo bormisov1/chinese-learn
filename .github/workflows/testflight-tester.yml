@@ -87,6 +87,10 @@ jobs:
             });
             const builds = (await api(`/v1/builds?${buildQuery}`)).data;
             console.log(`Recent builds: ${builds.map(build => `${build.attributes.version} (${build.attributes.processingState}, ${build.attributes.buildAudienceType ?? 'STANDARD'})`).join(', ') || '(none)'}`);
+            if (builds[0]) {
+              const detail = (await api(`/v1/builds/${builds[0].id}/buildBetaDetail?fields%5BbuildBetaDetails%5D=internalBuildState,externalBuildState`)).data;
+              console.log(`Latest beta state: internal=${detail.attributes.internalBuildState}, external=${detail.attributes.externalBuildState}.`);
+            }
             if (process.env.TESTER_MODE === 'list') return;
 
             const email = process.env.TESTER_EMAIL.trim().toLowerCase();
