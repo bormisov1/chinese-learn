@@ -2,11 +2,24 @@ import { Evaluation, Explanation, Sentence, Settings, Word, WordExplanation } fr
 import type { AppLanguage } from './types';
 import type { ImportedWord } from './types';
 import { evaluateChinesePrompt, evaluatePrompt, explainPrompt, generatePrompt, translateWordsPrompt, wordExplanationPrompt } from './prompts';
-import { resolveContextualPinyin, resolveSentencePronunciation } from './pronunciation';
+import { resolveSentencePronunciation } from './pronunciation';
 import { validateWordExplanation } from './word-explanations';
 import { readExplanationStream } from './explanation-stream';
 
 const DEEPSEEK_FLASH_MODEL = 'deepseek-v4-flash';
+type RequestLexeme = { id: string; hanzi: string; pinyin: string; gloss: string; wordId: string };
+type GeneratedCandidate = { wordIds?: unknown; russian?: unknown; grammarPattern?: unknown };
+
+export function reconstructGeneratedSentences(candidates: GeneratedCandidate[], requestLexemes: RequestLexeme[], size: number): Omit<Sentence, 'id' | 'sentenceShownCount'>[] {
+  const byRequestId = new Map(requestLexemes.map(item => [item.id, item]));
+  const valid = candidates.flatMap(sentence => {
+    if (!Array.isArray(sentence.wordIds) || !sentence.wordIds.length || sentence.wordIds.some(id => typeof id !== 'string' || !byRequestId.has(id))) return [];
+    if (typeof sentence.russian !== 'string' || !sentence.russian.trim() || typeof sentence.grammarPattern !== 'string' || !sentence.grammarPattern.trim()) return [];
+    const entries = sentence.wordIds.map(id => byRequestId.get(id as string)!);
+    return [{ chinese: entries.map(item => item.hanzi).join(' '), pinyin: entries.map(item => item.pinyin).join(' '), russian: sentence.russian.trim(), grammarPattern: sentence.grammarPattern.trim(), wordIds: entries.map(item => item.wordId) }];
+  });
+  return valid.filter((sentence, index, all) => all.findIndex(item => item.chinese === sentence.chinese && item.wordIds.join() === sentence.wordIds.join()) === index).slice(0, size);
+}
 
 export async function validateApiKey(apiKey: string, signal?: AbortSignal) {
   const response = await fetch('https://api.deepseek.com/user/balance', {
@@ -26,22 +39,18 @@ async function call<T>(settings: Settings, system: string, user: string, tempera
   const json = await response.json();
   return JSON.parse(json.choices?.[0]?.message?.content ?? '{}') as T;
 }
-export async function generate(settings: Settings, words: Word[], targets: Word[], size: number): Promise<Omit<Sentence, 'id' | 'wordIds' | 'sentenceShownCount'>[]> {
+export async function generate(settings: Settings, words: Word[], targets: Word[], size: number): Promise<Omit<Sentence, 'id' | 'sentenceShownCount'>[]> {
   const shuffle = <T,>(items: T[]) => {
     const copy = [...items];
     for (let i = copy.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [copy[i], copy[j]] = [copy[j], copy[i]]; }
     return copy;
   };
-  const vocabulary = words.map(({ hanzi, pinyin, russian }) => ({ hanzi, pinyin, russian }));
+  const requestLexemes = words.map((word, index) => ({ id: `l${index}`, hanzi: word.hanzi, pinyin: word.pinyin, gloss: word.russian, wordId: word.id }));
+  const targetIds = targets.map(target => requestLexemes.find(item => item.wordId === target.id)?.id).filter(Boolean);
   const perCall = Math.ceil(size / 4);
-  const responses: { sentences?: { chinese: string; pinyin: string; russian: string; grammarPattern: string }[] }[] = [];
-  for (let request = 0; request < 4; request++) responses.push(await call(settings, 'Generate natural, semantically coherent Mandarin practice sentences. Follow every vocabulary and formatting constraint exactly. JSON only.', generatePrompt(settings.language, perCall, shuffle(vocabulary), shuffle(targets.map(w => w.hanzi)))));
-  const candidates = responses.flatMap(data => data.sentences ?? []);
-  const allowed = new Set(words.map(w => w.hanzi));
-  return candidates.filter((s, i, all) => typeof s.chinese === 'string' && s.chinese.trim().split(/ +/).every(t => allowed.has(t)) && !!s.pinyin?.trim() && !!s.russian?.trim() && !!s.grammarPattern?.trim() && all.findIndex(x => x.chinese === s.chinese) === i).slice(0, size).map(sentence => ({
-    ...sentence,
-    pinyin: resolveContextualPinyin(sentence.chinese, sentence.pinyin),
-  }));
+  const responses: { sentences?: { wordIds?: unknown; russian?: unknown; grammarPattern?: unknown }[] }[] = [];
+  for (let request = 0; request < 4; request++) responses.push(await call(settings, 'Generate natural, semantically coherent Mandarin practice sentences. Follow every vocabulary and formatting constraint exactly. JSON only.', generatePrompt(settings.language, perCall, shuffle(requestLexemes.map(({ wordId: _wordId, ...item }) => item)), shuffle(targetIds))));
+  return reconstructGeneratedSentences(responses.flatMap(data => data.sentences ?? []), requestLexemes, size);
 }
 export const evaluate = (settings: Settings, sentence: Sentence, answer: string) => {
   const pronunciation = resolveSentencePronunciation(sentence);

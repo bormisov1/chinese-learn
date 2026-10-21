@@ -51,3 +51,12 @@ test("backup merge unions words, remaps sentence word IDs, and keeps strongest p
     { round: 5, wordId: "new", at: 2000 },
   ]);
 });
+
+test("backup keeps two readings of one Hanzi as independent cards and repeated import is idempotent", () => {
+  const current = { ...baseStore(), words: [{ ...word("hai", "还", 2), pinyin: "hái", russian: "still" }] };
+  const imported = { ...baseStore(), words: [{ ...word("huan", "还", 5), pinyin: "huán", russian: "return" }] };
+  const once = mergeBackupData(current, createBackup(imported)).data;
+  const twice = mergeBackupData(once, createBackup(imported)).data;
+  assert.deepEqual(once.words.map(item => [item.id, item.pinyin, item.cardSrsCorrect]), [["hai", "hái", 2], ["huan", "huán", 5]]);
+  assert.deepEqual(twice.words, once.words);
+});

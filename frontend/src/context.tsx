@@ -5,13 +5,14 @@ import { emptyStore, loadStore, saveStore } from './storage';
 import { AppLanguage, ImportedWord, StoreData, Word } from './types';
 import { fillActivePool } from './card-srs';
 import { replenishAutomaticWords } from './hsk-vocabulary';
-import { Dictionary, loadDictionary } from './dictionary';
-import { refreshWords, switchStoreLanguage } from './language';
+import { Dictionary, dictionaryWithEntries, loadDictionary } from './dictionary';
+import { refreshStoreWords, switchStoreLanguage } from './language';
 import { Account, authUrl, clearTokens, exchangeCode, getAccount, getTokens } from './api-client';
 import { bootstrapStore, syncableSnapshot } from './sync';
 import { commitBootstrapResponse, createBootstrapCoordinator } from './sync-coordinator';
 import { initializeTelemetry, track } from './telemetry';
 import { createBackup, mergeBackupData, type BackupFile, type BackupMergeSummary } from './backup';
+import { ensureLexicalKey, lexicalKey } from './lexical';
 
 type Context = { data: StoreData; ready: boolean; generating: boolean; error: string; dictionary: Dictionary | null; dictionaryLoading: boolean; dictionaryError: string; dictionaryProgress: number | null; switchingLanguage: AppLanguage | null; account: Account | null; authBusy: boolean; authError: string; authCompletedCode: string | null; selectLanguage: (language: AppLanguage) => Promise<boolean>; retryDictionary: () => void; importWords: (items: ImportedWord[]) => number; patch: (fn: (data: StoreData) => StoreData) => void; createBackup: () => BackupFile; mergeBackup: (backup: BackupFile) => BackupMergeSummary; setAutomaticWordAddition: (enabled: boolean, completeOnboarding?: boolean) => void; generateBatch: (mandatory?: Word) => Promise<void>; signIn: (provider: "google" | "telegram") => Promise<void>; signOut: () => Promise<void> };
 const StoreContext = createContext<Context>(null as never);
@@ -33,7 +34,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const refreshSyncedWords = (merged: StoreData): StoreData => {
     const loaded = dictionaryRef.current;
     return loaded?.language === merged.settings.language
-      ? { ...merged, words: refreshWords(merged.words, merged.settings.language, loaded.value) }
+      ? refreshStoreWords(merged, merged.settings.language, loaded.value)
       : merged;
   };
   const syncNow = useRef<(() => void) | null>(null);
@@ -49,7 +50,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }),
   );
   useEffect(() => { loadStore().then(value => { setData(value); setReady(true); void initializeTelemetry(); }); }, []);
-  const redirectUri = () => Platform.OS === "web" && typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : "hanzideck://auth/callback";
+  const redirectUri = () => Platform.OS === "web" && typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : `${process.env.EXPO_PUBLIC_APP_SCHEME || "hanzideck"}://auth/callback`;
   const completeAuth = async (url: string) => {
     const parsed = new URL(url);
     const code = parsed.searchParams.get("code");
@@ -104,7 +105,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (!active) return;
       dictionaryRef.current = { language, value };
       setLoadedDictionary({ language, value });
-      setData(current => current.settings.language === language ? { ...current, words: refreshWords(current.words, language, value) } : current);
+      setData(current => current.settings.language === language ? refreshStoreWords(current, language, value) : current);
     }).catch(reason => { if (active) setDictionaryError(reason instanceof Error ? reason.message : 'Dictionary download failed.'); })
       .finally(() => { if (active) setDictionaryLoading(false); });
     return () => { active = false; };
@@ -112,7 +113,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!ready || !dictionary || !data.onboardingComplete || !data.settings.automaticWordAddition) return;
     setData(current => {
-      const words = replenishAutomaticWords(current.words, dictionary, Date.now(), current.cardRound, new Set(current.removedWordHanzi));
+      const words = replenishAutomaticWords(current.words, dictionary, Date.now(), current.cardRound, new Set(current.removedWordKeys));
       return words === current.words ? current : { ...current, words };
     });
   }, [ready, dictionary, data.onboardingComplete, data.settings.automaticWordAddition, data.words]);
@@ -135,7 +136,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         try {
           const translated = await translateWords(data.settings, unresolved.map(word => word.hanzi), language);
           if (switchRequest.current !== request) return false;
-          if (translated.length) value = new Map([...value, ...translated.map(word => [word.hanzi, word] as const)]);
+          if (translated.length) value = dictionaryWithEntries(value, translated);
         } catch { /* Dictionary switching remains available when the optional AI fallback fails. */ }
       }
       dictionaryRef.current = { language, value };
@@ -161,13 +162,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       ...current,
       onboardingComplete: completeOnboarding || current.onboardingComplete,
       settings: { ...current.settings, automaticWordAddition: enabled },
-      words: enabled && dictionary ? replenishAutomaticWords(current.words, dictionary, Date.now(), current.cardRound, new Set(current.removedWordHanzi)) : current.words,
+      words: enabled && dictionary ? replenishAutomaticWords(current.words, dictionary, Date.now(), current.cardRound, new Set(current.removedWordKeys)) : current.words,
     }));
   };
   const importWords = (items: ImportedWord[]) => {
-    const existing = new Set(data.words.map(w => w.hanzi));
-    const fresh = items.filter(w => !existing.has(w.hanzi));
-    if (fresh.length) setData(d => ({ ...d, removedWordHanzi: d.removedWordHanzi?.filter(hanzi => !fresh.some(word => word.hanzi === hanzi)), words: fillActivePool([...d.words, ...fresh.map(w => ({ ...w, translationByLanguage: { [d.settings.language]: w.russian }, id: id(), exampleCount: 0, wordShownCount: 0, createdAt: Date.now(), srsLevel: 0, srsCorrect: 0, srsIncorrect: 0, srsDueAt: 0, cardSrsLevel: 0, cardSrsCorrect: 0, cardSrsIncorrect: 0, cardSrsDueAt: 0, cardLapses: 0 }))], Date.now(), d.cardRound) }));
+    const existing = new Set(data.words.map(w => w.lexicalKey || lexicalKey(w.hanzi, w.pinyin)));
+    const fresh = items.map(ensureLexicalKey).filter(w => w.lexicalKey && !existing.has(w.lexicalKey));
+    if (fresh.length) setData(d => ({ ...d, removedWordKeys: d.removedWordKeys?.filter(key => !fresh.some(word => word.lexicalKey === key)), words: fillActivePool([...d.words, ...fresh.map(w => ({ ...w, translationSource: 'import' as const, translationByLanguage: { [d.settings.language]: w.russian }, id: id(), exampleCount: 0, wordShownCount: 0, createdAt: Date.now(), srsLevel: 0, srsCorrect: 0, srsIncorrect: 0, srsDueAt: 0, cardSrsLevel: 0, cardSrsCorrect: 0, cardSrsIncorrect: 0, cardSrsDueAt: 0, cardLapses: 0 }))], Date.now(), d.cardRound) }));
     if (fresh.length) void track("words_added", { count: fresh.length });
     return fresh.length;
   };
@@ -189,9 +190,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (!incoming.length) throw new Error('DeepSeek returned no valid sentences. Import function words such as 我, 你, 是, 的, 了, 在, then try again.');
       setData(current => {
         if (current.settings.language !== language) return current;
-        const known = new Map(current.words.map(w => [w.hanzi, w]));
-        const existing = new Set(current.sentences.map(s => s.chinese));
-        const added = incoming.filter(s => !existing.has(s.chinese)).map(s => ({ ...s, id: id(), wordIds: s.chinese.split(/ +/).map(t => known.get(t)?.id).filter(Boolean) as string[], sentenceShownCount: 0 }));
+        const sentenceKey = (sentence: { chinese: string; pinyin: string }) => JSON.stringify([sentence.chinese, sentence.pinyin.normalize('NFC').toLowerCase()]);
+        const existing = new Set(current.sentences.map(sentenceKey));
+        const added = incoming.filter(s => !existing.has(sentenceKey(s))).map(s => ({ ...s, id: id(), sentenceShownCount: 0 }));
         const words = current.words.map(w => ({ ...w, exampleCount: w.exampleCount + added.filter(s => s.wordIds.includes(w.id)).length }));
         const index = { ...current.wordSentenceIndex };
         for (const s of added) for (const wordId of s.wordIds) index[wordId] = [...(index[wordId] ?? []), s.id];

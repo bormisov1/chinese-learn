@@ -178,7 +178,10 @@ export function ChatOverlay() {
   };
   const confirmRemoval = () => {
     if (!pendingRemoval) return;
-    patch(current => removeVocabularyWord(current, pendingRemoval.hanzi));
+    patch(current => {
+      const matches = current.words.filter(word => word.hanzi === pendingRemoval.hanzi);
+      return matches.length === 1 ? removeVocabularyWord(current, matches[0].id) : current;
+    });
     setPendingRemoval(null);
   };
 

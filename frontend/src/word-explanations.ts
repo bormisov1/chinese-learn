@@ -2,8 +2,8 @@ import type { AppLanguage, CachedExplanation, WordExplanation } from "./types";
 
 export type ExplanationKind = "word" | "sentence";
 export const normalizeExplanationText = (text: string) => text.normalize("NFC").trim().replace(/\s+/g, " ");
-export const explanationKey = (kind: ExplanationKind, text: string, language: AppLanguage) =>
-  JSON.stringify([language, kind, normalizeExplanationText(text)]);
+export const explanationKey = (kind: ExplanationKind, text: string, language: AppLanguage, identity?: string) =>
+  JSON.stringify([language, kind, identity || normalizeExplanationText(text)]);
 
 const hanzi = (text: string) => (text.match(/\p{Script=Han}/gu) ?? []).join('');
 const filled = (value: unknown): value is string => typeof value === 'string' && !!value.trim();

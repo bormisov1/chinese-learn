@@ -12,11 +12,11 @@ import { explanationReturnPath } from '@/explanation-navigation';
 import type { WordExplanation } from '@/types';
 
 export default function ExplanationPage() {
-  const params = useLocalSearchParams<{ kind?: string; text?: string; from?: string }>();
+  const params = useLocalSearchParams<{ kind?: string; text?: string; pinyin?: string; identity?: string; from?: string }>();
   const kind = params.kind === 'sentence' ? 'sentence' : 'word';
   const text = normalizeExplanationText(typeof params.text === 'string' ? params.text : '');
   const { data } = useStore();
-  const key = explanationKey(kind, text, data.settings.language);
+  const key = explanationKey(kind, text, data.settings.language, typeof params.identity === 'string' ? params.identity : undefined);
   return <ExplanationDetail key={key} kind={kind} text={text} cacheKey={key} returnPath={explanationReturnPath(params.from)} />;
 }
 

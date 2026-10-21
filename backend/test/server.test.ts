@@ -70,6 +70,19 @@ test("sync merges explanations and preserves a failed card review across stale c
     const progressedSnapshot = await bootstrap({ words: [progressed] }) as unknown as { words: typeof failed[] };
     expect(progressedSnapshot.words[0].cardSrsLevel).toBe(1);
 
+    const hai = { id: "shared-reading-id", hanzi: "还", pinyin: "hái", russian: "still", createdAt: 300, cardSrsCorrect: 2 };
+    const huan = { id: "shared-reading-id", hanzi: "还", pinyin: "huán", russian: "return", lexicalKey: JSON.stringify(["还", "huán"]), createdAt: 400, cardSrsCorrect: 7 };
+    await bootstrap({ storageVersion: 3, words: [hai], sentences: [{ id: "hai-s", chinese: "还", pinyin: "hái", wordIds: [hai.id] }] });
+    const readings = await bootstrap({ storageVersion: 4, words: [huan], sentences: [{ id: "huan-s", chinese: "还", pinyin: "huán", wordIds: [huan.id] }] }) as unknown as { words: typeof huan[]; sentences: { id: string; wordIds: string[] }[]; storageVersion: number };
+    const retained = readings.words.filter(word => word.hanzi === "还");
+    expect(retained).toHaveLength(2);
+    expect(new Set(retained.map(word => word.pinyin))).toEqual(new Set(["hái", "huán"]));
+    expect(new Set(retained.map(word => word.id)).size).toBe(2);
+    expect(readings.sentences.find(sentence => sentence.id === "huan-s")?.wordIds[0]).not.toBe(hai.id);
+    expect(readings.storageVersion).toBe(4);
+    const staleOldDevice = await bootstrap({ storageVersion: 3, words: [hai] }) as unknown as { words: typeof huan[] };
+    expect(staleOldDevice.words.filter(word => word.hanzi === "还")).toHaveLength(2);
+
     const event = (eventId: string, name: string, properties: Record<string, unknown>) => ({
       eventId, name, properties, occurredAt: Date.now(), platform: "web", appVersion: "test", installId: "test-install",
     });

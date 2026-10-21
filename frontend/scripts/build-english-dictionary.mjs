@@ -14,6 +14,13 @@ const OUTPUT = new URL("../public/dictionaries/hsk-en.json", import.meta.url);
 const RUSSIAN = new URL("../public/dictionaries/hsk-ru.json", import.meta.url);
 const CARD_GLOSSES = new URL("../src/data/hsk-english-card-glosses.json", import.meta.url);
 const METADATA_GLOSS = /^(?:CL:|(?:also |Taiwan )?pr\.|(?:old )?variant of |see |abbr\. for )/i;
+const key = (hanzi, pinyin) => JSON.stringify([normalizeHanzi(hanzi), normalizePinyin(pinyin)]);
+const add = (entries, row) => {
+  const entryKey = key(row[0], row[1]);
+  const previous = entries.get(entryKey);
+  if (!previous) entries.set(entryKey, row);
+  else entries.set(entryKey, [row[0], row[1], [...new Set([...previous[2].split("; "), ...row[2].split("; ")])].join("; ").slice(0, 1800)]);
+};
 
 const cleanMeanings = (values) => {
   const present = values.map(value => value.trim()).filter(Boolean);
@@ -59,13 +66,12 @@ const hskByPinyin = new Map();
 const cedictTraditional = new Map();
 
 // Prefer the curated HSK forms and glosses for graded vocabulary.
-for (const item of hsk) {
-  const form = item.f?.[0];
+for (const item of hsk) for (const form of item.f ?? []) {
   const meanings = cleanMeanings(form?.m ?? []);
   const hanzi = normalizeHanzi(item.s ?? "");
   if (hanzi && form?.i?.y && meanings.length) {
     const row = [hanzi, form.i.y, meanings.join("; ")];
-    entries.set(hanzi, row);
+    add(entries, row);
     const pinyin = normalizePinyin(form.i.y);
     hskByPinyin.set(pinyin, hskByPinyin.has(pinyin) ? null : row);
   }
@@ -79,26 +85,26 @@ for (const line of cedict.split(/\r?\n/)) {
   const [, traditional, hanzi, numericPinyin, rawMeanings] = match;
   const meanings = cleanMeanings(rawMeanings.split("/"));
   if (!hanzi || !meanings.length) continue;
-  if (!entries.has(hanzi)) entries.set(hanzi, [hanzi, markPinyin(numericPinyin), meanings.slice(0, 12).join("; ").slice(0, 1800)]);
+  add(entries, [hanzi, markPinyin(numericPinyin), meanings.slice(0, 12).join("; ").slice(0, 1800)]);
   if (traditional !== hanzi) cedictTraditional.set(traditional, hanzi);
 }
 
 // Reviewed HSK readings and short meanings override the uncurated source forms.
-for (const [hanzi, pinyin, meaning] of cardGlosses) entries.set(hanzi, [hanzi, pinyin, meaning]);
+for (const [hanzi, pinyin, meaning] of cardGlosses) entries.set(key(hanzi, pinyin), [hanzi, pinyin, meaning]);
 // Common standalone character used outside the 4,991 HSK 2.0 card list.
-entries.set("打", ["打", "dǎ", "to hit; to play"]);
+entries.set(key("打", "dǎ"), ["打", "dǎ", "to hit; to play"]);
 
 // Preserve malformed spacing used by the legacy Russian HSK identifiers.
 for (const [legacyHanzi, legacyPinyin] of russian) {
   const normalized = normalizeHanzi(legacyHanzi);
   const simplified = cedictTraditional.get(normalized);
-  const source = entries.get(normalized) ?? (simplified ? entries.get(simplified) : undefined) ?? hskByPinyin.get(normalizePinyin(legacyPinyin));
-  if (source && legacyHanzi !== source[0]) entries.set(legacyHanzi, [legacyHanzi, source[1], source[2]]);
+  const source = entries.get(key(normalized, legacyPinyin)) ?? (simplified ? entries.get(key(simplified, legacyPinyin)) : undefined) ?? hskByPinyin.get(normalizePinyin(legacyPinyin));
+  if (source && legacyHanzi !== source[0]) add(entries, [legacyHanzi, source[1], source[2]]);
 }
 
-const rows = [...entries.values()].sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0);
+const rows = [...entries.values()].sort(([left, leftPinyin], [right, rightPinyin]) => left < right ? -1 : left > right ? 1 : leftPinyin.localeCompare(rightPinyin));
 await writeFile(OUTPUT, JSON.stringify(rows));
 
-const missing = russian.filter(([hanzi]) => !entries.has(hanzi));
+const missing = russian.filter(([hanzi, pinyin]) => !entries.has(key(hanzi, pinyin)) && ![...entries.values()].some(row => row[0] === hanzi));
 console.log(`Wrote ${rows.length} entries; ${russian.length - missing.length}/${russian.length} legacy Russian words covered.`);
 if (missing.length) console.log(`Remaining legacy misses: ${missing.map(([hanzi]) => hanzi).join(", ")}`);

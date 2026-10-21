@@ -9,6 +9,7 @@ const STATE = new URL("../.thai-translation-progress.json", import.meta.url);
 const PARTIAL = new URL("../.thai-translation-partial.json", import.meta.url);
 const HSK = new URL("../src/data/hsk-levels.json", import.meta.url);
 const ENGLISH = new URL("../public/dictionaries/hsk-en.json", import.meta.url);
+const CARD_GLOSSES = new URL("../src/data/hsk-english-card-glosses.json", import.meta.url);
 
 const prices = {
   flash: { input: { offpeak: 0.15, peak: 0.30 }, output: { offpeak: 0.60, peak: 1.20 } },
@@ -21,9 +22,11 @@ if (!process.env.DEEPSEEK_API_KEY) throw new Error("DEEPSEEK_API_KEY is required
 if (!Number.isInteger(LIMIT) || LIMIT < 1 || LIMIT > 4991) throw new Error("THAI_TRANSLATION_LIMIT must be 1..4991.");
 
 const levels = JSON.parse(await readFile(HSK, "utf8"));
-const englishRows = new Map(JSON.parse(await readFile(ENGLISH, "utf8")).map(row => [row[0], row]));
+const englishRows = new Map(JSON.parse(await readFile(ENGLISH, "utf8")).map(row => [JSON.stringify([row[0], row[1].normalize("NFC").toLowerCase()]), row]));
+const hskPinyin = new Map(JSON.parse(await readFile(CARD_GLOSSES, "utf8")).map(row => [row[0], row[1]]));
 const words = [...new Set(Object.values(levels).flat())].slice(0, LIMIT).map(hanzi => {
-  const row = englishRows.get(hanzi);
+  const pinyin = hskPinyin.get(hanzi);
+  const row = pinyin ? englishRows.get(JSON.stringify([hanzi, pinyin.normalize("NFC").toLowerCase()])) : undefined;
   if (!row) throw new Error(`Missing English dictionary row for ${hanzi}`);
   return { hanzi, pinyin: row[1], english: row[2] };
 });

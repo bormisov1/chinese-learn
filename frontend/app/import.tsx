@@ -14,6 +14,8 @@ import { Button, Header, shell } from '@/ui';
 import hskLevels from '@/data/hsk-levels.json';
 import type { Dictionary } from '@/dictionary';
 import { parseTextVocabulary } from '@/text-vocabulary';
+import { hskDictionaryEntry } from '@/hsk-vocabulary';
+import { lexicalKey } from '@/lexical';
 
 export default function Import() {
   const { data, dictionary, dictionaryLoading, dictionaryError, retryDictionary, importWords } = useStore();
@@ -29,7 +31,7 @@ export default function Import() {
     <Header eyebrow="Build your deck" title="Import vocabulary" subtitle="Enter Chinese text or add words from an HSK level."/>
     {dictionaryLoading ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}><ActivityIndicator color={colors.green}/><Text style={styles.note}>Loading dictionary…</Text></View> : null}
     {dictionaryError && !dictionary ? <View style={{ alignItems: 'flex-start', marginBottom: 14 }}><Text style={styles.warning}>{dictionaryError} Saved cards are unaffected.</Text><Button secondary label="Retry dictionary" onPress={retryDictionary}/></View> : null}
-    <HskAdder dictionary={dictionary} existing={new Set(data.words.map(w => w.hanzi))} onAdd={importWords}/>
+    <HskAdder dictionary={dictionary} existing={new Set(data.words.map(w => w.lexicalKey || lexicalKey(w.hanzi, w.pinyin)))} onAdd={importWords}/>
     <Text style={styles.label}>CHINESE TEXT</Text>
     <View style={styles.textPanel}>
       <Text style={styles.sectionTitle}>Add a word or sentence</Text>
@@ -56,8 +58,8 @@ function HskAdder({ dictionary, existing, onAdd }: { dictionary: Dictionary | nu
   const [level, setLevel] = useState(1), [message, setMessage] = useState('');
   const cumulative = hskLevels as Record<string, string[]>;
   const lower = new Set(level > 1 ? cumulative[String(level - 1)] : []);
-  const available = (cumulative[String(level)] ?? []).filter(hanzi => !lower.has(hanzi) && !!dictionary?.has(hanzi) && !existing.has(hanzi));
-  const add = () => { const selected = available.slice(0, 7).map(hanzi => dictionary!.get(hanzi)!); const count = onAdd(selected); setMessage(count ? `Added ${count} new HSK ${level} words.` : `No more HSK ${level} words available.`); };
+  const available = (cumulative[String(level)] ?? []).filter(hanzi => !lower.has(hanzi) && !!dictionary && !!hskDictionaryEntry(dictionary, hanzi) && !existing.has(lexicalKey(hanzi, hskDictionaryEntry(dictionary, hanzi)!.pinyin)));
+  const add = () => { const selected = available.slice(0, 7).map(hanzi => hskDictionaryEntry(dictionary!, hanzi)!); const count = onAdd(selected); setMessage(count ? `Added ${count} new HSK ${level} words.` : `No more HSK ${level} words available.`); };
   return <View style={{ marginTop: 16, padding: 16, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: 16 }}><Text style={styles.sectionTitle}>Add HSK words</Text><Text style={styles.textHelp}>Seven new words per click. Choose a level:</Text><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginVertical: 14 }}>{[1, 2, 3, 4, 5, 6].map(value => <Pressable key={value} onPress={() => { setLevel(value); setMessage(''); }} style={{ paddingHorizontal: 11, paddingVertical: 8, borderRadius: 10, backgroundColor: level === value ? colors.green : colors.pale }}><Text style={{ color: level === value ? colors.white : colors.green, fontWeight: '800', fontSize: 12 }}>HSK {value}</Text></Pressable>)}</View><Text style={{ color: colors.muted, fontSize: 12, marginBottom: 12 }}>{`${available.length} HSK ${level} ${t("words remaining")}`}</Text><Button label={`Add 7 HSK ${level} words`} icon="add-circle-outline" disabled={!available.length} onPress={add}/>{message ? <Text style={styles.note}>{message}</Text> : null}</View>;
 }
 

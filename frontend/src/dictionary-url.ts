@@ -5,7 +5,7 @@ const ASSET_PATHS: Record<AppLanguage, string> = {
   ru: "/dictionaries/hsk-ru.json",
   th: "/dictionaries/hsk-th.json",
 };
-const NATIVE_ASSET_ORIGIN = "https://zh.x.bormisov.com";
+const NATIVE_ASSET_ORIGIN = process.env.EXPO_PUBLIC_ASSET_ORIGIN || "https://zh.x.bormisov.com";
 
 export function dictionaryAssetUrl(language: AppLanguage, platform: string): string {
   const path = ASSET_PATHS[language];

@@ -28,5 +28,6 @@ export function applyBootstrapSnapshot(local: StoreData, remote: Partial<StoreDa
     mixPosition: local.mixPosition,
     storageVersion: local.storageVersion,
     removedWordHanzi: local.removedWordHanzi,
+    removedWordKeys: local.removedWordKeys,
   }, local.removedWordHanzi ?? []);
 }

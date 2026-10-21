@@ -15,24 +15,29 @@ const OUTPUT = new URL("../public/dictionaries/hsk-ru.json", import.meta.url);
 const source = JSON.parse(await readFile(SOURCE, "utf8"));
 const supplement = JSON.parse(await readFile(SUPPLEMENT, "utf8"));
 const entries = new Map();
+const entryKey = (hanzi, pinyin) => JSON.stringify([normalizeHanzi(hanzi), normalizePinyin(pinyin)]);
+const addEntry = (hanzi, pinyin, translation) => {
+  const key = entryKey(hanzi, pinyin), previous = entries.get(key);
+  entries.set(key, previous ? [normalizeHanzi(hanzi), pinyin.trim(), [...new Set([...previous[2].split("; "), ...translation.trim().split("; ")])].join("; ")] : [normalizeHanzi(hanzi), pinyin.trim(), translation.trim()]);
+};
 
 for (const [hanzi, pinyin, translation] of source) {
   if (hanzi.trim() && pinyin.trim() && translation.trim()) {
-    entries.set(hanzi, [hanzi, pinyin.trim(), translation.trim()]);
+    addEntry(hanzi, pinyin, translation);
   }
 }
 
 // Keep legacy spaced identifiers working while adding their canonical aliases.
 for (const [hanzi, pinyin, translation] of source) {
   const normalized = normalizeHanzi(hanzi);
-  if (normalized !== hanzi && !entries.has(normalized)) {
-    entries.set(normalized, [normalized, pinyin.trim(), translation.trim()]);
+  if (normalized !== hanzi && !entries.has(entryKey(normalized, pinyin))) {
+    addEntry(normalized, pinyin, translation);
   }
 }
 
 // Curated rows win over both legacy entries and generated aliases.
 for (const [hanzi, pinyin, translation] of supplement) {
-  entries.set(normalizeHanzi(hanzi), [normalizeHanzi(hanzi), pinyin.trim(), translation.trim()]);
+  addEntry(hanzi, pinyin, translation);
 }
 
 const commonPrefixLength = (left, right) => {
@@ -97,13 +102,13 @@ const hsk = await downloadHsk();
 let aliases = 0;
 for (const item of hsk.filter(oldHskLevel)) {
   const hanzi = normalizeHanzi(item.s ?? "");
-  if (!hanzi || entries.has(hanzi)) continue;
+  if (!hanzi || [...entries.values()].some(row => row[0] === hanzi)) continue;
   const candidate = bestRussianSource(item);
   const pinyin = (item.f ?? []).find((form) =>
     candidate?.pinyin.startsWith(normalizePinyin(form.i?.y ?? "")),
   )?.i?.y?.trim();
   if (candidate && pinyin) {
-    entries.set(hanzi, [hanzi, pinyin, candidate.translation]);
+    addEntry(hanzi, pinyin, candidate.translation);
     aliases += 1;
   }
 }
@@ -111,7 +116,7 @@ for (const item of hsk.filter(oldHskLevel)) {
 const missing = hsk
   .filter(oldHskLevel)
   .map((item) => normalizeHanzi(item.s ?? ""))
-  .filter((hanzi) => hanzi && !entries.has(hanzi));
+  .filter((hanzi) => hanzi && ![...entries.values()].some(row => row[0] === hanzi));
 if (missing.length) {
   throw new Error(`Russian dictionary misses ${missing.length} HSK words: ${missing.join(", ")}`);
 }

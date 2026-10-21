@@ -38,11 +38,13 @@ for (const [language, url] of Object.entries(DICTIONARIES)) {
     throw new Error(`${language} dictionary misses ${missing.length} HSK words.`);
   }
   console.log(`${language}: all ${previous.size} distinct HSK spellings covered.`);
+  const keys = new Set(rows.map(([hanzi, pinyin]) => JSON.stringify([hanzi.normalize("NFC").trim(), pinyin.normalize("NFC").trim().toLowerCase().replace(/u:|v/g, "ü")])));
+  if (keys.size !== rows.length) throw new Error(`${language} dictionary contains collapsed duplicate readings.`);
 }
 
 const curated = JSON.parse(await readFile(ENGLISH_CARD_GLOSSES, "utf8"));
 if (curated.length !== previous.size) throw new Error(`English card glosses contain ${curated.length} rows; expected ${previous.size}.`);
-const english = new Map(JSON.parse(await readFile(DICTIONARIES.en, "utf8")).map(row => [row[0], row]));
+const english = new Map(JSON.parse(await readFile(DICTIONARIES.en, "utf8")).map(row => [JSON.stringify([row[0], row[1].normalize("NFC").toLowerCase()]), row]));
 const seenCurated = new Set();
 for (const row of curated) {
   if (!Array.isArray(row) || row.length !== 3) throw new Error("Invalid English card gloss row.");
@@ -52,9 +54,23 @@ for (const row of curated) {
   if (!pinyin || !meaning || meaning.length > 140 || meaning.split(";").length > 2 || /[□\p{Script=Han}\r\n]/u.test(meaning)) {
     throw new Error(`Invalid English card gloss for ${hanzi}`);
   }
-  if (JSON.stringify(english.get(hanzi)) !== JSON.stringify(row)) throw new Error(`English dictionary is stale for ${hanzi}.`);
+  if (JSON.stringify(english.get(JSON.stringify([hanzi, pinyin.normalize("NFC").toLowerCase()]))) !== JSON.stringify(row)) throw new Error(`English dictionary is stale for ${hanzi} ${pinyin}.`);
 }
 console.log(`en: ${curated.length} curated card glosses applied with clean English meanings.`);
-if (JSON.stringify(english.get("打")) !== JSON.stringify(["打", "dǎ", "to hit; to play"])) {
+if (JSON.stringify(english.get(JSON.stringify(["打", "dǎ"]))) !== JSON.stringify(["打", "dǎ", "to hit; to play"])) {
   throw new Error("Reviewed standalone 打 entry was not applied.");
+}
+
+const englishRows = JSON.parse(await readFile(DICTIONARIES.en, "utf8"));
+for (const [hanzi, readings] of Object.entries({ 长: ["cháng", "zhǎng"], 得: ["de", "děi"], 过: ["guō", "guò"], 还: ["hái", "huán"], 只: ["zhī", "zhǐ"] })) {
+  for (const pinyin of readings) if (!englishRows.some(row => row[0] === hanzi && row[1].normalize("NFC").toLowerCase() === pinyin)) throw new Error(`English dictionary collapsed ${hanzi} ${pinyin}.`);
+}
+for (const hanzi of ["等", "对"]) {
+  const rows = englishRows.filter(row => row[0] === hanzi);
+  if (new Set(rows.map(row => row[1])).size !== rows.length) throw new Error(`Same-pinyin ${hanzi} senses were not merged by lexical key.`);
+}
+const thaiRows = JSON.parse(await readFile(DICTIONARIES.th, "utf8"));
+for (const [hanzi, forbidden] of [["过", "guō"], ["还", "huán"]]) {
+  const hskPinyin = curated.find(row => row[0] === hanzi)?.[1]?.normalize("NFC").toLowerCase();
+  if (!thaiRows.some(row => row[0] === hanzi && row[1].normalize("NFC").toLowerCase() === hskPinyin) || thaiRows.some(row => row[0] === hanzi && row[1].normalize("NFC").toLowerCase() === forbidden)) throw new Error(`Thai surname reading replaced HSK lexeme ${hanzi}.`);
 }

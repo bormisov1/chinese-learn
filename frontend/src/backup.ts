@@ -1,6 +1,8 @@
 import { fillActivePool, migrateCardPool } from "./card-srs";
 import { migrateCardGraduations, migrateRoundCompletions } from "./round-history";
 import { mergeExplanations } from "./word-explanations";
+import { migrateStoreV4 } from "./storage-migration";
+import { lexicalKey } from "./lexical";
 import type {
   AppLanguage,
   LanguageSentenceData,
@@ -78,7 +80,7 @@ function mergeWord(current: Word, imported: Word): Word {
     ...current,
     pinyin: current.pinyin || imported.pinyin,
     russian: current.russian || imported.russian,
-    translationByLanguage,
+    ...(Object.keys(translationByLanguage).length ? { translationByLanguage } : {}),
     exampleCount: Math.max(current.exampleCount, imported.exampleCount),
     wordShownCount: Math.max(current.wordShownCount, imported.wordShownCount),
     createdAt: Math.min(current.createdAt, imported.createdAt),
@@ -110,7 +112,7 @@ function mergeSentence(current: Sentence, imported: Sentence, wordIds: string[])
   };
 }
 
-const sentenceKey = (sentence: Sentence) => sentence.chinese.replace(/\s+/g, " ").trim();
+const sentenceKey = (sentence: Sentence) => JSON.stringify([sentence.chinese.replace(/\s+/g, " ").trim(), sentence.pinyin.normalize("NFC").trim().toLowerCase()]);
 const attemptKey = (attempt: SentenceAttempt) =>
   JSON.stringify([attempt.sentenceId, attempt.answer, attempt.direction ?? "", attempt.at]);
 
@@ -133,8 +135,9 @@ function mergeLanguageData(
   const byKey = new Map(sentences.map((sentence) => [sentenceKey(sentence), sentence]));
   let sentencesAdded = 0;
   const sentenceIdMap = new Map<string, string>();
+  for (const sentence of current.sentences) sentenceIdMap.set(sentence.id, sentence.id);
   for (const sentence of imported.sentences) {
-    const mappedWordIds = sentence.wordIds.map((wordId) => wordIdMap.get(wordId)).filter(Boolean) as string[];
+    const mappedWordIds = sentence.wordIds.map((wordId) => wordIdMap.get(wordId) ?? wordId);
     const existing = byKey.get(sentenceKey(sentence));
     if (existing) {
       const merged = mergeSentence(existing, sentence, mappedWordIds);
@@ -168,8 +171,8 @@ function mergeLanguageData(
       sentences,
       wordSentenceIndex: rebuildIndex(sentences),
       attempts,
-      mixQueue: current.mixQueue.filter((id) => sentences.some((sentence) => sentence.id === id)),
-      mixPosition: Math.min(current.mixPosition, current.mixQueue.length),
+      mixQueue: [...new Set([...current.mixQueue, ...imported.mixQueue.map(id => sentenceIdMap.get(id) ?? id)])].filter((id) => sentences.some((sentence) => sentence.id === id)),
+      mixPosition: Math.min(Math.max(current.mixPosition, imported.mixPosition), sentences.length),
     },
     sentencesAdded,
     attemptsAdded,
@@ -177,6 +180,7 @@ function mergeLanguageData(
 }
 
 export function createBackup(data: StoreData): BackupFile {
+  data = migrateStoreV4(data);
   return {
     format: BACKUP_FORMAT,
     version: BACKUP_VERSION,
@@ -205,29 +209,31 @@ export function parseBackup(raw: string): BackupFile {
   if (!Array.isArray(data.words) || !Array.isArray(data.sentences) || !Array.isArray(data.attempts)) {
     throw new Error("Backup is missing vocabulary or study data.");
   }
-  return candidate as BackupFile;
+  return { ...candidate, data: migrateStoreV4(data) } as BackupFile;
 }
 
 export function mergeBackupData(current: StoreData, backup: BackupFile): { data: StoreData; summary: BackupMergeSummary } {
-  const imported = backup.data;
+  current = migrateStoreV4(current);
+  const imported = migrateStoreV4(backup.data);
   const words = [...current.words];
-  const wordsByHanzi = new Map(words.map((word) => [word.hanzi, word]));
+  const wordsByKey = new Map(words.map((word) => [word.lexicalKey || lexicalKey(word.hanzi, word.pinyin), word]));
   const usedWordIds = new Set(words.map((word) => word.id));
   const wordIdMap = new Map<string, string>();
   let wordsAdded = 0;
   for (const importedWord of imported.words) {
-    const existing = wordsByHanzi.get(importedWord.hanzi);
+    const key = importedWord.lexicalKey || lexicalKey(importedWord.hanzi, importedWord.pinyin);
+    const existing = wordsByKey.get(key);
     if (existing) {
       const merged = mergeWord(existing, importedWord);
       words[words.indexOf(existing)] = merged;
-      wordsByHanzi.set(merged.hanzi, merged);
+      wordsByKey.set(key, merged);
       wordIdMap.set(importedWord.id, merged.id);
     } else {
       let id = importedWord.id;
       while (usedWordIds.has(id)) id = `${id}-import`;
-      const added = { ...importedWord, id };
+      const added = { ...importedWord, lexicalKey: key, id };
       words.push(added);
-      wordsByHanzi.set(added.hanzi, added);
+      wordsByKey.set(key, added);
       usedWordIds.add(id);
       wordIdMap.set(importedWord.id, id);
       wordsAdded += 1;

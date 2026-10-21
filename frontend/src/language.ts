@@ -1,5 +1,6 @@
-import type { Dictionary } from "./dictionary";
+import { dictionaryByKey, dictionaryReadings, LexicalDictionary, type Dictionary } from "./dictionary-index";
 import type { AppLanguage, LanguageSentenceData, StoreData, Word } from "./types";
+import { lexicalKey } from "./lexical";
 
 const emptySentenceData = (): LanguageSentenceData => ({
   sentences: [],
@@ -21,20 +22,36 @@ function localizeWord(word: Word, currentLanguage: AppLanguage, targetLanguage: 
   const translationByLanguage = { ...word.translationByLanguage };
   const currentMeaning = word.russian.trim();
   if (currentMeaning) translationByLanguage[currentLanguage] = currentMeaning;
-  const localized = dictionary.get(word.hanzi);
-  if (localized) translationByLanguage[targetLanguage] = localized.russian;
-  const targetMeaning = localized?.russian ?? translationByLanguage[targetLanguage] ?? "";
+  const key = word.lexicalKey || lexicalKey(word.hanzi, word.pinyin);
+  const localized = dictionary instanceof LexicalDictionary ? dictionaryByKey(dictionary, key) : dictionary.get(word.hanzi);
+  const protectedUserMeaning = word.translationSource === "user";
+  const contaminated = localized && currentMeaning && dictionaryReadings(dictionary, word.hanzi).some(entry => entry.lexicalKey !== key && entry.russian === currentMeaning);
+  if (localized && !protectedUserMeaning) translationByLanguage[targetLanguage] = localized.russian;
+  const targetMeaning = protectedUserMeaning ? translationByLanguage[targetLanguage] ?? currentMeaning : localized?.russian ?? translationByLanguage[targetLanguage] ?? "";
   return {
     ...word,
-    pinyin: localized?.pinyin ?? word.pinyin,
+    lexicalKey: key,
+    pinyin: dictionary instanceof LexicalDictionary ? word.pinyin : localized?.pinyin ?? word.pinyin,
     russian: targetMeaning,
     translationByLanguage,
+    migrationFlag: localized ? "dictionary-bound" : word.migrationFlag ?? "unmatched",
+    ...(contaminated ? { translationCorrectionBackup: { ...word.translationCorrectionBackup, [targetLanguage]: currentMeaning } } : {}),
   };
 }
 
 /** Refresh known words from the canonical dictionary and retain fallbacks for unknown words. */
 export function refreshWords(words: Word[], language: AppLanguage, dictionary: Dictionary): Word[] {
   return words.map((word) => localizeWord(word, language, language, dictionary));
+}
+
+export function refreshStoreWords(data: StoreData, language: AppLanguage, dictionary: Dictionary): StoreData {
+  const words = refreshWords(data.words, language, dictionary);
+  if (!data.migrationReport) return { ...data, words };
+  return { ...data, words, migrationReport: {
+    ...data.migrationReport,
+    unmatchedWordIds: words.filter(word => word.migrationFlag === "unmatched").map(word => word.id),
+    correctedWordIds: words.filter(word => Object.keys(word.translationCorrectionBackup ?? {}).length).map(word => word.id),
+  } };
 }
 
 /** Build the single state update committed after a target dictionary is available. */

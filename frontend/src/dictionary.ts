@@ -2,8 +2,10 @@ import { Platform } from "react-native";
 import { dictionaryAssetUrl } from "./dictionary-url";
 import type { AppLanguage } from "./types";
 import type { ImportedWord } from "./types";
-
-export type Dictionary = Map<string, ImportedWord>;
+import { LexicalDictionary } from "./dictionary-index";
+import type { Dictionary } from "./dictionary-index";
+export { LexicalDictionary, dictionaryByKey, dictionaryReadings, dictionaryWithEntries } from "./dictionary-index";
+export type { Dictionary } from "./dictionary-index";
 const ASSET_BYTES: Record<AppLanguage, number> = {
   en: 8_733_196,
   ru: 410_405,
@@ -60,7 +62,7 @@ async function downloadDictionary(language: AppLanguage, onProgress?: (value: nu
   if (text.length > MAX_BYTES[language]) throw new Error("Dictionary file is unexpectedly large.");
   const rows: unknown = JSON.parse(text);
   if (!Array.isArray(rows) || rows.length > MAX_ENTRIES[language]) throw new Error("Invalid dictionary file.");
-  const dictionary: Dictionary = new Map();
+  const dictionary = new LexicalDictionary();
   for (const row of rows) {
     if (!Array.isArray(row) || row.length !== 3 || row.some(value => typeof value !== "string" || value.length > 2_000)) throw new Error("Invalid dictionary entry.");
     const [hanzi, pinyin, rawMeaning] = row;
@@ -68,7 +70,7 @@ async function downloadDictionary(language: AppLanguage, onProgress?: (value: nu
     // Ignore isolated unusable source rows; the completeness check below still
     // rejects missing or broadly corrupted dictionaries.
     if (!hanzi || !pinyin || !meaning || !/^\p{Script=Han}/u.test(hanzi)) continue;
-    dictionary.set(hanzi, { hanzi, pinyin, russian: meaning });
+    dictionary.add({ hanzi, pinyin, russian: meaning });
   }
   if (dictionary.size < 100) throw new Error("Dictionary is incomplete.");
   return dictionary;

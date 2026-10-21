@@ -1,5 +1,6 @@
 export type Word = {
   id: string;
+  lexicalKey?: string;
   hanzi: string;
   pinyin: string;
   russian: string;
@@ -22,8 +23,13 @@ export type Word = {
   cardLastStudiedRound?: number;
   cardLastIncorrectAt?: number;
   cardLapses?: number;
+  migrationFlag?: "unmatched" | "dictionary-bound" | "ambiguous-translation";
+  translationSource?: "dictionary" | "user" | "import";
+  /** Original value retained when an exact-key dictionary match proves cross-reading contamination. */
+  translationCorrectionBackup?: Partial<Record<AppLanguage, string>>;
 };
 export type ImportedWord = {
+  lexicalKey?: string;
   hanzi: string;
   pinyin: string;
   russian: string;
@@ -109,6 +115,9 @@ export type StoreData = {
   words: Word[];
   /** Vocabulary removed on this device; the current account sync endpoint merges words by union. */
   removedWordHanzi?: string[];
+  /** v4 tombstones: exact lexical keys, or `hanzi:<NFC Hanzi>` for all readings. */
+  removedWordKeys?: string[];
+  migrationReport?: MigrationReport;
   sentences: Sentence[];
   wordSentenceIndex: Record<string, string[]>;
   attempts: SentenceAttempt[];
@@ -122,4 +131,15 @@ export type StoreData = {
   onboardingComplete: boolean;
   languageSelected: boolean;
   settings: Settings;
+};
+export type MigrationReport = {
+  fromVersion: number;
+  toVersion: 4;
+  migratedAt: number;
+  wordCount: number;
+  sentenceCount: number;
+  attemptCount: number;
+  unmatchedWordIds: string[];
+  ambiguousTombstones: string[];
+  correctedWordIds: string[];
 };

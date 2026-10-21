@@ -1,12 +1,19 @@
 import { fillActivePool, CARD_GRADUATION_LEVEL } from "./card-srs";
 import hskLevels from "./data/hsk-levels.json";
 import { Word } from "./types";
-import type { Dictionary } from "./dictionary";
+import { dictionaryByKey, type Dictionary } from "./dictionary-index";
+import cardGlosses from "./data/hsk-english-card-glosses.json";
+import { lexicalKey } from "./lexical";
 
 export const AUTOMATIC_WORD_TARGET = 20;
 
 const cumulative = hskLevels as Record<string, string[]>;
 const hskLevelByWord = new Map<string, number>();
+const hskKeyByHanzi = new Map((cardGlosses as [string, string, string][]).map(([hanzi, pinyin]) => [hanzi, lexicalKey(hanzi, pinyin)]));
+export const hskDictionaryEntry = (dictionary: Dictionary, hanzi: string) => {
+  const key = hskKeyByHanzi.get(hanzi);
+  return key ? dictionaryByKey(dictionary, key) : undefined;
+};
 [1, 2, 3, 4, 5, 6].forEach((level) => {
   for (const hanzi of cumulative[String(level)] ?? []) {
     if (!hskLevelByWord.has(hanzi)) hskLevelByWord.set(hanzi, level);
@@ -34,7 +41,7 @@ export function replenishAutomaticWords(
   dictionary: Dictionary,
   at = Date.now(),
   round?: number,
-  excludedHanzi: ReadonlySet<string> = new Set(),
+  excludedKeys: ReadonlySet<string> = new Set(),
 ): Word[] {
   const learningCount = words.filter(
     (word) => word.cardSrsLevel < CARD_GRADUATION_LEVEL,
@@ -42,12 +49,13 @@ export function replenishAutomaticWords(
   const needed = Math.max(0, AUTOMATIC_WORD_TARGET - learningCount);
   if (!needed) return words;
 
-  const existing = new Set(words.map((word) => word.hanzi));
+  const existing = new Set(words.map((word) => word.lexicalKey || lexicalKey(word.hanzi, word.pinyin)));
   const additions = orderedHskWords
-    .filter((hanzi) => !existing.has(hanzi) && !excludedHanzi.has(hanzi) && dictionary.has(hanzi))
+    .map(hanzi => ({ hanzi, key: hskKeyByHanzi.get(hanzi) ?? "" }))
+    .filter(({ hanzi, key }) => key && !existing.has(key) && !excludedKeys.has(hanzi) && !excludedKeys.has(key) && !excludedKeys.has(`hanzi:${hanzi}`) && !!hskDictionaryEntry(dictionary, hanzi))
     .slice(0, needed)
-    .map((hanzi, index): Word => ({
-      ...dictionary.get(hanzi)!,
+    .map(({ key }, index): Word => ({
+      ...dictionaryByKey(dictionary, key)!,
       id: wordId(),
       exampleCount: 0,
       wordShownCount: 0,

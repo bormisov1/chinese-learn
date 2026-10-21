@@ -1,6 +1,8 @@
 name: Verify Hanzi Deck iOS native build
 
 on:
+  push:
+    branches: [dev]
   pull_request:
     branches: [dev]
   workflow_dispatch:
@@ -17,7 +19,9 @@ jobs:
         working-directory: frontend
     env:
       CI: '1'
-      EXPO_PUBLIC_BACKEND_URL: https://zh.x.bormisov.com/api
+      EXPO_PUBLIC_BACKEND_URL: https://dev.zh.x.bormisov.com/api
+      EXPO_PUBLIC_ASSET_ORIGIN: https://dev.zh.x.bormisov.com
+      EXPO_PUBLIC_APP_SCHEME: hanzideck-dev
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -26,15 +30,30 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - name: Configure isolated dev application identity
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const config = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+          config.expo.name = 'Hanzi Deck Dev';
+          config.expo.slug = 'hanzi-deck-dev';
+          config.expo.scheme = 'hanzideck-dev';
+          config.expo.ios.bundleIdentifier = 'com.bormisov.hanzideck.dev';
+          config.expo.android.package = 'com.bormisov.hanzideck.dev';
+          delete config.expo.extra?.eas;
+          fs.writeFileSync('app.json', JSON.stringify(config, null, 2) + '\n');
+          NODE
       - run: npm run audit:i18n
       - run: npx expo prebuild --platform ios --no-install
       - run: pod install --project-directory=ios
       - run: node scripts/patch-ios-fmt.mjs
       - name: Compile for iOS Simulator without signing
         run: |
+          workspace=$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)
+          scheme=$(basename "$workspace" .xcworkspace)
           xcodebuild build \
-            -workspace ios/HanziDeck.xcworkspace \
-            -scheme HanziDeck \
+            -workspace "$workspace" \
+            -scheme "$scheme" \
             -configuration Release \
             -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO

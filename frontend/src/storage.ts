@@ -5,9 +5,10 @@ import { migrateCardPool } from "./card-srs";
 import { isAppLanguage } from "./i18n";
 import russianSupplement from "./data/hsk-russian-supplement.json";
 import { migrateCardGraduations, migrateRoundCompletions } from "./round-history";
+import { migrateStoreV4, STORAGE_VERSION } from "./storage-migration";
 
 const KEY = "hanzi-deck:v1";
-const STORAGE_VERSION = 3;
+export const RECOVERY_KEY = "hanzi-deck:v3:recovery";
 const russianRepairs = new Map(
   (russianSupplement as [string, string, string][]).map(([hanzi, pinyin, translation]) => [
     hanzi,
@@ -18,6 +19,7 @@ export const emptyStore: StoreData = {
   storageVersion: STORAGE_VERSION,
   words: [],
   removedWordHanzi: [],
+  removedWordKeys: [],
   sentences: [],
   wordSentenceIndex: {},
   attempts: [],
@@ -52,7 +54,13 @@ export async function loadStore(): Promise<StoreData> {
       : await AsyncStorage.getItem(KEY);
   if (!raw) return emptyStore;
   try {
-    const parsed = JSON.parse(raw) as StoreData;
+    const original = JSON.parse(raw) as StoreData;
+    if ((original.storageVersion ?? 0) < STORAGE_VERSION) {
+      if (Platform.OS === "web") {
+        if (!globalThis.localStorage?.getItem(RECOVERY_KEY)) globalThis.localStorage?.setItem(RECOVERY_KEY, raw);
+      } else if (!await AsyncStorage.getItem(RECOVERY_KEY)) await AsyncStorage.setItem(RECOVERY_KEY, raw);
+    }
+    const parsed = migrateStoreV4(original);
     const language = isAppLanguage(parsed.settings?.language) ? parsed.settings.language : "en";
     const needsRussianRepair = (parsed.storageVersion ?? 0) < STORAGE_VERSION;
     return {
@@ -90,6 +98,7 @@ export async function loadStore(): Promise<StoreData> {
       removedWordHanzi: Array.isArray(parsed.removedWordHanzi)
         ? parsed.removedWordHanzi.filter((hanzi): hanzi is string => typeof hanzi === 'string')
         : [],
+      removedWordKeys: Array.isArray(parsed.removedWordKeys) ? parsed.removedWordKeys : [],
       cardRound: parsed.cardRound ?? 0,
       roundCompletions: migrateRoundCompletions(parsed.roundCompletions),
       cardGraduations: migrateCardGraduations(parsed.cardGraduations),

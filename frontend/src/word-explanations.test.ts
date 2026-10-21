@@ -21,6 +21,7 @@ test('cache keys normalize text and separate language and target kind', () => {
   assert.equal(explanationKey('word', ' 你 好  ', 'en'), explanationKey('word', '你   好', 'en'));
   assert.notEqual(explanationKey('word', '你好', 'en'), explanationKey('word', '你好', 'ru'));
   assert.notEqual(explanationKey('word', '你好', 'en'), explanationKey('sentence', '你好', 'en'));
+  assert.notEqual(explanationKey('word', '还', 'en', '["还","hái"]'), explanationKey('word', '还', 'en', '["还","huán"]'));
 });
 
 test('rejects explanations that omit target characters or pinyin before caching', () => {

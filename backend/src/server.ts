@@ -216,14 +216,64 @@ function keyForSentence(sentence: Snapshot) {
   return String(sentence.id ?? sentence.chinese ?? "").trim().normalize("NFC");
 }
 
+function normalizeHanzi(value: unknown) { return String(value ?? "").normalize("NFC").trim(); }
+function normalizePinyin(value: unknown) {
+  return String(value ?? "").normalize("NFC").trim().toLocaleLowerCase("en-US")
+    .replace(/u:|v/g, "ü").replace(/[’‘`´]/g, "'").replace(/[·・]/g, " ")
+    .replace(/\s*([-''])\s*/g, "$1").replace(/[_–—/]+/g, " ").replace(/\s+/g, " ");
+}
+function keyForWord(word: Snapshot) {
+  const hanzi = normalizeHanzi(word.hanzi), pinyin = normalizePinyin(word.pinyin);
+  return hanzi && pinyin ? JSON.stringify([hanzi, pinyin]) : `id:${String(word.id ?? "")}`;
+}
+function remapSnapshotWordIds(snapshot: Snapshot, aliases: Map<string, string>) {
+  const remapSentences = (sentences: unknown) => Array.isArray(sentences) ? sentences.map(value => {
+    const sentence = safeJson(value);
+    return { ...sentence, wordIds: Array.isArray(sentence.wordIds) ? sentence.wordIds.map(id => aliases.get(String(id)) ?? id) : [] };
+  }) : [];
+  snapshot.sentences = remapSentences(snapshot.sentences);
+  snapshot.cardGraduations = Array.isArray(snapshot.cardGraduations) ? snapshot.cardGraduations.map(value => {
+    const event = safeJson(value), id = String(event.wordId ?? ""); return { ...event, wordId: aliases.get(id) ?? id };
+  }) : [];
+  const byLanguage = safeJson(snapshot.sentenceDataByLanguage);
+  for (const [language, value] of Object.entries(byLanguage)) {
+    const data = safeJson(value); byLanguage[language] = { ...data, sentences: remapSentences(data.sentences) };
+  }
+  snapshot.sentenceDataByLanguage = byLanguage;
+}
+
+function prepareSnapshots(serverInput: Snapshot, clientInput: Snapshot) {
+  const server = structuredClone(serverInput), client = structuredClone(clientInput);
+  for (const snapshot of [server, client]) snapshot.words = (Array.isArray(snapshot.words) ? snapshot.words : []).map(value => {
+    const word = safeJson(value), lexicalKey = keyForWord(word);
+    return { ...word, ...(lexicalKey.startsWith("id:") ? {} : { lexicalKey }), storageVersion: undefined };
+  });
+  const serverWords = server.words as Snapshot[], clientWords = client.words as Snapshot[];
+  const serverByKey = new Map(serverWords.map(word => [keyForWord(word), word]));
+  const serverById = new Map(serverWords.map(word => [String(word.id ?? ""), word]));
+  const aliases = new Map<string, string>();
+  for (const word of clientWords) {
+    const id = String(word.id ?? ""), sameKey = serverByKey.get(keyForWord(word)), collision = serverById.get(id);
+    if (sameKey && String(sameKey.id ?? "") !== id) aliases.set(id, String(sameKey.id));
+    else if (id && collision && keyForWord(collision) !== keyForWord(word)) {
+      const replacement = `${id}~${hash(keyForWord(word)).slice(0, 10)}`; aliases.set(id, replacement); word.id = replacement;
+    }
+  }
+  remapSnapshotWordIds(client, aliases);
+  return { server, client };
+}
+
 function mergeWords(local: Snapshot[], incoming: Snapshot[]) {
   const byKey = new Map<string, Snapshot>();
   for (const word of [...local, ...incoming]) {
-    const key = String(word.hanzi ?? "").trim();
+    const key = keyForWord(word);
     if (!key) continue;
     const previous = byKey.get(key);
     if (!previous) { byKey.set(key, word); continue; }
     const newer = Number(word.updatedAt ?? word.createdAt ?? 0) >= Number(previous.updatedAt ?? previous.createdAt ?? 0) ? { ...previous, ...word } : { ...word, ...previous };
+    newer.id = previous.id;
+    newer.lexicalKey = key.startsWith("id:") ? newer.lexicalKey : key;
+    newer.translationByLanguage = { ...safeJson(previous.translationByLanguage), ...safeJson(word.translationByLanguage) };
     for (const field of ["exampleCount", "wordShownCount", "srsLevel", "srsCorrect", "srsIncorrect", "cardSrsCorrect", "cardSrsIncorrect", "cardLapses"]) newer[field] = Math.max(Number(previous[field] ?? 0), Number(word[field] ?? 0));
     newer.srsDueAt = Math.max(Number(previous.srsDueAt ?? 0), Number(word.srsDueAt ?? 0));
     // Card level and due date can decrease after a mistake. Keep all card
@@ -258,6 +308,7 @@ function mergeList(local: Snapshot[], incoming: Snapshot[], key: (value: Snapsho
 }
 
 function mergeSnapshot(server: Snapshot, client: Snapshot): Snapshot {
+  ({ server, client } = prepareSnapshots(server, client));
   const merged: Snapshot = { ...server, ...client };
   merged.words = mergeWords(Array.isArray(server.words) ? server.words as Snapshot[] : [], Array.isArray(client.words) ? client.words as Snapshot[] : []);
   merged.sentences = mergeList(Array.isArray(server.sentences) ? server.sentences as Snapshot[] : [], Array.isArray(client.sentences) ? client.sentences as Snapshot[] : [], keyForSentence);
@@ -272,17 +323,25 @@ function mergeSnapshot(server: Snapshot, client: Snapshot): Snapshot {
   }
   merged.explanations = explanations;
   merged.cardRound = Math.max(Number(server.cardRound ?? 0), Number(client.cardRound ?? 0));
+  const validWordIds = new Set((merged.words as Snapshot[]).map(word => String(word.id ?? "")).filter(Boolean));
+  const sanitizeSentences = (sentences: Snapshot[]) => sentences.map(sentence => ({ ...sentence, wordIds: (Array.isArray(sentence.wordIds) ? sentence.wordIds : []).filter(id => validWordIds.has(String(id))) }));
+  merged.sentences = sanitizeSentences(merged.sentences as Snapshot[]);
   const serverByLanguage = safeJson(server.sentenceDataByLanguage), clientByLanguage = safeJson(client.sentenceDataByLanguage);
   const languageData: Snapshot = {};
   for (const language of new Set([...Object.keys(serverByLanguage), ...Object.keys(clientByLanguage)])) {
     const serverLanguage = safeJson(serverByLanguage[language]), clientLanguage = safeJson(clientByLanguage[language]);
+    const sentences = sanitizeSentences(mergeList(Array.isArray(serverLanguage.sentences) ? serverLanguage.sentences as Snapshot[] : [], Array.isArray(clientLanguage.sentences) ? clientLanguage.sentences as Snapshot[] : [], keyForSentence));
+    const sentenceIds = new Set(sentences.map(sentence => String(sentence.id ?? "")));
+    const wordSentenceIndex: Snapshot = {};
+    for (const sentence of sentences) for (const wordId of sentence.wordIds as unknown[]) wordSentenceIndex[String(wordId)] = [...(wordSentenceIndex[String(wordId)] as string[] ?? []), sentence.id];
     languageData[language] = {
       ...serverLanguage,
       ...clientLanguage,
-      sentences: mergeList(Array.isArray(serverLanguage.sentences) ? serverLanguage.sentences as Snapshot[] : [], Array.isArray(clientLanguage.sentences) ? clientLanguage.sentences as Snapshot[] : [], keyForSentence),
+      sentences,
+      wordSentenceIndex,
       attempts: mergeList(Array.isArray(serverLanguage.attempts) ? serverLanguage.attempts as Snapshot[] : [], Array.isArray(clientLanguage.attempts) ? clientLanguage.attempts as Snapshot[] : [], item => `${item.sentenceId}:${item.at}:${item.direction ?? ""}`),
-      mixQueue: clientLanguage.mixQueue ?? serverLanguage.mixQueue ?? [],
-      mixPosition: clientLanguage.mixPosition ?? serverLanguage.mixPosition ?? 0,
+      mixQueue: [...new Set([...(Array.isArray(serverLanguage.mixQueue) ? serverLanguage.mixQueue : []), ...(Array.isArray(clientLanguage.mixQueue) ? clientLanguage.mixQueue : [])])].filter(id => sentenceIds.has(String(id))),
+      mixPosition: Math.max(Number(serverLanguage.mixPosition ?? 0), Number(clientLanguage.mixPosition ?? 0)),
     };
   }
   merged.sentenceDataByLanguage = languageData;
@@ -293,8 +352,10 @@ function mergeSnapshot(server: Snapshot, client: Snapshot): Snapshot {
   const { apiKey: _apiKey, apiKeyValidated: _validated, apiUrl: _apiUrl, model: _model, ...safeServerSettings } = serverSettings as Record<string, unknown>;
   const { apiKey: _clientKey, apiKeyValidated: _clientValidated, apiUrl: _clientUrl, model: _clientModel, ...safeClientSettings } = clientSettings as Record<string, unknown>;
   merged.settings = { ...safeServerSettings, ...safeClientSettings };
-  merged.mixQueue = client.mixQueue ?? server.mixQueue ?? [];
-  merged.mixPosition = client.mixPosition ?? server.mixPosition ?? 0;
+  const activeSentenceIds = new Set((merged.sentences as Snapshot[]).map(sentence => String(sentence.id ?? "")));
+  merged.mixQueue = [...new Set([...(Array.isArray(server.mixQueue) ? server.mixQueue : []), ...(Array.isArray(client.mixQueue) ? client.mixQueue : [])])].filter(id => activeSentenceIds.has(String(id)));
+  merged.mixPosition = Math.max(Number(server.mixPosition ?? 0), Number(client.mixPosition ?? 0));
+  merged.storageVersion = 4;
   return merged;
 }
 
@@ -320,7 +381,7 @@ async function fetchRequest(request: Request) {
     const url = new URL(request.url);
     try {
       if (url.pathname === "/metrics") return new Response(prometheus(), { headers: { "content-type": "text/plain; version=0.0.4" } });
-      if (url.pathname === "/health") return json({ ok: true, service: "hanzi-deck-backend" });
+      if (url.pathname === "/health") return json({ ok: true, service: process.env.SERVICE_NAME ?? (port === 8787 ? "hanzi-deck-backend-dev" : "hanzi-deck-backend") });
       if (request.method === "POST" && url.pathname === "/v1/telemetry/batch") {
         const body = safeJson(await request.json());
         const events = Array.isArray(body.events) ? body.events.slice(0, 100) : [];
