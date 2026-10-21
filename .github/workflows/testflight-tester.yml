@@ -76,6 +76,10 @@ jobs:
             const apps = (await api(`/v1/apps?${appQuery}`)).data;
             if (apps.length !== 1) throw new Error(`Expected one app for ${process.env.APP_BUNDLE_ID}; found ${apps.length}.`);
             const app = apps[0];
+            const reviewDetail = (await api(`/v1/apps/${app.id}/betaAppReviewDetail?fields%5BbetaAppReviewDetails%5D=contactFirstName,contactLastName,contactPhone,contactEmail,demoAccountRequired`)).data;
+            const missingReviewFields = ['contactFirstName', 'contactLastName', 'contactPhone', 'contactEmail']
+              .filter(field => !reviewDetail.attributes[field]?.trim());
+            console.log(`Beta review contact: ${missingReviewFields.length ? `missing ${missingReviewFields.join(', ')}` : 'complete'}.`);
             const groupQuery = new URLSearchParams({ 'filter[app]': app.id, limit: '200' });
             const groups = (await api(`/v1/betaGroups?${groupQuery}`)).data;
             console.log(`Groups for ${process.env.APP_BUNDLE_ID}: ${groups.map(group => `${group.attributes.name} (${group.attributes.isInternalGroup ? 'internal' : 'external'})`).join(', ') || '(none)'}`);
