@@ -24,6 +24,14 @@ test('only words present in the user question can be added from a reply', () => 
   assert.deepEqual(addableChatWords(words, 'Correct 我 love 你').map(word => word.hanzi), []);
 });
 
+test('correction prompt separates the Chinese sentence from full-sentence pinyin', () => {
+  const prompt = CHAT_PRESETS.find(preset => preset.id === 'correct')?.prompt ?? '';
+  assert.match(prompt, /Chinese sentence alone on the first line/);
+  assert.match(prompt, /complete Hanyu Pinyin.*alone on the next line/);
+  assert.match(prompt, /Do not put pinyin after individual Hanzi/);
+  assert.doesNotMatch(prompt, /pinyin immediately after/);
+});
+
 test('chat progressively decodes JSON answer text and completes an SSE response', async () => {
   assert.equal(partialChatAnswer('{"answer":"Line\\n\u4f60'), 'Line\n你');
   assert.equal(partialChatAnswer('{"answer":"Line\\u4f'), 'Line');
