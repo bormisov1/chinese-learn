@@ -130,6 +130,17 @@ jobs:
                 });
                 console.log(`Added build ${eligibleBuild.attributes.version} to ${group.attributes.name}.`);
               }
+              const betaDetail = (await api(`/v1/builds/${eligibleBuild.id}/buildBetaDetail?fields%5BbuildBetaDetails%5D=externalBuildState`)).data;
+              if (betaDetail.attributes.externalBuildState === 'READY_FOR_BETA_SUBMISSION') {
+                await api('/v1/betaAppReviewSubmissions', {
+                  method: 'POST',
+                  body: JSON.stringify({ data: {
+                    type: 'betaAppReviewSubmissions',
+                    relationships: { build: { data: { type: 'builds', id: eligibleBuild.id } } },
+                  } }),
+                });
+                console.log(`Submitted build ${eligibleBuild.attributes.version} for TestFlight beta review.`);
+              }
             }
 
             const testerQuery = new URLSearchParams({ 'filter[email]': email, limit: '200' });
