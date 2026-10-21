@@ -1,0 +1,117 @@
+name: Manage TestFlight tester
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: List groups or invite a tester
+        required: true
+        type: choice
+        options: [list, invite]
+        default: list
+      email:
+        description: Tester email (required for invite)
+        required: false
+        type: string
+      beta_group:
+        description: Exact external beta group name (optional when only one exists)
+        required: false
+        type: string
+      bundle_id:
+        description: App bundle identifier
+        required: true
+        type: string
+        default: com.bormisov.hanzideck
+
+permissions:
+  contents: read
+
+jobs:
+  tester:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+      TESTER_MODE: ${{ inputs.mode }}
+      TESTER_EMAIL: ${{ inputs.email }}
+      BETA_GROUP: ${{ inputs.beta_group }}
+      APP_BUNDLE_ID: ${{ inputs.bundle_id }}
+    steps:
+      - name: List groups or invite tester
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in ASC_KEY_ID ASC_ISSUER_ID ASC_API_KEY_P8; do
+            test -n "${!name}" || { echo "::error::Missing $name"; exit 1; }
+          done
+          node <<'NODE'
+          const crypto = require('node:crypto');
+
+          const base64url = value => Buffer.from(value).toString('base64url');
+          const now = Math.floor(Date.now() / 1000);
+          const unsigned = [
+            base64url(JSON.stringify({ alg: 'ES256', kid: process.env.ASC_KEY_ID, typ: 'JWT' })),
+            base64url(JSON.stringify({ iss: process.env.ASC_ISSUER_ID, iat: now, exp: now + 1199, aud: 'appstoreconnect-v1' })),
+          ].join('.');
+          const key = process.env.ASC_API_KEY_P8.replace(/\\n/g, '\n');
+          const signature = crypto.sign('sha256', Buffer.from(unsigned), { key, dsaEncoding: 'ieee-p1363' }).toString('base64url');
+          const token = `${unsigned}.${signature}`;
+          const origin = 'https://api.appstoreconnect.apple.com';
+
+          async function api(path, options = {}) {
+            const response = await fetch(`${origin}${path}`, {
+              ...options,
+              headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...options.headers },
+            });
+            const text = await response.text();
+            const body = text ? JSON.parse(text) : undefined;
+            if (!response.ok) throw new Error(`${options.method ?? 'GET'} ${path} failed (${response.status}): ${text}`);
+            return body;
+          }
+
+          (async () => {
+            const appQuery = new URLSearchParams({ 'filter[bundleId]': process.env.APP_BUNDLE_ID, limit: '2' });
+            const apps = (await api(`/v1/apps?${appQuery}`)).data;
+            if (apps.length !== 1) throw new Error(`Expected one app for ${process.env.APP_BUNDLE_ID}; found ${apps.length}.`);
+            const app = apps[0];
+            const groupQuery = new URLSearchParams({ 'filter[app]': app.id, 'filter[isInternalGroup]': 'false', limit: '200' });
+            const groups = (await api(`/v1/betaGroups?${groupQuery}`)).data;
+            console.log(`External groups for ${process.env.APP_BUNDLE_ID}: ${groups.map(group => group.attributes.name).join(', ') || '(none)'}`);
+            if (process.env.TESTER_MODE === 'list') return;
+
+            const email = process.env.TESTER_EMAIL.trim().toLowerCase();
+            if (!email) throw new Error('Tester email is required in invite mode.');
+            const requestedName = process.env.BETA_GROUP.trim();
+            const selected = requestedName ? groups.filter(group => group.attributes.name === requestedName) : groups;
+            if (selected.length !== 1) throw new Error(`Select exactly one external group; matched ${selected.length}.`);
+            const group = selected[0];
+
+            const testerQuery = new URLSearchParams({ 'filter[email]': email, limit: '200' });
+            const matches = (await api(`/v1/betaTesters?${testerQuery}`)).data
+              .filter(tester => tester.attributes.email.toLowerCase() === email);
+            let tester;
+            if (matches.length) {
+              tester = matches[0];
+              await api(`/v1/betaGroups/${group.id}/relationships/betaTesters`, {
+                method: 'POST',
+                body: JSON.stringify({ data: [{ type: 'betaTesters', id: tester.id }] }),
+              });
+            } else {
+              const created = await api('/v1/betaTesters', {
+                method: 'POST',
+                body: JSON.stringify({ data: {
+                  type: 'betaTesters',
+                  attributes: { email },
+                  relationships: { betaGroups: { data: [{ type: 'betaGroups', id: group.id }] } },
+                } }),
+              });
+              tester = created.data;
+            }
+
+            const memberships = (await api(`/v1/betaTesters/${tester.id}/relationships/betaGroups?limit=200`)).data;
+            if (!memberships.some(membership => membership.id === group.id)) throw new Error('Tester group assignment was not persisted.');
+            console.log(`Tester ${email} assigned to external group ${group.attributes.name}; TestFlight invitation enabled.`);
+          })().catch(error => { console.error(`::error::${error.message}`); process.exitCode = 1; });
+          NODE
