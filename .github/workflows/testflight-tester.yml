@@ -84,6 +84,24 @@ jobs:
             const email = process.env.TESTER_EMAIL.trim().toLowerCase();
             if (!email) throw new Error('Tester email is required in invite mode.');
             const requestedName = process.env.BETA_GROUP.trim();
+            if (!groups.length) {
+              const name = requestedName || 'External Testers';
+              const created = await api('/v1/betaGroups', {
+                method: 'POST',
+                body: JSON.stringify({ data: {
+                  type: 'betaGroups',
+                  attributes: {
+                    name,
+                    isInternalGroup: false,
+                    hasAccessToAllBuilds: true,
+                    publicLinkEnabled: false,
+                  },
+                  relationships: { app: { data: { type: 'apps', id: app.id } } },
+                } }),
+              });
+              groups.push(created.data);
+              console.log(`Created private external group ${name}.`);
+            }
             const selected = requestedName ? groups.filter(group => group.attributes.name === requestedName) : groups;
             if (selected.length !== 1) throw new Error(`Select exactly one external group; matched ${selected.length}.`);
             const group = selected[0];
