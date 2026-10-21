@@ -114,6 +114,20 @@ jobs:
             if (selected.length !== 1) throw new Error(`Select exactly one beta group; matched ${selected.length}.`);
             const group = selected[0];
 
+            if (!group.attributes.isInternalGroup) {
+              const eligibleBuild = builds.find(build => build.attributes.processingState === 'VALID' &&
+                !build.attributes.expired && build.attributes.buildAudienceType !== 'INTERNAL_ONLY');
+              if (!eligibleBuild) throw new Error('No valid build is eligible for external TestFlight testing.');
+              const groupBuilds = (await api(`/v1/betaGroups/${group.id}/relationships/builds?limit=1000`)).data;
+              if (!groupBuilds.some(build => build.id === eligibleBuild.id)) {
+                await api(`/v1/betaGroups/${group.id}/relationships/builds`, {
+                  method: 'POST',
+                  body: JSON.stringify({ data: [{ type: 'builds', id: eligibleBuild.id }] }),
+                });
+                console.log(`Added build ${eligibleBuild.attributes.version} to ${group.attributes.name}.`);
+              }
+            }
+
             const testerQuery = new URLSearchParams({ 'filter[email]': email, limit: '200' });
             const matches = (await api(`/v1/betaTesters?${testerQuery}`)).data
               .filter(tester => tester.attributes.email.toLowerCase() === email);
