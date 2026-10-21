@@ -112,10 +112,13 @@ jobs:
             let tester;
             if (matches.length) {
               tester = matches[0];
-              await api(`/v1/betaGroups/${group.id}/relationships/betaTesters`, {
-                method: 'POST',
-                body: JSON.stringify({ data: [{ type: 'betaTesters', id: tester.id }] }),
-              });
+              const currentGroups = (await api(`/v1/betaTesters/${tester.id}/relationships/betaGroups?limit=200`)).data;
+              if (!currentGroups.some(membership => membership.id === group.id)) {
+                await api(`/v1/betaGroups/${group.id}/relationships/betaTesters`, {
+                  method: 'POST',
+                  body: JSON.stringify({ data: [{ type: 'betaTesters', id: tester.id }] }),
+                });
+              }
             } else {
               const created = await api('/v1/betaTesters', {
                 method: 'POST',
