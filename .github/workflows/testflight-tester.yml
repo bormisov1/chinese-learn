@@ -132,6 +132,30 @@ jobs:
               }
               const betaDetail = (await api(`/v1/builds/${eligibleBuild.id}/buildBetaDetail?fields%5BbuildBetaDetails%5D=externalBuildState`)).data;
               if (betaDetail.attributes.externalBuildState === 'READY_FOR_BETA_SUBMISSION') {
+                const localizations = (await api(`/v1/apps/${app.id}/betaAppLocalizations?limit=200&fields%5BbetaAppLocalizations%5D=description,feedbackEmail,locale`)).data;
+                const description = 'Hanzi Deck helps learners practice Mandarin vocabulary, sentences, pinyin, handwriting, OCR, and spaced repetition.';
+                if (!localizations.length) {
+                  await api('/v1/betaAppLocalizations', {
+                    method: 'POST',
+                    body: JSON.stringify({ data: {
+                      type: 'betaAppLocalizations',
+                      attributes: { locale: 'en-US', description, feedbackEmail: email },
+                      relationships: { app: { data: { type: 'apps', id: app.id } } },
+                    } }),
+                  });
+                } else {
+                  for (const localization of localizations) {
+                    const attributes = {};
+                    if (!localization.attributes.description?.trim()) attributes.description = description;
+                    if (!localization.attributes.feedbackEmail?.trim()) attributes.feedbackEmail = email;
+                    if (Object.keys(attributes).length) {
+                      await api(`/v1/betaAppLocalizations/${localization.id}`, {
+                        method: 'PATCH',
+                        body: JSON.stringify({ data: { type: 'betaAppLocalizations', id: localization.id, attributes } }),
+                      });
+                    }
+                  }
+                }
                 await api('/v1/betaAppReviewSubmissions', {
                   method: 'POST',
                   body: JSON.stringify({ data: {
