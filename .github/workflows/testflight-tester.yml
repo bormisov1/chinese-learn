@@ -79,6 +79,14 @@ jobs:
             const groupQuery = new URLSearchParams({ 'filter[app]': app.id, limit: '200' });
             const groups = (await api(`/v1/betaGroups?${groupQuery}`)).data;
             console.log(`Groups for ${process.env.APP_BUNDLE_ID}: ${groups.map(group => `${group.attributes.name} (${group.attributes.isInternalGroup ? 'internal' : 'external'})`).join(', ') || '(none)'}`);
+            const buildQuery = new URLSearchParams({
+              'filter[app]': app.id,
+              'fields[builds]': 'version,uploadedDate,expirationDate,expired,processingState,buildAudienceType',
+              sort: '-uploadedDate',
+              limit: '10',
+            });
+            const builds = (await api(`/v1/builds?${buildQuery}`)).data;
+            console.log(`Recent builds: ${builds.map(build => `${build.attributes.version} (${build.attributes.processingState}, ${build.attributes.buildAudienceType ?? 'STANDARD'})`).join(', ') || '(none)'}`);
             if (process.env.TESTER_MODE === 'list') return;
 
             const email = process.env.TESTER_EMAIL.trim().toLowerCase();
