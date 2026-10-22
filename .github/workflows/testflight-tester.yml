@@ -34,6 +34,7 @@ jobs:
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+      ASC_REVIEW_PHONE: ${{ secrets.ASC_REVIEW_PHONE }}
       TESTER_MODE: ${{ inputs.mode }}
       TESTER_EMAIL: ${{ inputs.email }}
       BETA_GROUP: ${{ inputs.beta_group }}
@@ -136,6 +137,21 @@ jobs:
               }
               const betaDetail = (await api(`/v1/builds/${eligibleBuild.id}/buildBetaDetail?fields%5BbuildBetaDetails%5D=externalBuildState`)).data;
               if (betaDetail.attributes.externalBuildState === 'READY_FOR_BETA_SUBMISSION') {
+                if (missingReviewFields.length) {
+                  if (!process.env.ASC_REVIEW_PHONE?.trim()) throw new Error('Missing ASC_REVIEW_PHONE secret.');
+                  const attributes = {
+                    contactFirstName: reviewDetail.attributes.contactFirstName?.trim() || 'Vlad',
+                    contactLastName: reviewDetail.attributes.contactLastName?.trim() || 'Bormisov',
+                    contactPhone: reviewDetail.attributes.contactPhone?.trim() || process.env.ASC_REVIEW_PHONE.trim(),
+                    contactEmail: reviewDetail.attributes.contactEmail?.trim() || email,
+                    demoAccountRequired: reviewDetail.attributes.demoAccountRequired ?? false,
+                  };
+                  await api(`/v1/betaAppReviewDetails/${reviewDetail.id}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ data: { type: 'betaAppReviewDetails', id: reviewDetail.id, attributes } }),
+                  });
+                  console.log('Completed missing beta review contact information.');
+                }
                 const localizations = (await api(`/v1/apps/${app.id}/betaAppLocalizations?limit=200&fields%5BbetaAppLocalizations%5D=description,feedbackEmail,locale`)).data;
                 const description = 'Hanzi Deck helps learners practice Mandarin vocabulary, sentences, pinyin, handwriting, OCR, and spaced repetition.';
                 if (!localizations.length) {
