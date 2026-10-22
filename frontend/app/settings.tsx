@@ -460,7 +460,7 @@ export default function Settings() {
             style={({ pressed }) => [styles.activeWord, pressed && styles.pressed]}
           >
             <View style={styles.activeWordLabel}>
-              <ExplanationButton kind="word" text={word.hanzi} size={18} />
+              <ExplanationButton kind="word" text={word.hanzi} pinyin={word.pinyin} gloss={displayTranslation(word.russian, data.settings.language)} size={18} />
               <Text style={styles.activeHanzi}>{word.hanzi}</Text>
             </View>
             <Text style={styles.activeStep}>step {Math.min(3, word.cardSrsLevel + 1)}/3</Text>
@@ -486,7 +486,7 @@ export default function Settings() {
               ]}
             >
               <Text style={styles.queuePosition}>{index + 1}</Text>
-              <ExplanationButton kind="word" text={word.hanzi} size={18} />
+              <ExplanationButton kind="word" text={word.hanzi} pinyin={word.pinyin} gloss={displayTranslation(word.russian, data.settings.language)} size={18} />
               <Text style={styles.queueHanzi}>{word.hanzi}</Text>
               <View style={styles.wordCell}>
                 <Text style={styles.queuePinyin}>{word.pinyin}</Text>
@@ -536,7 +536,7 @@ export default function Settings() {
                 pressed && styles.pressed,
               ]}
             >
-              <ExplanationButton kind="word" text={word.hanzi} size={18} />
+              <ExplanationButton kind="word" text={word.hanzi} pinyin={word.pinyin} gloss={displayTranslation(word.russian, data.settings.language)} size={18} />
               <View style={styles.wordCell}>
                 <Text style={styles.hanzi}>{word.hanzi}</Text>
                 <Text numberOfLines={1} style={styles.wordMeta}>
@@ -620,7 +620,7 @@ function WordDetailsModal({
             <>
               <Text style={styles.detailsLabel}>WORD DETAILS</Text>
               <View style={styles.detailsHanziRow}>
-                <ExplanationButton kind="word" text={pronunciation.hanzi} onOpen={onClose} />
+                <ExplanationButton kind="word" text={pronunciation.hanzi} pinyin={pronunciation.pinyin} gloss={pronunciation.meaning} onOpen={onClose} />
                 <Text style={styles.detailsHanzi}>{pronunciation.hanzi}</Text>
                 <SpeakerButton
                   pronunciation={pronunciation}

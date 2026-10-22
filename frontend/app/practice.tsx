@@ -238,7 +238,7 @@ export default function Practice() {
                 inverted
               />
             )}
-            <ExplanationButton kind="sentence" text={sentence.chinese} size={22} inverted />
+            <ExplanationButton kind="sentence" text={pronunciation.hanzi} pinyin={pronunciation.pinyin} gloss={pronunciation.meaning} size={22} inverted />
           </View>
         </View>
       </Pressable>
@@ -320,7 +320,7 @@ export default function Practice() {
           {explanation.words.map((w, i) => {
             const wordPronunciation = resolveExplainedPronunciation(w, data.words);
             return <View key={`${w.word}-${i}`} style={styles.audioRow}>
-              <ExplanationButton kind="word" text={wordPronunciation.hanzi} size={19} />
+              <ExplanationButton kind="word" text={wordPronunciation.hanzi} pinyin={wordPronunciation.pinyin} gloss={wordPronunciation.meaning} size={19} />
               <Text style={[styles.word, { flex: 1 }]}>
                 <Text style={{ fontWeight: "800" }}>{wordPronunciation.hanzi}</Text> ·{" "}
                 {wordPronunciation.meaning}

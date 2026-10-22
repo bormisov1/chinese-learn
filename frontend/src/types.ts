@@ -65,7 +65,7 @@ export type WordExplanation = {
   }[] }[];
   grammar: string;
 };
-export type CachedExplanation = { language: AppLanguage; kind: "word" | "sentence"; text: string; explanation: WordExplanation; updatedAt: number };
+export type CachedExplanation = { language: AppLanguage; kind: "word" | "sentence"; text: string; pinyin?: string; gloss?: string; explanation: WordExplanation; updatedAt: number };
 export type Settings = {
   language: AppLanguage;
   apiKey: string;

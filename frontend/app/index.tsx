@@ -161,7 +161,7 @@ export default function Home() {
       <View style={shell.panel}>
         {data.words.length ? data.words.slice(-5).reverse().map((word, index) => (
           <View key={word.id} style={[styles.word, index > 0 && styles.border]}>
-            <ExplanationButton kind="word" text={word.hanzi} size={19} />
+            <ExplanationButton kind="word" text={word.hanzi} pinyin={word.pinyin} gloss={displayTranslation(word.russian, data.settings.language)} size={19} />
             <Text style={styles.hanzi}>{word.hanzi}</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.pinyin}>{word.pinyin}</Text>

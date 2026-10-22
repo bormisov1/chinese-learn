@@ -18,15 +18,17 @@ const entry = (updatedAt: number, translation: string): CachedExplanation => ({
 });
 
 test('cache keys normalize text and separate language and target kind', () => {
-  assert.equal(explanationKey('word', ' 你 好  ', 'en'), explanationKey('word', '你   好', 'en'));
-  assert.notEqual(explanationKey('word', '你好', 'en'), explanationKey('word', '你好', 'ru'));
-  assert.notEqual(explanationKey('word', '你好', 'en'), explanationKey('sentence', '你好', 'en'));
+  assert.equal(explanationKey('word', ' 你 好  ', 'en', ' NǏ  HǍO '), explanationKey('word', '你   好', 'en', 'nǐ hǎo'));
+  assert.notEqual(explanationKey('word', '你好', 'en', 'nǐ hǎo'), explanationKey('word', '你好', 'ru', 'nǐ hǎo'));
+  assert.notEqual(explanationKey('word', '你好', 'en', 'nǐ hǎo'), explanationKey('sentence', '你好', 'en', 'nǐ hǎo'));
+  assert.notEqual(explanationKey('word', '说', 'en', 'shuì'), explanationKey('word', '说', 'en', 'shuō'));
 });
 
 test('rejects explanations that omit target characters or pinyin before caching', () => {
-  assert.equal(validateWordExplanation(entry(1, 'hello').explanation, '你好').translation, 'hello');
-  assert.throws(() => validateWordExplanation(entry(1, 'hello').explanation, '你好啊'), /incomplete/);
-  assert.throws(() => validateWordExplanation({ ...entry(1, 'hello').explanation, pinyin: '' }, '你好'), /incomplete/);
+  assert.equal(validateWordExplanation(entry(1, 'hello').explanation, '你好', 'sentence', 'nǐ hǎo').translation, 'hello');
+  assert.throws(() => validateWordExplanation(entry(1, 'hello').explanation, '你好啊', 'sentence', 'nǐ hǎo'), /incomplete/);
+  assert.throws(() => validateWordExplanation({ ...entry(1, 'hello').explanation, pinyin: '' }, '你好', 'sentence', 'nǐ hǎo'), /incomplete/);
+  assert.throws(() => validateWordExplanation({ ...entry(1, 'hello').explanation, pinyin: 'nì hǎo' }, '你好', 'sentence', 'nǐ hǎo'), /incomplete/);
 });
 
 test('word explanations require component notes and a memory association for every Hanzi', () => {
@@ -37,29 +39,34 @@ test('word explanations require component notes and a memory association for eve
     phoneticComponent: 'Sound component or none, with a reason.',
     memoryAssociation: 'A memorable link to the character.',
   })) })) };
-  assert.equal(validateWordExplanation(detailed, '你好', 'word'), detailed);
+  assert.equal(validateWordExplanation(detailed, '你好', 'word', 'nǐ hǎo'), detailed);
   assert.equal(hasWordCharacterAnalysis(detailed), true);
   assert.equal(hasWordCharacterAnalysis(explanation), false);
-  assert.throws(() => validateWordExplanation(explanation, '你好', 'word'), /incomplete/);
+  assert.throws(() => validateWordExplanation(explanation, '你好', 'word', 'nǐ hǎo'), /incomplete/);
   const missingOne = { ...detailed, parts: [{ ...detailed.parts[0], characters: [
     detailed.parts[0].characters[0], { ...detailed.parts[0].characters[1], phoneticComponent: '' },
   ] }] };
-  assert.throws(() => validateWordExplanation(missingOne, '你好', 'word'), /incomplete/);
-  assert.equal(validateWordExplanation(explanation, '你好', 'sentence'), explanation);
+  assert.throws(() => validateWordExplanation(missingOne, '你好', 'word', 'nǐ hǎo'), /incomplete/);
+  assert.equal(validateWordExplanation(explanation, '你好', 'sentence', 'nǐ hǎo'), explanation);
 });
 
-test('word prompt requests component analysis without inventing an absent component', () => {
-  const prompt = wordExplanationPrompt('en', 'word', '你好');
+test('word prompt pins the selected reading and sense', () => {
+  const prompt = wordExplanationPrompt('en', 'word', { text: '说', pinyin: 'shuì', gloss: 'persuade' });
+  assert.match(prompt, /"text":"说","pinyin":"shuì","gloss":"persuade"/);
+  assert.match(prompt, /pinyin identifies the exact intended pronunciation/);
+  assert.match(prompt, /do not infer or substitute another reading/);
+  assert.match(prompt, /top-level pinyin exactly as supplied: "shuì"/);
+  assert.match(prompt, /gloss identifies the intended contextual sense/);
   assert.match(prompt, /semanticComponent/);
   assert.match(prompt, /phoneticComponent/);
   assert.match(prompt, /memoryAssociation/);
   assert.match(prompt, /rather than inventing one/);
-  assert.doesNotMatch(wordExplanationPrompt('en', 'sentence', '你好'), /memoryAssociation/);
+  assert.doesNotMatch(wordExplanationPrompt('en', 'sentence', { text: '你好', pinyin: 'nǐ hǎo', gloss: 'hello' }), /memoryAssociation/);
 });
 
 test('sync merges concurrent explanation entries and latest refresh wins', () => {
-  const key = explanationKey('word', '你好', 'en');
-  const other = explanationKey('word', '学习', 'en');
+  const key = explanationKey('word', '你好', 'en', 'nǐ hǎo');
+  const other = explanationKey('word', '学习', 'en', 'xué xí');
   const local = { ...emptyStore, explanations: { [key]: entry(20, 'hello') } };
   const remote = { ...emptyStore, explanations: { [key]: entry(10, 'hi'), [other]: entry(11, 'study') } };
   const merged = applyBootstrapSnapshot(local, remote);
@@ -69,8 +76,8 @@ test('sync merges concurrent explanation entries and latest refresh wins', () =>
 });
 
 test('backup import preserves locally refreshed explanation and adds missing entries', () => {
-  const key = explanationKey('word', '你好', 'en');
-  const other = explanationKey('word', '学习', 'en');
+  const key = explanationKey('word', '你好', 'en', 'nǐ hǎo');
+  const other = explanationKey('word', '学习', 'en', 'xué xí');
   const current = { ...emptyStore, explanations: { [key]: entry(20, 'hello') } };
   const imported = { ...emptyStore, explanations: { [key]: entry(10, 'hi'), [other]: entry(11, 'study') } };
   const merged = mergeBackupData(current, createBackup(imported)).data;

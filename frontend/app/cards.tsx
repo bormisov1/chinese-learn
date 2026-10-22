@@ -427,7 +427,7 @@ export default function Cards() {
               {mistaken.map((w) => {
                 const pronunciation = resolveWordPronunciation(w!, displayTranslation(w!.russian, data.settings.language));
                 return <View key={w!.id} style={styles.mistake}>
-                  <ExplanationButton kind="word" text={pronunciation.hanzi} size={19} />
+                  <ExplanationButton kind="word" text={pronunciation.hanzi} pinyin={pronunciation.pinyin} gloss={pronunciation.meaning} size={19} />
                   <Pressable onPress={() => copyText(pronunciation.hanzi)}>
                     <Text style={styles.mistakeHanzi} numberOfLines={1} adjustsFontSizeToFit>{pronunciation.hanzi}</Text>
                   </Pressable>
@@ -702,7 +702,7 @@ function StackCard({ word, depth, roundIndex, initialTilt, active, height, setti
                 opacity: swipe.x.interpolate({ inputRange: [35, 100], outputRange: [0, 1], extrapolate: "clamp" }),
               }]}>{t("RIGHT")}</Animated.Text>
               <View style={styles.cardControls}>
-                <ExplanationButton kind="word" text={pronunciation.hanzi} />
+                <ExplanationButton kind="word" text={pronunciation.hanzi} pinyin={pronunciation.pinyin} gloss={pronunciation.meaning} />
                 <HskBadge hanzi={pronunciation.hanzi} />
                 <SpeakerButton pronunciation={pronunciation} settings={settings} size={22} />
               </View>
@@ -758,7 +758,7 @@ function PoolChangeSection({ title, words, settings, incoming = false, handwriti
     {words.map((word) => {
       const pronunciation = resolveWordPronunciation(word, displayTranslation(word.russian, settings.language));
       return <View key={word.id} style={styles.poolChangeRow}>
-        <ExplanationButton kind="word" text={pronunciation.hanzi} size={19} />
+        <ExplanationButton kind="word" text={pronunciation.hanzi} pinyin={pronunciation.pinyin} gloss={pronunciation.meaning} size={19} />
         <Text style={styles.poolChangeHanzi}>{pronunciation.hanzi}</Text>
         <View style={styles.poolChangeDetails}>
           <Text style={styles.poolChangePinyin}>{pronunciation.pinyin}</Text>
@@ -819,7 +819,7 @@ function ExampleRow({
         </Text>
         <View style={styles.exampleSentenceControls}>
           <SpeakerButton pronunciation={pronunciation} settings={settings} />
-          <ExplanationButton kind="sentence" text={sentence.chinese} size={18} />
+          <ExplanationButton kind="sentence" text={pronunciation.hanzi} pinyin={pronunciation.pinyin} gloss={pronunciation.meaning} size={18} />
         </View>
       </View>
       <View style={styles.exampleHelp}>
