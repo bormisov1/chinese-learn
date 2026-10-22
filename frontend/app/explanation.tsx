@@ -7,46 +7,47 @@ import { explainWordOrSentence } from '@/deepseek';
 import { requestExplanation } from '@/explanation-loading';
 import { Text, useTranslation } from '@/i18n';
 import { colors } from '@/theme';
-import { explanationKey, hasWordCharacterAnalysis, normalizeExplanationText, type ExplanationKind } from '@/word-explanations';
+import { explanationKey, hasWordCharacterAnalysis, normalizeExplanationText, type ExplanationKind, type ExplanationTarget } from '@/word-explanations';
 import { explanationReturnPath } from '@/explanation-navigation';
 import type { WordExplanation } from '@/types';
 
 export default function ExplanationPage() {
-  const params = useLocalSearchParams<{ kind?: string; text?: string; pinyin?: string; identity?: string; from?: string }>();
+  const params = useLocalSearchParams<{ kind?: string; text?: string; pinyin?: string; gloss?: string; from?: string }>();
   const kind = params.kind === 'sentence' ? 'sentence' : 'word';
   const text = normalizeExplanationText(typeof params.text === 'string' ? params.text : '');
   const { data } = useStore();
-  const key = explanationKey(kind, text, data.settings.language, typeof params.identity === 'string' ? params.identity : undefined);
-  return <ExplanationDetail key={key} kind={kind} text={text} cacheKey={key} returnPath={explanationReturnPath(params.from)} />;
+  const target = { text, pinyin: typeof params.pinyin === 'string' ? params.pinyin.trim() : '', gloss: typeof params.gloss === 'string' ? params.gloss.trim() : undefined };
+  const key = explanationKey(kind, text, data.settings.language, target.pinyin);
+  return <ExplanationDetail key={key} kind={kind} target={target} cacheKey={key} returnPath={explanationReturnPath(params.from)} />;
 }
 
-function ExplanationDetail({ kind, text, cacheKey, returnPath }: { kind: ExplanationKind; text: string; cacheKey: string; returnPath: string }) {
+function ExplanationDetail({ kind, target, cacheKey, returnPath }: { kind: ExplanationKind; target: ExplanationTarget; cacheKey: string; returnPath: string }) {
   const { data, patch, ready } = useStore();
   const t = useTranslation();
   const language = data.settings.language;
   const cached = data.explanations?.[cacheKey];
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(target.pinyin ? '' : 'Pronunciation is required for an explanation.');
   const [partial, setPartial] = useState<Partial<WordExplanation> | null>(null);
   const fetchExplanation = async () => {
-    if (!text || busy) return;
+    if (!target.text || !target.pinyin || busy) return;
     setBusy(true); setError(''); setPartial(null);
     try {
-      const explanation = await requestExplanation(cacheKey, onPartial => explainWordOrSentence(data.settings, kind, text, onPartial), preview => setPartial(preview));
+      const explanation = await requestExplanation(cacheKey, onPartial => explainWordOrSentence(data.settings, kind, target, onPartial), preview => setPartial(preview));
       const updatedAt = Date.now();
-      patch(current => ({ ...current, explanations: { ...current.explanations, [cacheKey]: { language, kind, text, explanation, updatedAt } } }));
+      patch(current => ({ ...current, explanations: { ...current.explanations, [cacheKey]: { language, kind, text: target.text, pinyin: target.pinyin, gloss: target.gloss, explanation, updatedAt } } }));
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not get explanation.'); }
     finally { setPartial(null); setBusy(false); }
   };
   useEffect(() => {
-    if (!ready || !text || (cached && (kind !== 'word' || hasWordCharacterAnalysis(cached.explanation) || !data.settings.apiKey))) return;
+    if (!ready || !target.text || !target.pinyin || (cached && (kind !== 'word' || hasWordCharacterAnalysis(cached.explanation) || !data.settings.apiKey))) return;
     let active = true;
     setBusy(true); setError(''); setPartial(null);
-    void requestExplanation(cacheKey, onPartial => explainWordOrSentence(data.settings, kind, text, onPartial), preview => { if (active) setPartial(preview); })
+    void requestExplanation(cacheKey, onPartial => explainWordOrSentence(data.settings, kind, target, onPartial), preview => { if (active) setPartial(preview); })
       .then(explanation => {
         if (!active) return;
         const updatedAt = Date.now();
-        patch(current => ({ ...current, explanations: { ...current.explanations, [cacheKey]: { language, kind, text, explanation, updatedAt } } }));
+        patch(current => ({ ...current, explanations: { ...current.explanations, [cacheKey]: { language, kind, text: target.text, pinyin: target.pinyin, gloss: target.gloss, explanation, updatedAt } } }));
       })
       .catch(reason => { if (active) setError(reason instanceof Error ? reason.message : 'Could not get explanation.'); })
       .finally(() => { if (active) { setPartial(null); setBusy(false); } });
@@ -58,10 +59,10 @@ function ExplanationDetail({ kind, text, cacheKey, returnPath }: { kind: Explana
     <View style={styles.header}>
       <Pressable accessibilityRole="button" accessibilityLabel={t('Back')} onPress={() => router.navigate(returnPath)} style={styles.icon}><Ionicons name="arrow-back" size={25} color={colors.green} /></Pressable>
       <Text style={styles.headerTitle}>Explanation</Text>
-      <Pressable accessibilityRole="button" accessibilityLabel={t('Refresh explanation')} disabled={busy || !text} onPress={fetchExplanation} style={styles.icon}><Ionicons name="refresh" size={24} color={busy ? '#9A9D95' : colors.green} /></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel={t('Refresh explanation')} disabled={busy || !target.text || !target.pinyin} onPress={fetchExplanation} style={styles.icon}><Ionicons name="refresh" size={24} color={busy ? '#9A9D95' : colors.green} /></Pressable>
     </View>
     <ScrollView contentContainerStyle={styles.content}>
-      <Text style={styles.hanzi}>{text}</Text>
+      <Text style={styles.hanzi}>{target.text}</Text>
       {explanation ? <>
         {!!explanation.pinyin && <Text style={styles.pinyin}>{explanation.pinyin}</Text>}
         {!!explanation.translation && <Text style={styles.translation}>{explanation.translation}</Text>}
@@ -81,7 +82,7 @@ function ExplanationDetail({ kind, text, cacheKey, returnPath }: { kind: Explana
         </View> : null)}
         {!!explanation.grammar && <Text style={styles.summary}>{explanation.grammar}</Text>}
       </> : null}
-      {!cached && !partial && !error && ready && <ActivityIndicator accessibilityLabel={t('Loading explanation')} color={colors.green} style={{ marginTop: 20 }} />}
+      {!cached && !partial && !error && ready && target.pinyin && <ActivityIndicator accessibilityLabel={t('Loading explanation')} color={colors.green} style={{ marginTop: 20 }} />}
       {!!partial && busy && <ActivityIndicator accessibilityLabel={t('Loading explanation')} color={colors.green} style={{ marginTop: 10 }} />}
       {!!cached && !partial && busy && <ActivityIndicator accessibilityLabel={t('Loading explanation')} color={colors.green} style={{ marginTop: 10 }} />}
       {!!error && <Text style={styles.error}>{error} {t('Use Refresh to try again.')}</Text>}

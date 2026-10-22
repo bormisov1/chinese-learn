@@ -111,14 +111,14 @@ export default function Listening() {
       >
         {item.kind === "sentence" ? <View style={styles.sentenceControls}>
           <SpeakerButton pronunciation={item.pronunciation} settings={data.settings} size={42} accessibilityLabel="Play listening prompt" />
-          <ExplanationButton kind="sentence" text={item.sentence.chinese} size={42} />
+          <ExplanationButton kind="sentence" text={item.pronunciation.hanzi} pinyin={item.pronunciation.pinyin} gloss={item.pronunciation.meaning} size={42} />
         </View> : <SpeakerButton pronunciation={item.pronunciation} settings={data.settings} size={42} accessibilityLabel="Play listening prompt" />}
       </Pressable>
 
       {item.kind === "word" && revealed && (
         <View style={styles.answer}>
           <View style={styles.wordHeading}>
-            <ExplanationButton kind="word" text={item.pronunciation.hanzi} />
+            <ExplanationButton kind="word" text={item.pronunciation.hanzi} pinyin={item.pronunciation.pinyin} gloss={item.pronunciation.meaning} />
             <Text style={styles.chinese}>{item.pronunciation.hanzi}</Text>
             <HskBadge hanzi={item.pronunciation.hanzi} />
           </View>
@@ -166,7 +166,7 @@ export default function Listening() {
           {explanation.words.map((word, index) => {
             const pronunciation = resolveExplainedPronunciation(word, data.words);
             return <View key={`${word.word}-${index}`} style={styles.wordRow}>
-              <ExplanationButton kind="word" text={pronunciation.hanzi} size={19} />
+              <ExplanationButton kind="word" text={pronunciation.hanzi} pinyin={pronunciation.pinyin} gloss={pronunciation.meaning} size={19} />
               <Text style={styles.word}><Text style={styles.wordHanzi}>{pronunciation.hanzi}</Text> · {pronunciation.meaning}</Text>
               <SpeakerButton pronunciation={pronunciation} settings={data.settings} />
             </View>;

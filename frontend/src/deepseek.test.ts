@@ -43,7 +43,7 @@ test('all DeepSeek tasks request Flash even with a saved Pro model', async () =>
     await evaluate(settings, sentence, 'hello');
     await evaluateChinese(settings, sentence, '你好');
     await explain(settings, sentence, [word]);
-    await explainWordOrSentence(settings, 'word', '你好');
+    await explainWordOrSentence(settings, 'word', { text: '你好', pinyin: 'nǐ hǎo', gloss: 'hello' });
     await translateWords(settings, ['你好'], 'en');
     assert.equal(requests.length, 9);
     assert.ok(requests.every(({ model }) => model === 'deepseek-v4-flash'));
@@ -75,7 +75,7 @@ test('retries without streaming when fetch cannot expose the explanation stream'
       : new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(explanation) } }] }), { status: 200 });
   };
   try {
-    assert.deepEqual(await explainWordOrSentence(settings, 'word', '帮助'), explanation);
+    assert.deepEqual(await explainWordOrSentence(settings, 'word', { text: '帮助', pinyin: 'bāng zhù', gloss: 'help' }), explanation);
     assert.deepEqual(streams, [true, false]);
   } finally { globalThis.fetch = originalFetch; }
 });
@@ -98,8 +98,39 @@ test('requests ordinary JSON explanations in React Native', async () => {
     }) } }] }), { status: 200 });
   };
   try {
-    assert.equal((await explainWordOrSentence(settings, 'word', '你')).translation, 'you');
+    assert.equal((await explainWordOrSentence(settings, 'word', { text: '你', pinyin: 'nǐ', gloss: 'you' })).translation, 'you');
     assert.equal(requestedStream, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalNavigator) Object.defineProperty(globalThis, 'navigator', originalNavigator);
+    else Reflect.deleteProperty(globalThis, 'navigator');
+  }
+});
+
+test('explanation request carries the authoritative polyphone reading and gloss', async () => {
+  const settings: Settings = {
+    language: 'en', apiKey: 'test-key', apiKeyValidated: true,
+    apiUrl: 'https://example.test/chat/completions', model: 'deepseek-v4-pro',
+    ttsProvider: 'browser', ttsVoiceURI: '', ttsRate: 1, automaticWordAddition: false, aiChatEnabled: true, handwritingAfterWrong: true,
+  };
+  const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  const originalFetch = globalThis.fetch;
+  let prompt = '';
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { product: 'ReactNative' } });
+  globalThis.fetch = async (_input, init) => {
+    const body = JSON.parse(String(init?.body));
+    prompt = body.messages[1].content;
+    const explanation = {
+      pinyin: 'shuì', translation: 'persuade', summary: 'To persuade someone.', grammar: 'Verb.',
+      parts: [{ text: '说', pinyin: 'shuì', meaning: 'persuade', characters: [{ hanzi: '说', pinyin: 'shuì', meaning: 'persuade', semanticComponent: '讠', phoneticComponent: '兑', memoryAssociation: 'Use words to persuade.' }] }],
+    };
+    return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(explanation) } }] }), { status: 200 });
+  };
+  try {
+    await explainWordOrSentence(settings, 'word', { text: '说', pinyin: 'shuì', gloss: 'persuade' });
+    assert.match(prompt, /"text":"说","pinyin":"shuì","gloss":"persuade"/);
+    assert.match(prompt, /top-level pinyin exactly as supplied: "shuì"/);
+    assert.doesNotMatch(prompt, /"pinyin":"shuō"/);
   } finally {
     globalThis.fetch = originalFetch;
     if (originalNavigator) Object.defineProperty(globalThis, 'navigator', originalNavigator);
