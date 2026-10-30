@@ -28,6 +28,13 @@ const learningNeedComparator = (round: number) => (a: Word, b: Word) =>
   a.createdAt - b.createdAt ||
   a.id.localeCompare(b.id);
 
+const weakestCardComparator = (round: number) => (a: Word, b: Word) =>
+  a.cardSrsLevel - b.cardSrsLevel ||
+  cardLearningNeed(b, round) - cardLearningNeed(a, round) ||
+  (a.cardLastStudiedRound ?? -1) - (b.cardLastStudiedRound ?? -1) ||
+  a.createdAt - b.createdAt ||
+  a.id.localeCompare(b.id);
+
 const queueComparator = (round: number) => (a: Word, b: Word) =>
   Number(Boolean(b.cardRelearning)) - Number(Boolean(a.cardRelearning)) ||
   Number(Boolean(b.cardIntroducedAt)) - Number(Boolean(a.cardIntroducedAt)) ||
@@ -163,8 +170,8 @@ export function selectRound(words: Word[], round: number, now = Date.now()) {
     : size;
   const selected = [...reviews.slice(0, reviewSlots), ...active].slice(0, size);
   if (selected.length) return selected;
-  // With a one-word deck a full skipped round is impossible.
-  return words.filter((word) => word.cardActive).slice(0, 1);
+  // Keep practice available between scheduled reviews by showing the weakest card.
+  return [...words].sort(weakestCardComparator(round)).slice(0, 1);
 }
 
 export function gradeCard(
