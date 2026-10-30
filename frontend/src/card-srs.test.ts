@@ -89,11 +89,22 @@ test("a small active pool still gets a card alongside relearning reviews", () =>
   assert.ok(round.some((item) => item.id === "active"));
 });
 
-test("returns an empty round when all retention cards are waiting", () => {
-  const retained = word("retained", {
-    cardSrsLevel: 3,
-    cardSrsCorrect: 3,
+test("falls back to the weakest card when all retention cards are waiting", () => {
+  const stronger = word("stronger", {
+    cardSrsLevel: 4,
+    cardSrsCorrect: 8,
     cardSrsDueAt: 1_000,
   });
-  assert.deepEqual(selectRound([retained], 5, 100), []);
+  const steadier = word("steadier", {
+    cardSrsLevel: 3,
+    cardSrsCorrect: 6,
+    cardSrsDueAt: 1_000,
+  });
+  const weakest = word("weakest", {
+    cardSrsLevel: 3,
+    cardSrsCorrect: 3,
+    cardSrsIncorrect: 2,
+    cardSrsDueAt: 1_000,
+  });
+  assert.deepEqual(selectRound([stronger, steadier, weakest], 5, 100), [weakest]);
 });
