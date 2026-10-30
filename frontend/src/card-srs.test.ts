@@ -88,3 +88,12 @@ test("a small active pool still gets a card alongside relearning reviews", () =>
   assert.equal(round.length, 4);
   assert.ok(round.some((item) => item.id === "active"));
 });
+
+test("returns an empty round when all retention cards are waiting", () => {
+  const retained = word("retained", {
+    cardSrsLevel: 3,
+    cardSrsCorrect: 3,
+    cardSrsDueAt: 1_000,
+  });
+  assert.deepEqual(selectRound([retained], 5, 100), []);
+});

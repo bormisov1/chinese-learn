@@ -102,10 +102,17 @@ export default function Cards() {
       ? `${upcoming.length} จาก ${CARD_ROUND_SIZE} บัตรคำ · ${activeCount} จาก ${ACTIVE_CARD_LIMIT} คำที่กำลังเรียน`
       : `${upcoming.length} of ${CARD_ROUND_SIZE} cards · ${activeCount} of ${ACTIVE_CARD_LIMIT} active`;
   const startRoundLabel = data.settings.language === "ru"
-    ? `Начать раунд из ${upcoming.length} ${upcoming.length === 1 ? "карточки" : "карточек"}`
+    ? upcoming.length
+      ? `Начать раунд из ${upcoming.length} ${upcoming.length === 1 ? "карточки" : "карточек"}`
+      : "Нет карточек для повторения"
     : data.settings.language === "th"
-      ? `เริ่มรอบ ${upcoming.length} บัตรคำ`
-      : `Start ${upcoming.length}-card round`;
+      ? upcoming.length ? `เริ่มรอบ ${upcoming.length} บัตรคำ` : "ยังไม่มีบัตรคำที่ต้องทบทวน"
+      : upcoming.length ? `Start ${upcoming.length}-card round` : "No cards due";
+  const caughtUpSubtitle = data.settings.language === "ru"
+    ? "Сейчас повторять нечего. Возвращайтесь позже."
+    : data.settings.language === "th"
+      ? "ตอนนี้ไม่มีบัตรคำที่ต้องทบทวน โปรดกลับมาใหม่ภายหลัง"
+      : "No cards are due right now. Come back later.";
   const roundWords = roundIds
     .map((id) => data.words.find((w) => w.id === id))
     .filter(Boolean) as typeof data.words;
@@ -211,7 +218,10 @@ export default function Cards() {
     cardSpin.setValue(0);
     setPhase("studying");
   };
-  const startRound = () => begin(upcoming, data.cardRound + 1);
+  const startRound = () => {
+    if (!upcoming.length) return;
+    begin(upcoming, data.cardRound + 1);
+  };
   const startNextRound = startRound;
   const grade = (correct: boolean) => {
     if (!word) return;
@@ -379,26 +389,28 @@ export default function Cards() {
     },
   });
 
-  if (phase === "ready")
+  if (phase === "ready" || !word)
     return (
       <ScrollView style={shell.page} contentContainerStyle={shell.content}>
         <Header
           eyebrow={`${t("Round")} ${data.cardRound + 1}`}
-          title="Ready for a card round?"
-          subtitle={readySubtitle}
+          title={upcoming.length ? "Ready for a card round?" : "You're all caught up"}
+          subtitle={upcoming.length ? readySubtitle : caughtUpSubtitle}
         />
         <View style={styles.roundPanel}>
           <Text style={styles.roundIcon}>卡</Text>
           <Text style={styles.roundTitle}>{`${t("Round")} ${data.cardRound + 1}`}</Text>
           <Text style={styles.roundText}>
-            Correct cards skip the next round. Three correct appearances move
-            a word to retention review and bring in another deck word.
+            {upcoming.length
+              ? "Correct cards skip the next round. Three correct appearances move a word to retention review and bring in another deck word."
+              : caughtUpSubtitle}
           </Text>
         </View>
         <Button
           label={startRoundLabel}
           icon="play"
           onPress={startRound}
+          disabled={!upcoming.length}
         />
       </ScrollView>
     );
@@ -458,9 +470,10 @@ export default function Cards() {
           )}
         </View>
         <Button
-          label="Start next SRS round"
+          label={upcoming.length ? "Start next SRS round" : startRoundLabel}
           icon="play"
           onPress={startNextRound}
+          disabled={!upcoming.length}
         />
         </ScrollView>
         {poolHandwritingWord && <Modal visible animationType="slide" onRequestClose={() => setPoolHandwritingWord(null)}>
