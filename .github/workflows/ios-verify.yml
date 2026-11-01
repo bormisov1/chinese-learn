@@ -28,7 +28,7 @@ jobs:
       - run: npm ci
       - run: npm run audit:i18n
       - run: npx expo prebuild --platform ios --no-install
-      - run: pod install --project-directory=ios
+      - run: pod install --project-directory=ios --repo-update
       - run: node scripts/patch-ios-fmt.mjs
       - name: Compile for iOS Simulator without signing
         run: |
