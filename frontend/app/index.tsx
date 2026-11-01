@@ -1,5 +1,5 @@
 import { displayTranslation, Text, useTranslation } from "@/i18n";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useState } from "react";
 import { ScrollView,
@@ -16,7 +16,7 @@ import { ExplanationButton } from "@/explanation-button";
 import { StatsExport } from "@/stats-export";
 
 export default function Home() {
-  const { data, error } = useStore();
+  const { data, error, premium, hasPremiumAccess, handwritingTrialRemaining, requestPremiumAccess } = useStore();
   const t = useTranslation();
   const [showApiTip, setShowApiTip] = useState(false);
   const passedWords = data.words.filter(
@@ -31,10 +31,10 @@ export default function Home() {
   const maxDailyRounds = Math.max(1, ...roundDays.map((item) => item.count));
   const maxDailyGraduations = Math.max(1, ...graduationDays.map((item) => item.count));
   const modes = [
-    { label: "Cards", icon: "albums-outline", href: "/cards", enabled: true },
-    { label: "Sentences", icon: "create-outline", href: "/practice", enabled: aiEnabled },
-    { label: "Listening", icon: "headset-outline", href: "/listening", enabled: aiEnabled },
-    { label: "Mix", icon: "shuffle-outline", href: "/mix", enabled: aiEnabled },
+    { label: "Cards", icon: "albums-outline", href: "/cards", enabled: true, premium: false },
+    { label: "Sentences", icon: "create-outline", href: "/practice", enabled: aiEnabled, premium: true },
+    { label: "Listening", icon: "headset-outline", href: "/listening", enabled: aiEnabled, premium: true },
+    { label: "Mix", icon: "shuffle-outline", href: "/mix", enabled: aiEnabled, premium: true },
   ] as const;
   return (
     <ScrollView style={shell.page} contentContainerStyle={shell.content}>
@@ -116,15 +116,20 @@ export default function Home() {
         </View>
       ) : null}
       <View style={styles.modeGrid}>
-        {modes.map((mode) => (
+        {modes.map((mode) => {
+          const locked = mode.premium && !hasPremiumAccess;
+          return (
           <Pressable
             key={mode.label}
             accessibilityRole="button"
-            accessibilityState={{ disabled: !mode.enabled }}
-            accessibilityHint={mode.enabled ? `Open ${mode.label}` : "Requires a validated DeepSeek API key"}
+            accessibilityState={{ disabled: !mode.enabled && !locked }}
+            accessibilityHint={locked ? "Opens the subscription paywall" : mode.enabled ? `Open ${mode.label}` : "Requires a validated DeepSeek API key"}
             onPress={() => {
-              if (mode.enabled) router.push(mode.href);
-              else setShowApiTip(true);
+              void (async () => {
+                if (mode.premium && !await requestPremiumAccess()) return;
+                if (mode.enabled) router.push(mode.href);
+                else setShowApiTip(true);
+              })();
             }}
             style={({ pressed }) => [
               styles.mode,
@@ -133,7 +138,7 @@ export default function Home() {
             ]}
           >
             <Ionicons
-              name={mode.icon}
+              name={locked ? "lock-closed-outline" : mode.icon}
               size={25}
               color={mode.enabled ? colors.green : colors.muted}
             />
@@ -141,8 +146,26 @@ export default function Home() {
               {mode.label}
             </Text>
           </Pressable>
-        ))}
+          );
+        })}
       </View>
+      <Pressable
+        disabled={premium || handwritingTrialRemaining > 0}
+        accessibilityRole={premium || handwritingTrialRemaining > 0 ? "text" : "button"}
+        accessibilityHint={!hasPremiumAccess ? "Opens the subscription paywall" : undefined}
+        onPress={() => void requestPremiumAccess()}
+        style={[styles.accessStatus, premium && styles.accessStatusPremium]}
+      >
+        <Ionicons name={premium ? "checkmark-circle" : hasPremiumAccess ? "gift-outline" : "lock-closed-outline"} size={20} color={premium ? colors.green : colors.coral} />
+        <Text style={styles.accessStatusText}>
+          {premium
+            ? "Premium active — all study modes and handwriting unlocked."
+            : handwritingTrialRemaining > 0
+              ? `${handwritingTrialRemaining} free handwriting ${handwritingTrialRemaining === 1 ? "session" : "sessions"} remaining. Premium modes unlock during the trial.`
+              : "Unlock handwriting, Sentences, Listening, and Mix."}
+        </Text>
+        {!hasPremiumAccess ? <Ionicons name="chevron-forward" size={18} color={colors.coral} /> : null}
+      </Pressable>
       {showApiTip && !aiEnabled ? (
         <Pressable
           accessibilityRole="button"
@@ -248,6 +271,9 @@ const styles = StyleSheet.create({
   modePressed: { opacity: 0.65 },
   modeLabel: { color: colors.green, fontSize: 15, fontWeight: "800" },
   modeLabelDisabled: { color: colors.muted },
+  accessStatus: { marginTop: 12, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: "#E8C9BD", backgroundColor: "#FFF1EC", flexDirection: "row", alignItems: "center", gap: 10 },
+  accessStatusPremium: { borderColor: "#AED8B7", backgroundColor: "#EAF7ED" },
+  accessStatusText: { flex: 1, color: colors.ink, fontSize: 13, lineHeight: 19 },
   apiTip: {
     marginTop: 12,
     padding: 14,

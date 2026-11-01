@@ -1,29 +1,21 @@
+import { requireOptionalNativeModule } from 'expo';
 import type { Stroke } from './types';
 
-// The example's bundled HanziLookupJS matcher is used on Android.
-const HanziLookup = require('./vendor/hanzilookup');
-const data = require('./vendor/mmah.json');
-let matcher: any;
+type InkModule = {
+  isModelDownloaded(): Promise<boolean>;
+  downloadModel(): Promise<boolean>;
+  recognize(strokesJSON: string, width: number, height: number): Promise<string[]>;
+};
+
+const ink = requireOptionalNativeModule<InkModule>('HanziInk');
 
 export async function prepareRecognition(): Promise<void> {
-  if (matcher) return;
-  HanziLookup.data.mmah = {
-    chars: data.chars,
-    substrokes: HanziLookup.decodeCompact(data.substrokes),
-  };
-  matcher = new HanziLookup.Matcher('mmah');
+  if (!ink) throw new Error('Handwriting requires a new native app build. It is unavailable in Expo Go.');
+  if (!(await ink.isModelDownloaded())) await ink.downloadModel();
 }
 
 export async function recognizeStrokes(strokes: Stroke[], width: number, height: number): Promise<string[]> {
-  await prepareRecognition();
-  const scale = 256 / Math.max(width, height, 1);
-  const normalized = strokes.filter(stroke => stroke.length >= 2)
-    .map(stroke => stroke.map(([x, y]) => [x * scale, y * scale]));
-  if (!normalized.length) return [];
-  const analyzed = new HanziLookup.AnalyzedCharacter(normalized);
-  let results: string[] = [];
-  matcher.match(analyzed, 12, (matches: { character: string }[]) => {
-    results = matches.map(match => match.character);
-  });
-  return results;
+  if (!ink) throw new Error('Handwriting requires a new native app build.');
+  const points = strokes.map(stroke => stroke.map(([x, y, t]) => ({ x, y, t })));
+  return ink.recognize(JSON.stringify(points), width, height);
 }

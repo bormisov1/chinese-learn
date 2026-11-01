@@ -45,6 +45,23 @@ test("sync merges explanations and preserves a failed card review across stale c
     expect(refreshed.explanations[key].explanation.translation).toBe("greetings");
     expect(refreshed.explanations[other].explanation.translation).toBe("учиться");
 
+    const queued = JSON.stringify(["en", "sentence", "你好"]);
+    const upsertResponse = await fetch(`${base}/v1/explanations/upsert`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${session.accessToken}` }, body: JSON.stringify({ entries: [{ key: queued, value: cached(40, "hello sentence") }] }) });
+    expect(upsertResponse.ok).toBe(true);
+    expect((await upsertResponse.json() as { acknowledgements: { key: string }[] }).acknowledgements[0].key).toBe(queued);
+    const afterQueuedUpsert = await bootstrap({});
+    expect(afterQueuedUpsert.explanations[queued].explanation.translation).toBe("hello sentence");
+
+    const forbidden = await fetch(`${base}/v1/admin/settings/paid-mode`, { method: "PUT", headers: { "content-type": "application/json", authorization: `Bearer ${session.accessToken}` }, body: JSON.stringify({ enabled: false }) });
+    expect(forbidden.status).toBe(403);
+    const adminSessionResponse = await fetch(`${base}/v1/auth/dev/session`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "bormisov1@gmail.com" }) });
+    const adminSession = await adminSessionResponse.json() as { accessToken: string };
+    const adminAccount = await fetch(`${base}/v1/account`, { headers: { authorization: `Bearer ${adminSession.accessToken}` } }).then(response => response.json()) as { isAdmin: boolean };
+    expect(adminAccount.isAdmin).toBe(true);
+    const disabled = await fetch(`${base}/v1/admin/settings/paid-mode`, { method: "PUT", headers: { "content-type": "application/json", authorization: `Bearer ${adminSession.accessToken}` }, body: JSON.stringify({ enabled: false }) });
+    expect(disabled.ok).toBe(true);
+    expect((await fetch(`${base}/v1/config`).then(response => response.json()) as { paidModeEnabled: boolean }).paidModeEnabled).toBe(false);
+
     const firstGraduation = { round: 1, wordId: "word-1", at: 100 };
     await bootstrap({ cardGraduations: [firstGraduation] });
     const graduationMerge = await bootstrap({ cardGraduations: [{ round: 2, wordId: "word-2", at: 200 }] }) as unknown as { cardGraduations: typeof firstGraduation[] };
@@ -69,6 +86,10 @@ test("sync merges explanations and preserves a failed card review across stale c
       cardLastStudiedRound: 2 };
     const progressedSnapshot = await bootstrap({ words: [progressed] }) as unknown as { words: typeof failed[] };
     expect(progressedSnapshot.words[0].cardSrsLevel).toBe(1);
+
+    await bootstrap({ handwritingOpenCount: 8 });
+    const staleTrial = await bootstrap({ handwritingOpenCount: 3 }) as unknown as { handwritingOpenCount: number };
+    expect(staleTrial.handwritingOpenCount).toBe(8);
 
     const event = (eventId: string, name: string, properties: Record<string, unknown>) => ({
       eventId, name, properties, occurredAt: Date.now(), platform: "web", appVersion: "test", installId: "test-install",

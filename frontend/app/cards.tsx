@@ -1,5 +1,5 @@
 import { displayTranslation, LANGUAGES, maskTranslatedHanzi, Text, useTranslation } from "@/i18n";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect,
   useMemo,
   useRef,
@@ -66,7 +66,7 @@ const waveOffset = (depth: number) => ({
 });
 
 export default function Cards() {
-  const { data, patch, generateBatch } = useStore();
+  const { data, patch, generateBatch, requestHandwritingAccess } = useStore();
   const t = useTranslation();
   const [studyRound, setStudyRound] = useState(data.cardRound + 1),
     [roundIds, setRoundIds] = useState<string[]>([]),
@@ -87,6 +87,7 @@ export default function Cards() {
   const swipe = useRef(new Animated.ValueXY()).current;
   const cardSpin = useRef(new Animated.Value(0)).current;
   const grading = useRef(false);
+  const handwritingRequestPending = useRef(false);
   const pendingTransition = useRef<PendingTransition | null>(null);
   const roundTransitionTimes = useRef<RoundTransitionTimes>({ count: 0, totalMs: 0, maxMs: 0, maxSwipeCallbackMs: 0, maxRenderReadyMs: 0 });
   const total = data.words.length;
@@ -314,15 +315,30 @@ export default function Cards() {
       } else pendingTransition.current = null;
     });
   };
+  const requestHandwriting = (onGranted: () => void) => {
+    if (handwritingRequestPending.current) return;
+    handwritingRequestPending.current = true;
+    void requestHandwritingAccess()
+      .then((granted) => { if (granted) onGranted(); })
+      .finally(() => { handwritingRequestPending.current = false; });
+  };
   const finishSwipe = (correct: boolean) => {
     if (!correct && data.settings.handwritingAfterWrong && !handwritingCorrect) {
       if (grading.current || handwritingOpen) return;
       swipe.setValue({ x: 0, y: 0 });
-      setHandwritingAfterWrong(true);
-      setHandwritingOpen(true);
+      requestHandwriting(() => {
+        setHandwritingAfterWrong(true);
+        setHandwritingOpen(true);
+      });
       return;
     }
     animateSwipe(correct);
+  };
+  const openHandwriting = () => {
+    requestHandwriting(() => setHandwritingOpen(true));
+  };
+  const openSummaryHandwriting = (selected: Word) => {
+    requestHandwriting(() => setPoolHandwritingWord(selected));
   };
   const closeHandwriting = () => {
     setHandwritingOpen(false);
@@ -431,7 +447,7 @@ export default function Cards() {
           onPreviousCard={previousCard}
         />
         {graduations.length > 0 && <RoundPoolChanges graduations={graduations} settings={data.settings}
-          handwritingCorrectIds={summaryHandwritingCorrectIds} onHandwriting={setPoolHandwritingWord} />}
+          handwritingCorrectIds={summaryHandwritingCorrectIds} onHandwriting={openSummaryHandwriting} />}
         <View style={styles.results}>
           {mistaken.length ? (
             <>
@@ -454,7 +470,7 @@ export default function Cards() {
                         <Ionicons name="checkmark" size={26} color={colors.green} />
                       </View>
                     : <Pressable accessibilityRole="button" accessibilityLabel={`Write ${pronunciation.hanzi} by hand`}
-                        onPress={() => setPoolHandwritingWord(w!)} style={styles.poolHandwritingButton}>
+                        onPress={() => openSummaryHandwriting(w!)} style={styles.poolHandwritingButton}>
                         <Ionicons name="pencil-outline" size={23} color={colors.green} />
                       </Pressable>}
                 </View>;
@@ -529,7 +545,7 @@ export default function Cards() {
             panHandlers={panResponder.panHandlers}
             onFlip={flipCard}
             onGrade={finishSwipe}
-            onHandwriting={() => setHandwritingOpen(true)}
+            onHandwriting={openHandwriting}
             handwritingCorrect={index === 0 && handwritingCorrect}
             onHeightChange={(height) => setCardHeights((current) =>
               current[stackWord.id] === height ? current : { ...current, [stackWord.id]: height })}

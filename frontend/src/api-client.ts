@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
 export type AuthTokens = { accessToken: string; refreshToken: string; userId: string; authProfile?: { provider?: string; chatId?: string; fullName?: string; username?: string } };
-export type Account = { id: string; name: string | null; email: string | null; picture: string | null; createdAt: string };
+export type Account = { id: string; name: string | null; email: string | null; picture: string | null; createdAt: string; isAdmin: boolean; paidModeEnabled: boolean };
 
 const defaultBackendUrl = Platform.OS === "web" && typeof window !== "undefined"
   ? `${window.location.origin}/api`
@@ -52,4 +52,7 @@ export const exchangeCode = async (code: string, redirectUri: string) => {
 };
 export const authUrl = (provider: "google" | "telegram", redirectUri: string) => `${BACKEND_URL}/v1/auth/${provider}/start?${new URLSearchParams({ redirect_uri: redirectUri }).toString()}`;
 export const getAccount = () => request("/v1/account");
+export const getAppConfig = () => request("/v1/config") as Promise<{ paidModeEnabled: boolean }>;
+export const setPaidMode = (enabled: boolean) => request("/v1/admin/settings/paid-mode", { method: "PUT", body: JSON.stringify({ enabled }) }) as Promise<{ paidModeEnabled: boolean }>;
+export const upsertExplanations = (entries: { key: string; value: unknown }[]) => request("/v1/explanations/upsert", { method: "POST", body: JSON.stringify({ entries }) }) as Promise<{ acknowledgements: { key: string; updatedAt: number }[] }>;
 export const bootstrap = (body: unknown) => request("/v1/sync/bootstrap", { method: "POST", body: JSON.stringify(body) });

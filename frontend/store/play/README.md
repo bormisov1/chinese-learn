@@ -27,8 +27,9 @@ Phone screenshots are still needed (see below).
    identity verification (can take a few days).
 2. **Create the app** — "Create app", name `Hanzi Deck`, default language English,
    *App* (not game), free.
-3. **App access** — all functionality is available without special access
-   (sign-in is via Google/Telegram but is standard OAuth, no demo credentials needed).
+3. **App access** — Cards and the initial handwriting trial are available without
+   special access. Premium modes require a store test purchase. Sign-in uses standard
+   Google/Telegram OAuth; provide review purchase instructions when Play requests them.
 4. **Content rating questionnaire** — Education app, no user-generated content that
    is shared between users, no violence/gambling/etc. Expected rating: *Everyone*.
 5. **Target audience** — 13+ (do NOT select child audiences; that would trigger the
@@ -36,12 +37,25 @@ Phone screenshots are still needed (see below).
 6. **Data safety form** — answers matching `public/privacy.html`:
    - Collected: email address and/or user ID (account management — app
      functionality); app interactions / study progress stored on the developer's
-     server (app functionality).
-   - Shared with third parties: No.
+     server (app functionality); purchase history and subscription status processed
+     by Google Play and RevenueCat (app functionality/account management).
+   - Shared with third parties: purchase data is processed by RevenueCat as a
+     service provider; answer the form according to Google's current service-provider rules.
    - Data encrypted in transit: Yes. Deletion mechanism: Yes (in-app + privacy policy).
-   - AI chat/explanations: text is sent **from the device directly** to the AI
-     provider (DeepSeek) using the user's own API key; the developer's server does
-     not receive it.
+   - AI features: user-initiated text is sent **from the device directly** to
+     DeepSeek using the user's own API key. This includes practice sentence and
+     translation generation, answer evaluation/corrections/feedback, word and
+     sentence explanations, missing-word translation, chat replies/titles, and
+     word suggestions. The developer's server does not receive it.
+   - Camera photos and handwriting strokes are processed on-device. ML Kit does
+     not send feature input or recognition output to Google.
+   - ML Kit collects device/app information, per-installation identifiers,
+     configured language (digital ink), performance and usage metrics, API
+     configuration, feature input/output size and version, event types, and error
+     codes for diagnostics and analytics. It encrypts these data in transit and
+     says it does not share them with third parties. Include these SDK practices
+     when completing the current Data safety form; verify against
+     <https://developers.google.com/ml-kit/android-data-disclosure> before each release.
 7. **Privacy policy URL** — `https://zh.x.bormisov.com/privacy.html`.
    (Deploy this repo's `dev` → `master` first so the production URL is live.)
 8. **Screenshots** — at least 2 phone screenshots, min 320px, max 3840px, 16:9 or

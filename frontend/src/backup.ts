@@ -278,12 +278,15 @@ export function mergeBackupData(current: StoreData, backup: BackupFile): { data:
     if (!previous || mapped.at > previous.at) cardGraduations.set(key, mapped);
   }
 
+  const explanations = mergeExplanations(current.explanations, imported.explanations);
   const merged: StoreData = {
     ...current,
     words: migrateCardPool(words, Math.max(current.cardRound, imported.cardRound ?? 0)),
     sentenceDataByLanguage,
-    explanations: mergeExplanations(current.explanations, imported.explanations),
+    explanations,
+    pendingExplanationKeys: [...new Set([...(current.pendingExplanationKeys ?? []), ...Object.keys(explanations)])],
     cardRound: Math.max(current.cardRound, imported.cardRound ?? 0),
+    handwritingOpenCount: Math.max(current.handwritingOpenCount ?? 0, imported.handwritingOpenCount ?? 0),
     roundCompletions: [...rounds.values()].sort((a, b) => a.round - b.round),
     cardGraduations: [...cardGraduations.values()].sort((a, b) => a.at - b.at),
     onboardingComplete: current.onboardingComplete || imported.onboardingComplete,

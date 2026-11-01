@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { Linking, Platform } from 'react-native';
+import { Alert, Linking, Platform } from 'react-native';
 import { generate, translateWords } from './deepseek';
 import { emptyStore, loadStore, saveStore } from './storage';
 import { AppLanguage, ImportedWord, StoreData, Word } from './types';
@@ -7,28 +7,34 @@ import { fillActivePool } from './card-srs';
 import { replenishAutomaticWords } from './hsk-vocabulary';
 import { Dictionary, loadDictionary } from './dictionary';
 import { refreshWords, switchStoreLanguage } from './language';
-import { Account, authUrl, clearTokens, exchangeCode, getAccount, getTokens } from './api-client';
+import { Account, authUrl, clearTokens, exchangeCode, getAccount, getAppConfig, getTokens, setPaidMode, upsertExplanations } from './api-client';
 import { bootstrapStore, syncableSnapshot } from './sync';
 import { commitBootstrapResponse, createBootstrapCoordinator } from './sync-coordinator';
 import { initializeTelemetry, track } from './telemetry';
 import { createBackup, mergeBackupData, type BackupFile, type BackupMergeSummary } from './backup';
+import { useRevenueCat } from './revenuecat';
+import { hasPremiumFeatureAccess, recordFreeHandwritingOpen, remainingHandwritingOpens } from './premium-access';
 
-type Context = { data: StoreData; ready: boolean; generating: boolean; error: string; dictionary: Dictionary | null; dictionaryLoading: boolean; dictionaryError: string; dictionaryProgress: number | null; switchingLanguage: AppLanguage | null; account: Account | null; authBusy: boolean; authError: string; authCompletedCode: string | null; selectLanguage: (language: AppLanguage) => Promise<boolean>; retryDictionary: () => void; importWords: (items: ImportedWord[]) => number; patch: (fn: (data: StoreData) => StoreData) => void; createBackup: () => BackupFile; mergeBackup: (backup: BackupFile) => BackupMergeSummary; setAutomaticWordAddition: (enabled: boolean, completeOnboarding?: boolean) => void; generateBatch: (mandatory?: Word) => Promise<void>; signIn: (provider: "google" | "telegram") => Promise<void>; signOut: () => Promise<void> };
+type Context = { data: StoreData; ready: boolean; generating: boolean; error: string; dictionary: Dictionary | null; dictionaryLoading: boolean; dictionaryError: string; dictionaryProgress: number | null; switchingLanguage: AppLanguage | null; account: Account | null; authBusy: boolean; authError: string; authCompletedCode: string | null; paymentsReady: boolean; paymentsConfigured: boolean; paymentBusy: boolean; paymentError: string; premium: boolean; subscribed: boolean; isAdmin: boolean; paidModeEnabled: boolean; setPaidModeEnabled: (enabled: boolean) => Promise<void>; hasPremiumAccess: boolean; handwritingTrialRemaining: number; openPaywall: () => Promise<boolean>; requestPremiumAccess: () => Promise<boolean>; requestHandwritingAccess: () => Promise<boolean>; restorePurchases: () => Promise<boolean>; manageSubscription: () => Promise<void>; selectLanguage: (language: AppLanguage) => Promise<boolean>; retryDictionary: () => void; importWords: (items: ImportedWord[]) => number; patch: (fn: (data: StoreData) => StoreData) => void; createBackup: () => BackupFile; mergeBackup: (backup: BackupFile) => BackupMergeSummary; setAutomaticWordAddition: (enabled: boolean, completeOnboarding?: boolean) => void; generateBatch: (mandatory?: Word) => Promise<void>; signIn: (provider: "google" | "telegram") => Promise<void>; signOut: () => Promise<void> };
 const StoreContext = createContext<Context>(null as never);
 const id = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [data, setData] = useState<StoreData>(emptyStore), [ready, setReady] = useState(false), [generating, setGenerating] = useState(false), [error, setError] = useState('');
   const [account, setAccount] = useState<Account | null>(null), [authBusy, setAuthBusy] = useState(false), [authError, setAuthError] = useState(''), [authCompletedCode, setAuthCompletedCode] = useState<string | null>(null);
+  const [paidModeEnabled, setPaidModeEnabledState] = useState(true);
+  const purchases = useRevenueCat(account?.id ?? null);
   const [loadedDictionary, setLoadedDictionary] = useState<{ language: AppLanguage; value: Dictionary } | null>(null);
   const [dictionaryLoading, setDictionaryLoading] = useState(false), [dictionaryError, setDictionaryError] = useState(''), [dictionaryProgress, setDictionaryProgress] = useState<number | null>(null), [switchingLanguage, setSwitchingLanguage] = useState<AppLanguage | null>(null), [dictionaryReload, setDictionaryReload] = useState(0);
   const dictionaryRef = useRef<{ language: AppLanguage; value: Dictionary } | null>(null), switchRequest = useRef(0), languageRef = useRef<AppLanguage>(data.settings.language);
   const dataRef = useRef(data), authCodeInFlight = useRef<string | null>(null), handledAuthCodes = useRef(new Set<string>()), syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null), syncedSnapshot = useRef<string | null>(null);
-  const accountRef = useRef(account), authBusyRef = useRef(authBusy);
+  const accountRef = useRef(account), authBusyRef = useRef(authBusy), explanationSyncBusy = useRef(false);
   dataRef.current = data;
   accountRef.current = account;
   authBusyRef.current = authBusy;
   languageRef.current = data.settings.language;
+  const isAdmin = account?.isAdmin === true;
+  const premium = purchases.premium || isAdmin || !paidModeEnabled;
   const dictionary = loadedDictionary?.language === data.settings.language ? loadedDictionary.value : null;
   const refreshSyncedWords = (merged: StoreData): StoreData => {
     const loaded = dictionaryRef.current;
@@ -61,6 +67,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const tokens = await exchangeCode(code, redirectUri());
       const remoteAccount = await getAccount();
       setAccount(remoteAccount);
+      setPaidModeEnabledState(remoteAccount.paidModeEnabled);
       const submitted = dataRef.current;
       const merged = await bootstrapStore(submitted);
       commitBootstrapResponse(setData, submitted, merged, accepted => {
@@ -78,12 +85,36 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const webSubscription = Platform.OS === "web" && typeof window !== "undefined" ? ((event: Event) => { const detail = (event as CustomEvent<string>).detail; if (detail) void completeAuth(detail); }) : null;
     if (webSubscription) window.addEventListener("hanzideck-auth", webSubscription);
     Linking.getInitialURL().then(value => { if (value) void completeAuth(value); });
-    getTokens().then(tokens => { if (!tokens) return; getAccount().then(setAccount).catch(() => clearTokens()); });
+    getAppConfig().then(config => setPaidModeEnabledState(config.paidModeEnabled)).catch(() => {});
+    getTokens().then(tokens => { if (!tokens) return; getAccount().then(remote => { setAccount(remote); setPaidModeEnabledState(remote.paidModeEnabled); }).catch(() => clearTokens()); });
     return () => { subscription.remove(); if (webSubscription) window.removeEventListener("hanzideck-auth", webSubscription); };
   }, [ready]);
   const signIn = async (provider: "google" | "telegram") => { setAuthError(''); setAuthCompletedCode(null); void track("login_started", { provider }); await Linking.openURL(authUrl(provider, redirectUri())); };
   const signOut = async () => { await clearTokens(); setAccount(null); setAuthCompletedCode(null); };
   useEffect(() => { if (ready) saveStore(data); }, [data, ready]);
+  useEffect(() => {
+    if (!ready || !account || authBusy || explanationSyncBusy.current) return;
+    const keys = (data.pendingExplanationKeys ?? []).slice(0, 100);
+    if (!keys.length) return;
+    const entries = keys.flatMap(key => data.explanations[key] ? [{ key, value: data.explanations[key] }] : []);
+    if (!entries.length) {
+      setData(current => ({ ...current, pendingExplanationKeys: (current.pendingExplanationKeys ?? []).filter(key => !keys.includes(key)) }));
+      return;
+    }
+    explanationSyncBusy.current = true;
+    void upsertExplanations(entries).then(({ acknowledgements }) => {
+      const acknowledged = new Map(acknowledgements.map(item => [item.key, item.updatedAt]));
+      setData(current => ({
+        ...current,
+        pendingExplanationKeys: (current.pendingExplanationKeys ?? []).filter(key => {
+          const serverUpdatedAt = acknowledged.get(key);
+          return serverUpdatedAt === undefined || Number(current.explanations[key]?.updatedAt ?? Infinity) > serverUpdatedAt;
+        }),
+      }));
+    }).catch(() => {
+      // Durable keys remain queued for the next authenticated state change.
+    }).finally(() => { explanationSyncBusy.current = false; });
+  }, [account, authBusy, data.pendingExplanationKeys, data.explanations, ready]);
   useEffect(() => {
     if (!ready || !account || authBusy) return;
     const snapshotKey = JSON.stringify(syncableSnapshot(data));
@@ -155,6 +186,43 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   };
   const retryDictionary = () => { setDictionaryError(''); setDictionaryReload(value => value + 1); };
   const patch = (fn: (value: StoreData) => StoreData) => setData(fn);
+  const setPaidModeEnabled = async (enabled: boolean) => {
+    if (!isAdmin) throw new Error("Admin access required.");
+    const result = await setPaidMode(enabled);
+    setPaidModeEnabledState(result.paidModeEnabled);
+    setAccount(current => current ? { ...current, paidModeEnabled: result.paidModeEnabled } : current);
+  };
+  const openPaywall = async () => {
+    if (premium) return true;
+    if (!purchases.ready) {
+      Alert.alert("Subscriptions", "Purchase information is still loading. Try again in a moment.");
+      return false;
+    }
+    if (!purchases.configured) {
+      Alert.alert("Subscriptions unavailable", purchases.error || "RevenueCat is not configured for this platform.");
+      return false;
+    }
+    return purchases.presentPaywall();
+  };
+  const requestPremiumAccess = async () =>
+    hasPremiumFeatureAccess(dataRef.current.handwritingOpenCount, premium) || await openPaywall();
+  const requestHandwritingAccess = async () => {
+    if (premium) return true;
+    if (!purchases.ready) return openPaywall();
+    const current = dataRef.current;
+    if (!hasPremiumFeatureAccess(current.handwritingOpenCount, false)) return openPaywall();
+    const next = {
+      ...current,
+      handwritingOpenCount: recordFreeHandwritingOpen(current.handwritingOpenCount),
+    };
+    dataRef.current = next;
+    setData(next);
+    void track("handwriting_trial_opened", {
+      used: next.handwritingOpenCount,
+      remaining: remainingHandwritingOpens(next.handwritingOpenCount),
+    });
+    return true;
+  };
   const setAutomaticWordAddition = (enabled: boolean, completeOnboarding = false) => {
     void track("study_mode_selected", { mode: enabled ? "automatic" : "manual", firstTime: !data.onboardingComplete });
     setData(current => ({
@@ -199,7 +267,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       });
     } catch (e) { if (languageRef.current === language) setError(e instanceof Error ? e.message : 'Generation failed'); } finally { setGenerating(false); }
   };
-  const value = useMemo(() => ({ data, ready, generating, error, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, account, authBusy, authError, authCompletedCode, selectLanguage, retryDictionary, importWords, patch, createBackup: makeBackup, mergeBackup, setAutomaticWordAddition, generateBatch, signIn, signOut }), [data, ready, generating, error, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, account, authBusy, authError, authCompletedCode]);
+  const value = useMemo(() => ({ data, ready, generating, error, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, account, authBusy, authError, authCompletedCode, paymentsReady: purchases.ready, paymentsConfigured: purchases.configured, paymentBusy: purchases.busy, paymentError: purchases.error, premium, subscribed: purchases.premium, isAdmin, paidModeEnabled, setPaidModeEnabled, hasPremiumAccess: hasPremiumFeatureAccess(data.handwritingOpenCount, premium), handwritingTrialRemaining: remainingHandwritingOpens(data.handwritingOpenCount), openPaywall, requestPremiumAccess, requestHandwritingAccess, restorePurchases: purchases.restorePurchases, manageSubscription: purchases.presentCustomerCenter, selectLanguage, retryDictionary, importWords, patch, createBackup: makeBackup, mergeBackup, setAutomaticWordAddition, generateBatch, signIn, signOut }), [data, ready, generating, error, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, account, authBusy, authError, authCompletedCode, purchases, premium, isAdmin, paidModeEnabled]);
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
 export const useStore = () => useContext(StoreContext);

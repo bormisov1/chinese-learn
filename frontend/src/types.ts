@@ -106,6 +106,8 @@ export type CardGraduation = {
 };
 export type StoreData = {
   storageVersion: number;
+  /** Number of free handwriting sessions consumed before premium is required. */
+  handwritingOpenCount?: number;
   words: Word[];
   /** Vocabulary removed on this device; the current account sync endpoint merges words by union. */
   removedWordHanzi?: string[];
@@ -114,6 +116,8 @@ export type StoreData = {
   attempts: SentenceAttempt[];
   sentenceDataByLanguage: Partial<Record<AppLanguage, LanguageSentenceData>>;
   explanations: Record<string, CachedExplanation>;
+  /** Explanation keys awaiting an explicit backend acknowledgement. Local-only. */
+  pendingExplanationKeys?: string[];
   cardRound: number;
   roundCompletions: RoundCompletion[];
   cardGraduations: CardGraduation[];

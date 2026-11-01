@@ -22,10 +22,12 @@ export function applyBootstrapSnapshot(local: StoreData, remote: Partial<StoreDa
   return keepRemovedWordsOut({
     ...local,
     ...remote,
+    handwritingOpenCount: Math.max(local.handwritingOpenCount ?? 0, remote.handwritingOpenCount ?? 0),
     explanations: mergeExplanations(local.explanations, remote.explanations),
     settings: { ...local.settings, ...remoteSettings },
     mixQueue: local.mixQueue,
     mixPosition: local.mixPosition,
+    pendingExplanationKeys: local.pendingExplanationKeys,
     storageVersion: local.storageVersion,
     removedWordHanzi: local.removedWordHanzi,
   }, local.removedWordHanzi ?? []);

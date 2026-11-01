@@ -26,11 +26,13 @@ test("backup excludes API keys and round-trips its format", () => {
 test("backup merge unions words, remaps sentence word IDs, and keeps strongest progress", () => {
   const current = {
     ...baseStore(),
+    handwritingOpenCount: 8,
     words: [word("current", "你好", 3)],
     settings: { ...baseStore().settings, apiKey: "keep-me" },
   } satisfies StoreData;
   const imported = {
     ...baseStore(),
+    handwritingOpenCount: 3,
     words: [word("old", "你好", 1), word("new", "学习", 2)],
     cardGraduations: [{ round: 4, wordId: "old", at: 1000 }, { round: 5, wordId: "new", at: 2000 }],
     sentences: [{ id: "sentence", chinese: "你好 学习", pinyin: "Nǐ hǎo xuéxí", russian: "hello study", wordIds: ["old", "new"], sentenceShownCount: 1 }],
@@ -46,6 +48,7 @@ test("backup merge unions words, remaps sentence word IDs, and keeps strongest p
   assert.equal(result.summary.sentencesAdded, 1);
   assert.equal(result.summary.attemptsAdded, 1);
   assert.equal(result.data.settings.apiKey, "keep-me");
+  assert.equal(result.data.handwritingOpenCount, 8);
   assert.deepEqual(result.data.cardGraduations, [
     { round: 4, wordId: "current", at: 1000 },
     { round: 5, wordId: "new", at: 2000 },

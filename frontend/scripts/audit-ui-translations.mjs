@@ -9,7 +9,7 @@ const i18nPath = new URL('../src/i18n.tsx', import.meta.url);
 const i18nSource = ts.createSourceFile('i18n.tsx', fs.readFileSync(i18nPath, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const contextual = { ru: {}, th: {} };
 const normalize = value => value.replace(/\s+/g, ' ').trim();
-const productTerms = /\b(?:DeepSeek|API|SRS|HSK|JSON|AI|V4|Flash|Telegram|Google|Gmail|TestFlight|iPhone|iOS|Hanzi Deck|HanziLookup|Rust\/WASM|LGPL|Arphic Public License)\b/gi;
+const productTerms = /\b(?:DeepSeek|RevenueCat|API|SRS|HSK|JSON|AI|V4|Flash|Telegram|Google|Gmail|TestFlight|iPhone|iOS|Hanzi Deck|HanziLookup|Rust\/WASM|LGPL|Arphic Public License)\b/gi;
 const unchanged = new Set(['L', 'sk-…', 'DEEPSEEK', 'HSK-']);
 
 function walk(node, visit) {

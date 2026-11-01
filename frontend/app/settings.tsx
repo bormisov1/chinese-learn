@@ -18,7 +18,7 @@ import {
   Linking,
   View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useStore } from "@/context";
 import { colors } from "@/theme";
 import { Header, shell, SpeakerButton } from "@/ui";
@@ -43,7 +43,7 @@ import { chooseBackup, downloadBackup } from "@/backup-files";
 export default function Settings() {
   const t = useTranslation();
   const params = useLocalSearchParams<{ focus?: string; request?: string }>();
-  const { data, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, importWords, patch, retryDictionary, selectLanguage, setAutomaticWordAddition, account, authBusy, authError, signIn, signOut, createBackup, mergeBackup } = useStore();
+  const { data, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, importWords, patch, retryDictionary, selectLanguage, setAutomaticWordAddition, account, authBusy, authError, signIn, signOut, createBackup, mergeBackup, premium, subscribed, isAdmin, paidModeEnabled, setPaidModeEnabled, hasPremiumAccess, handwritingTrialRemaining, paymentBusy, paymentError, openPaywall, restorePurchases, manageSubscription } = useStore();
   const scrollRef = useRef<ScrollView>(null);
   const generalMeasured = useRef(false);
   const apiKeyOffset = useRef<number | null>(null);
@@ -59,6 +59,7 @@ export default function Settings() {
   const [selectedWord, setSelectedWord] = useState<Word | null>(null);
   const [backupBusy, setBackupBusy] = useState(false);
   const [backupMessage, setBackupMessage] = useState("");
+  const [purchaseMessage, setPurchaseMessage] = useState("");
   const [avatarFailed, setAvatarFailed] = useState(false);
   const indicatorPosition = useRef(new Animated.Value(0)).current;
   const [keyValidation, setKeyValidation] = useState<
@@ -280,6 +281,55 @@ export default function Settings() {
           </View> : <View style={styles.authButtons}><Button label="Continue with Google / Gmail" disabled={authBusy} onPress={() => void signIn("google")} /><Button secondary label="Continue with Telegram" disabled={authBusy} onPress={() => void signIn("telegram")} /></View>}
           {authError ? <Text style={styles.error}>{authError}</Text> : null}
         </View>
+        <View style={[shell.panel, styles.membershipPanel, premium && styles.membershipPremium]}>
+          <View style={styles.membershipHeading}>
+            <Ionicons name={premium ? "checkmark-circle" : hasPremiumAccess ? "gift-outline" : "lock-closed-outline"} size={25} color={premium ? colors.green : colors.coral} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.privacyTitle}>{isAdmin ? "Admin access active" : !paidModeEnabled ? "Free access active" : subscribed ? "Premium active" : "Hanzi Deck Premium"}</Text>
+              <Text style={styles.help}>
+                {isAdmin
+                  ? "All paid features are permanently unlocked for this admin account."
+                  : !paidModeEnabled
+                    ? "Paid mode is disabled; all features are unlocked for everyone."
+                    : subscribed
+                      ? "Handwriting, Sentences, Listening, and Mix are unlocked."
+                  : handwritingTrialRemaining > 0
+                    ? `${handwritingTrialRemaining} of 10 free handwriting ${handwritingTrialRemaining === 1 ? "session remains" : "sessions remain"}.`
+                    : "Subscribe to unlock handwriting, Sentences, Listening, and Mix."}
+              </Text>
+            </View>
+          </View>
+          {paidModeEnabled && !isAdmin ? <View style={styles.membershipButtons}>
+            <Button
+              label={subscribed ? "Manage subscription" : "View plans"}
+              disabled={paymentBusy}
+              onPress={() => void (subscribed ? manageSubscription() : openPaywall())}
+            />
+            <Button
+              secondary
+              label={Platform.OS === "web" ? "Refresh access" : "Restore purchases"}
+              disabled={paymentBusy}
+              onPress={() => void restorePurchases().then((restored) => setPurchaseMessage(restored ? "Premium access restored." : "No active purchase found."))}
+            />
+          </View> : null}
+          {paymentError ? <Text style={styles.error}>{paymentError}</Text> : null}
+          {purchaseMessage ? <Text style={styles.purchaseMessage}>{purchaseMessage}</Text> : null}
+        </View>
+        {isAdmin ? <View style={[shell.panel, styles.adminPanel]}>
+          <View style={styles.aiChatRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>ADMIN</Text>
+              <Text style={styles.privacyTitle}>Paid mode</Text>
+              <Text style={styles.help}>{paidModeEnabled ? "Subscriptions and free limits apply to non-admin users." : "All users can use paid features without a subscription."}</Text>
+            </View>
+            <Switch
+              accessibilityLabel="Paid mode"
+              value={paidModeEnabled}
+              onValueChange={value => void setPaidModeEnabled(value).catch(reason => setPurchaseMessage(reason instanceof Error ? reason.message : "Could not change paid mode."))}
+              trackColor={{ false: colors.line, true: colors.green }}
+            />
+          </View>
+        </View> : null}
         <View
           onLayout={recordSection("general")}
           style={[
@@ -377,9 +427,16 @@ export default function Settings() {
           <Text style={styles.privacyTitle}>Local-first by design</Text>
           <Text style={styles.help}>
             Vocabulary, generated sentences, indexes, SRS counters, and attempts
-            remain on device. Only AI requests go to DeepSeek.
+            remain on device. AI requests go to DeepSeek; purchase status is handled by RevenueCat.
           </Text>
         </View>
+      </View>
+      <View style={styles.backupPanel}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.privacyTitle}>Legal & credits</Text>
+          <Text style={styles.help}>Licenses, source links, AI disclosure, privacy policy, and pinned artifact hashes.</Text>
+        </View>
+        <Button secondary label="Open legal information" icon="document-text-outline" onPress={() => router.push("/legal")} />
       </View>
       <View style={styles.backupPanel}>
         <View style={{ flex: 1 }}>
@@ -918,6 +975,12 @@ function Field(props: {
 const styles = StyleSheet.create({
   settingsContent: { paddingTop: 32 },
   accountPanel: { marginBottom: 14 },
+  membershipPanel: { marginBottom: 14 },
+  adminPanel: { marginBottom: 14, borderColor: "#D8B45B" },
+  membershipPremium: { backgroundColor: "#EAF7ED", borderColor: "#AED8B7" },
+  membershipHeading: { flexDirection: "row", alignItems: "center", gap: 12 },
+  membershipButtons: { flexDirection: "row", flexWrap: "wrap", gap: 9, marginTop: 16 },
+  purchaseMessage: { color: colors.green, fontSize: 12, marginTop: 10 },
   accountProfile: { alignItems: "center", gap: 12, paddingVertical: 8 },
   accountAvatar: { width: 88, height: 88, borderRadius: 44, borderWidth: 2, borderColor: colors.green },
   accountAvatarFallback: { backgroundColor: colors.pale, alignItems: "center", justifyContent: "center" },

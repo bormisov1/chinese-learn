@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ActivityIndicator, Pressable, SafeAreaView, StyleSheet, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useStore } from "@/context";
 import { colors } from "@/theme";
 import { LANGUAGES, Text, suggestedLanguage } from "@/i18n";

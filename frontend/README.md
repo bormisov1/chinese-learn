@@ -13,15 +13,33 @@ Add a DeepSeek API key under Settings. Vocabulary can be added from typed or pas
 The Handwriting tab lets learners draw one Hanzi at a time, choose a recognition
 candidate, and append it to an editable, copyable output field. Undo removes the
 last stroke; Clear resets the drawing without changing the output. The browser
-uses the existing HanziLookup Rust/WASM worker. Android uses the bundled
-HanziLookupJS matcher. iOS uses the local `modules/hanzi-ink` Expo module with
-Google ML Kit Digital Ink Recognition. The iOS model downloads on first use and
-then runs on device. iOS handwriting needs a new native build and does not work
-in Expo Go. The native module requires iOS 15.5 or later.
+uses the HanziLookup Rust/WASM worker. Android and iOS use the local
+`modules/hanzi-ink` Expo module with Google ML Kit Digital Ink Recognition. The
+Chinese model downloads on first use and recognition then runs on device.
+Native handwriting needs a new app build and does not work in Expo Go. The
+native module requires Android 24+ or iOS 15.5+.
 
-The Android matcher and its data are copied from the adjacent handwriting
-example. Its HanziLookupJS code is GPL v3 and the stroke data is under the
-Arphic Public License; both license texts are in `src/handwriting/vendor`.
+## Premium access
+
+RevenueCat unlocks handwriting, Sentences, Listening, and Mix after ten free
+handwriting sessions. Cards, Recognition, vocabulary import, and Settings remain
+free. Configure one `premium` entitlement, attach the App Store and Play Store
+products to an offering, and attach a RevenueCat Paywall to that offering. Set
+the public platform SDK keys with:
+
+```bash
+EXPO_PUBLIC_REVENUECAT_IOS_API_KEY=appl_...
+EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY=goog_...
+EXPO_PUBLIC_REVENUECAT_WEB_API_KEY=rcb_...
+EXPO_PUBLIC_REVENUECAT_ENTITLEMENT_ID=premium
+```
+
+The web key is optional when web purchases are not offered; web purchases need
+a separately configured RevenueCat Web Billing app. Public SDK keys are safe to
+bundle, but secret RevenueCat keys must never use these variables. Native
+purchases and RevenueCat Paywalls require a fresh development or production
+build; Expo Go only provides preview behavior. Signed-in users are identified
+to RevenueCat with the app account ID, preserving entitlements across platforms.
 
 The Recognition tab keeps the camera preview live on iOS, Android, and web while
 OCR boxes update from occasional captures and are visual guides. Recognized
@@ -42,27 +60,22 @@ Word meanings are remembered per language, so custom or dictionary-missing meani
 HSK dictionaries are lazy-loaded from the fixed `/dictionaries/hsk-<language>.json` allowlist. Web uses same-origin paths; native uses the deployed HTTPS origin. The loader rejects oversized and malformed files; a stored language value can never become a download URL. Only the active or explicitly requested target dictionary is loaded. Imports merge by Hanzi while preserving study counters.
 
 English card meanings and readings for the 4,991 HSK 2.0 forms come from
-`frontend/src/data/hsk-english-card-glosses.json`. They were selected from the full set
-of meanings and readings in the pinned HSK source with DeepSeek, then common
-words and particles were reviewed by hand. The complete CC-CEDICT dictionary
-remains available for all other words. Regenerate the curated set with
-`DEEPSEEK_API_KEY=... npm run build:dictionary:en-cards`, then run
-`npm run apply:dictionary:en-cards` and `npm run validate:hsk-data`. The apply
-step preserves all other dictionary rows. A full `npm run build:dictionary`
-downloads the current CC-CEDICT release, which can also change unrelated rows.
-The generation script resumes interrupted batches using an ignored progress file.
+`frontend/src/data/hsk-english-card-glosses.json`. The complete CC-CEDICT
+dictionary remains available for all other words. Run
+`npm run apply:dictionary:en-cards` and `npm run validate:hsk-data` after editing
+the curated set. A full `npm run build:dictionary` downloads the current
+CC-CEDICT release, which can also change unrelated rows.
 
-Russian meanings use the original HSK
-dictionary, normalized aliases for legacy spaced keys, and curated corrections from
-`frontend/src/data/hsk-russian-supplement.json`. Rebuild it with
+Russian meanings are original translations prepared manually by the developer,
+with normalized aliases and corrections in
+`frontend/src/data/hsk-russian-supplement.json`. Rebuild them with
 `npm run build:dictionary:ru`.
 
 The HSK 2.0 level sets and English dictionary are generated from the pinned
 complete-hsk-vocabulary release. The level sets contain all 4,991 distinct written
 forms behind the 5,000 syllabus entries; repeated forms with different parts of
-speech are intentionally represented once because decks are keyed by Hanzi. Russian
-aliases are matched from the downloaded legacy vocabulary by Hanzi and pinyin, and
-validation requires every selectable HSK form in every bundled learner dictionary.
+speech are intentionally represented once because decks are keyed by Hanzi.
+Validation requires every selectable HSK form in every bundled learner dictionary.
 Rebuild and validate all generated vocabulary assets with `npm run build:hsk-data`.
 The individual level, English, and Russian build scripts remain available for adding
 or updating learner-language assets independently.
@@ -73,3 +86,8 @@ word is still missing during a language change, a configured DeepSeek key
 provides a best-effort translation that is cached on-device. Rebuild the English
 asset with `npm run build:dictionary`; attribution is in
 `frontend/third-party/CC-CEDICT-NOTICE`.
+
+The in-app Legal & Credits screen lists licenses, exact source links, and
+runtime AI disclosures. `npm run legal:generate` verifies pinned artifact
+hashes and generates the full production dependency license report in
+`public/legal`.

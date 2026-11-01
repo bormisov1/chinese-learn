@@ -5,6 +5,7 @@ import { migrateCardPool } from "./card-srs";
 import { isAppLanguage } from "./i18n";
 import russianSupplement from "./data/hsk-russian-supplement.json";
 import { migrateCardGraduations, migrateRoundCompletions } from "./round-history";
+import { handwritingOpenCount } from "./premium-access";
 
 const KEY = "hanzi-deck:v1";
 const STORAGE_VERSION = 3;
@@ -16,6 +17,7 @@ const russianRepairs = new Map(
 );
 export const emptyStore: StoreData = {
   storageVersion: STORAGE_VERSION,
+  handwritingOpenCount: 0,
   words: [],
   removedWordHanzi: [],
   sentences: [],
@@ -23,6 +25,7 @@ export const emptyStore: StoreData = {
   attempts: [],
   sentenceDataByLanguage: {},
   explanations: {},
+  pendingExplanationKeys: [],
   cardRound: 0,
   roundCompletions: [],
   cardGraduations: [],
@@ -59,6 +62,7 @@ export async function loadStore(): Promise<StoreData> {
       ...emptyStore,
       ...parsed,
       storageVersion: STORAGE_VERSION,
+      handwritingOpenCount: handwritingOpenCount(parsed.handwritingOpenCount),
       words: migrateCardPool(
         (parsed.words ?? []).map((w) => {
           const repair = needsRussianRepair ? russianRepairs.get(w.hanzi) : undefined;
@@ -97,6 +101,9 @@ export async function loadStore(): Promise<StoreData> {
       mixPosition: parsed.mixPosition ?? 0,
       sentenceDataByLanguage: parsed.sentenceDataByLanguage ?? {},
       explanations: parsed.explanations ?? {},
+      pendingExplanationKeys: Array.isArray(parsed.pendingExplanationKeys)
+        ? parsed.pendingExplanationKeys.filter((key): key is string => typeof key === "string")
+        : Object.keys(parsed.explanations ?? {}),
       onboardingComplete:
         parsed.onboardingComplete ?? (parsed.words?.length ?? 0) > 0,
       languageSelected: parsed.languageSelected ?? false,

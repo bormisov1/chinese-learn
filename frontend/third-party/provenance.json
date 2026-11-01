@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-30",
+  "sources": [
+    {
+      "name": "complete-hsk-vocabulary",
+      "license": "MIT",
+      "version": "git 7ac65bf1a6387d35f1ade478906172a19311c7f9",
+      "url": "https://github.com/drkameleon/complete-hsk-vocabulary/tree/7ac65bf1a6387d35f1ade478906172a19311c7f9"
+    },
+    {
+      "name": "CC-CEDICT",
+      "license": "CC BY-SA 4.0",
+      "version": "bundled snapshot identified by artifact hash",
+      "url": "https://cc-cedict.org/editor/editor.php?handler=Download"
+    },
+    {
+      "name": "HanziLookup",
+      "license": "LGPL-3.0",
+      "version": "git 01f90c3ab99a8fadf0696c28e5eb097223c500db",
+      "url": "https://github.com/gugray/hanzi_lookup/tree/01f90c3ab99a8fadf0696c28e5eb097223c500db"
+    },
+    {
+      "name": "Make Me a Hanzi stroke data",
+      "license": "Arphic Public License",
+      "version": "embedded in pinned HanziLookup build",
+      "url": "https://github.com/skishore/makemeahanzi"
+    },
+    {
+      "name": "Google ML Kit Digital Ink Recognition Android",
+      "license": "Google APIs and ML Kit Terms",
+      "version": "19.0.0",
+      "url": "https://developers.google.com/ml-kit/vision/digital-ink-recognition/android"
+    },
+    {
+      "name": "Google ML Kit Digital Ink Recognition iOS",
+      "license": "Google APIs and ML Kit Terms",
+      "version": "8.0.0",
+      "url": "https://developers.google.com/ml-kit/vision/digital-ink-recognition/ios"
+    },
+    {
+      "name": "Google ML Kit Chinese Text Recognition Android/iOS",
+      "license": "Google APIs and ML Kit Terms",
+      "version": "Android 16.0.1; iOS 8.0.0",
+      "url": "https://developers.google.com/ml-kit/vision/text-recognition/v2"
+    },
+    {
+      "name": "Tesseract.js / language data",
+      "license": "Apache-2.0",
+      "version": "tesseract.js 7.0.0; traineddata 4.0.0_best_int",
+      "url": "https://github.com/naptha/tesseract.js/tree/v7.0.0"
+    },
+    {
+      "name": "OpenCC-js / OpenCC data",
+      "license": "MIT / Apache-2.0",
+      "version": "1.4.2",
+      "url": "https://github.com/nk2028/opencc-js/tree/v1.4.2"
+    },
+    {
+      "name": "Expo Vector Icons / Ionicons",
+      "license": "MIT",
+      "version": "15.1.1",
+      "url": "https://github.com/expo/vector-icons/tree/v15.1.1"
+    },
+    {
+      "name": "RevenueCat React Native SDK",
+      "license": "MIT",
+      "version": "11.0.0",
+      "url": "https://github.com/RevenueCat/react-native-purchases/releases/tag/11.0.0"
+    }
+  ],
+  "artifacts": [
+    { "path": "package-lock.json", "sha256": "6ce98da85cf70cc62331a623fa9aa4ad7cde70a881ce7be067a8613029003a89" },
+    { "path": "public/hanzi-lookup/hanzi_lookup.js", "sha256": "fe6f70c1b4172951727a1b313313cff1dc1c663ff0c5209a7ccb42ae3e0a71ef" },
+    { "path": "public/hanzi-lookup/hanzi_lookup_bg.wasm", "sha256": "8d2affdbfffe651d62534fb6a4ad192d57cf3559631860a7aadb7cd48ffa7463" },
+    { "path": "public/hanzi-lookup/worker.js", "sha256": "fd0fb333a2484fc6073f9d3844205cfb3804a0abf314d6f04471286a8e5ad3dc" },
+    { "path": "public/dictionaries/hsk-en.json", "sha256": "555ba4ddf19868a02a4b51d6cf63ccf5c453f45635c038cdeeb4227ea0ab4fa2" },
+    { "path": "public/dictionaries/hsk-ru.json", "sha256": "c46d26837f15eff3a28c12242d9d4ebb481143d9cc4f31075e29969f9a20e720" },
+    { "path": "public/dictionaries/hsk-th.json", "sha256": "8cbb12a7ffdd0492afdfd5d9b13c6f35c608ebb9d95c2061cf8996562ce8cd09" },
+    { "path": "src/data/hsk-levels.json", "sha256": "82700b8b7d6273338c4b180e0414fafdac5063bd8cf7f973d1d882468112960f" },
+    { "path": "src/data/hsk-english-card-glosses.json", "sha256": "05842244e0afb413dc908aef873209be711c74dc7b5985979c5f567071e64d3a" },
+    { "path": "src/data/hsk-russian.json", "sha256": "167a9060310a85aa92cb59951b737cdc977c10826ae9317c4a3735ed0091c713" },
+    { "path": "src/data/hsk-russian-supplement.json", "sha256": "d493a9d4ca342a61eca09ccd46d35e8c0a8c6e2374719ee7bc3022291bcffbcf" },
+    { "path": "assets/icon-source.svg", "sha256": "9d05857861b00eadfbbe1f55fd0fc5e1bfe97d6e54dad6b3002648392248c8a0" },
+    { "path": "assets/icon.png", "sha256": "bca15e23abb36d5227689aed84c0c19ac691adeee789b7a5eb131a1377121d73" },
+    { "path": "assets/adaptive-icon-foreground.png", "sha256": "4a9245a17993e2f61dbdf58a66a6d768b6a53fbed72db21db25816541982ba7c" },
+    { "path": "assets/splash-icon.png", "sha256": "cfc0395c3483aaee08d618e8aa62da9a1f765af791e630ee7a2ecf1615212b6c" },
+    { "path": "store/play/play-icon-512.png", "sha256": "8fdb456494945ef2df4f5da801eebf064a3532c9e64da622bfff0827754987f4" },
+    { "path": "store/play/feature-graphic-1024x500.png", "sha256": "80fc633474631c4f6e77fe2b8ad4a2464a4a394e123f08806d4f4a3e548256d3" }
+  ]
+}

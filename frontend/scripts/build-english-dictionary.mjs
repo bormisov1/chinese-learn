@@ -100,5 +100,5 @@ const rows = [...entries.values()].sort(([left], [right]) => left < right ? -1 :
 await writeFile(OUTPUT, JSON.stringify(rows));
 
 const missing = russian.filter(([hanzi]) => !entries.has(hanzi));
-console.log(`Wrote ${rows.length} entries; ${russian.length - missing.length}/${russian.length} legacy Russian words covered.`);
+console.log(`Wrote ${rows.length} entries; ${russian.length - missing.length}/${russian.length} manually translated Russian words covered.`);
 if (missing.length) console.log(`Remaining legacy misses: ${missing.map(([hanzi]) => hanzi).join(", ")}`);

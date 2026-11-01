@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -29,13 +29,20 @@ function ExplanationDetail({ kind, target, cacheKey, returnPath }: { kind: Expla
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(target.pinyin ? '' : 'Pronunciation is required for an explanation.');
   const [partial, setPartial] = useState<Partial<WordExplanation> | null>(null);
+  const cacheExplanation = (explanation: WordExplanation) => {
+    const updatedAt = Date.now();
+    patch(current => ({
+      ...current,
+      explanations: { ...current.explanations, [cacheKey]: { language, kind, text: target.text, pinyin: target.pinyin, gloss: target.gloss, explanation, updatedAt } },
+      pendingExplanationKeys: [...new Set([...(current.pendingExplanationKeys ?? []), cacheKey])],
+    }));
+  };
   const fetchExplanation = async () => {
     if (!target.text || !target.pinyin || busy) return;
     setBusy(true); setError(''); setPartial(null);
     try {
       const explanation = await requestExplanation(cacheKey, onPartial => explainWordOrSentence(data.settings, kind, target, onPartial), preview => setPartial(preview));
-      const updatedAt = Date.now();
-      patch(current => ({ ...current, explanations: { ...current.explanations, [cacheKey]: { language, kind, text: target.text, pinyin: target.pinyin, gloss: target.gloss, explanation, updatedAt } } }));
+      cacheExplanation(explanation);
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not get explanation.'); }
     finally { setPartial(null); setBusy(false); }
   };
@@ -46,8 +53,7 @@ function ExplanationDetail({ kind, target, cacheKey, returnPath }: { kind: Expla
     void requestExplanation(cacheKey, onPartial => explainWordOrSentence(data.settings, kind, target, onPartial), preview => { if (active) setPartial(preview); })
       .then(explanation => {
         if (!active) return;
-        const updatedAt = Date.now();
-        patch(current => ({ ...current, explanations: { ...current.explanations, [cacheKey]: { language, kind, text: target.text, pinyin: target.pinyin, gloss: target.gloss, explanation, updatedAt } } }));
+        cacheExplanation(explanation);
       })
       .catch(reason => { if (active) setError(reason instanceof Error ? reason.message : 'Could not get explanation.'); })
       .finally(() => { if (active) { setPartial(null); setBusy(false); } });

@@ -1,5 +1,5 @@
 import { Text } from "./i18n";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import React from "react";
 import { Pressable,
   ScrollView,

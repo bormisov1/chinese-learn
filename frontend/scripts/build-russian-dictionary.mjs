@@ -48,7 +48,7 @@ const sourceRows = source.map(([hanzi, pinyin, translation], index) => ({
   index,
 }));
 
-function bestRussianSource(item) {
+function bestManualRussianSource(item) {
   const target = normalizeHanzi(item.s ?? "");
   const pinyin = new Set(
     (item.f ?? [])
@@ -92,13 +92,13 @@ function bestRussianSource(item) {
 }
 
 // Canonical aliases repair truncation, spacing, and variant-character damage in
-// the downloaded legacy Russian list without hand-maintaining vocabulary rows.
+// the manually translated Russian list without duplicating vocabulary rows.
 const hsk = await downloadHsk();
 let aliases = 0;
 for (const item of hsk.filter(oldHskLevel)) {
   const hanzi = normalizeHanzi(item.s ?? "");
   if (!hanzi || entries.has(hanzi)) continue;
-  const candidate = bestRussianSource(item);
+  const candidate = bestManualRussianSource(item);
   const pinyin = (item.f ?? []).find((form) =>
     candidate?.pinyin.startsWith(normalizePinyin(form.i?.y ?? "")),
   )?.i?.y?.trim();

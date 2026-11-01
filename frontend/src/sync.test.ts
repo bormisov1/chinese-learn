@@ -40,6 +40,17 @@ test("bootstrap still applies a non-empty remote snapshot", () => {
   assert.equal(applyBootstrapSnapshot(local, remote).languageSelected, true);
 });
 
+test("bootstrap keeps the highest consumed handwriting trial count", () => {
+  assert.equal(applyBootstrapSnapshot(
+    store({ handwritingOpenCount: 8 }),
+    store({ handwritingOpenCount: 3, languageSelected: true }),
+  ).handwritingOpenCount, 8);
+  assert.equal(applyBootstrapSnapshot(
+    store({ handwritingOpenCount: 3 }),
+    store({ handwritingOpenCount: 8, languageSelected: true }),
+  ).handwritingOpenCount, 8);
+});
+
 test("bootstrap preserves device-local API settings when remote sends empty or missing values", () => {
   const local = store({
     settings: { ...store().settings, language: "ru", apiKey: "test-key", apiKeyValidated: true, apiUrl: "https://example.test/api", model: "local-model" },

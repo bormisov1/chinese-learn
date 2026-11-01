@@ -8,6 +8,7 @@ const port = Number(process.env.PORT ?? 8787);
 const dbPath = process.env.DATABASE_PATH ?? "./data/app.sqlite";
 const publicOrigin = process.env.PUBLIC_ORIGIN ?? `http://localhost:${port}`;
 const devAuth = process.env.AUTH_DEV_MODE === "1";
+const adminEmails = new Set((process.env.ADMIN_EMAILS ?? "bormisov1@gmail.com").split(",").map(value => value.trim().toLowerCase()).filter(Boolean));
 if (dirname(dbPath) !== ".") mkdirSync(dirname(dbPath), { recursive: true });
 const db = new Database(dbPath, { create: true });
 db.exec(`
@@ -36,12 +37,21 @@ db.exec(`
     user_id TEXT PRIMARY KEY REFERENCES users(id), snapshot_json TEXT NOT NULL,
     updated_at TEXT NOT NULL, bootstrap_id TEXT
   );
+  CREATE TABLE IF NOT EXISTS user_explanations (
+    user_id TEXT NOT NULL REFERENCES users(id), explanation_key TEXT NOT NULL,
+    payload_json TEXT NOT NULL, updated_at INTEGER NOT NULL,
+    PRIMARY KEY(user_id, explanation_key)
+  );
+  CREATE TABLE IF NOT EXISTS app_settings (
+    setting_key TEXT PRIMARY KEY, setting_value TEXT NOT NULL, updated_at TEXT NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS analytics_events (
     event_id TEXT PRIMARY KEY, name TEXT NOT NULL, occurred_at TEXT NOT NULL,
     received_at TEXT NOT NULL, platform TEXT NOT NULL, app_version TEXT NOT NULL,
     install_id_hash TEXT NOT NULL, properties_json TEXT NOT NULL
   );
 `);
+db.query("INSERT OR IGNORE INTO app_settings(setting_key, setting_value, updated_at) VALUES ('paid_mode_enabled', '1', ?)").run(new Date().toISOString());
 try { db.exec("ALTER TABLE oauth_states ADD COLUMN code_verifier TEXT NOT NULL DEFAULT ''"); } catch {}
 try { db.exec("ALTER TABLE oauth_states ADD COLUMN nonce TEXT NOT NULL DEFAULT ''"); } catch {}
 
@@ -96,7 +106,7 @@ const prometheus = () => {
 };
 
 const json = (value: unknown, status = 200) =>
-  Response.json(value, { status, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "content-type, authorization", "access-control-allow-methods": "GET,POST,OPTIONS" } });
+  Response.json(value, { status, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "content-type, authorization", "access-control-allow-methods": "GET,POST,PUT,OPTIONS" } });
 const now = () => new Date();
 const iso = () => now().toISOString();
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -207,9 +217,54 @@ function userForAccess(request: Request) {
   return db.query("SELECT user_id FROM sessions WHERE id = ? AND expires_at > ?").get(value, iso()) as { user_id: string } | null;
 }
 
+function userAccount(userId: string) {
+  return db.query("SELECT id, name, email, picture, created_at AS createdAt FROM users WHERE id = ?").get(userId) as { id: string; name: string | null; email: string | null; picture: string | null; createdAt: string } | null;
+}
+
+function isAdmin(userId: string) {
+  const email = userAccount(userId)?.email?.trim().toLowerCase();
+  return Boolean(email && adminEmails.has(email));
+}
+
+function paidModeEnabled() {
+  const row = db.query("SELECT setting_value FROM app_settings WHERE setting_key = 'paid_mode_enabled'").get() as { setting_value: string } | null;
+  return row?.setting_value !== "0";
+}
+
+function storedExplanations(userId: string): Snapshot {
+  const result: Snapshot = {};
+  const rows = db.query("SELECT explanation_key, payload_json FROM user_explanations WHERE user_id = ?").all(userId) as { explanation_key: string; payload_json: string }[];
+  for (const row of rows) {
+    try { result[row.explanation_key] = safeJson(JSON.parse(row.payload_json)); } catch {}
+  }
+  return result;
+}
+
+function upsertExplanation(userId: string, key: string, value: unknown) {
+  const entry = safeJson(value);
+  const updatedAt = Math.max(0, Math.trunc(Number(entry.updatedAt ?? 0)));
+  const payload = JSON.stringify(entry);
+  if (!key || key.length > 2048 || !updatedAt || payload.length > 256_000) return null;
+  db.query(`INSERT INTO user_explanations(user_id, explanation_key, payload_json, updated_at) VALUES (?, ?, ?, ?)
+    ON CONFLICT(user_id, explanation_key) DO UPDATE SET payload_json=excluded.payload_json, updated_at=excluded.updated_at
+    WHERE excluded.updated_at >= user_explanations.updated_at`).run(userId, key, payload, updatedAt);
+  const stored = db.query("SELECT updated_at FROM user_explanations WHERE user_id = ? AND explanation_key = ?").get(userId, key) as { updated_at: number } | null;
+  return stored ? { key, updatedAt: stored.updated_at } : null;
+}
+
+function persistExplanations(userId: string, explanations: unknown) {
+  const acknowledgements: { key: string; updatedAt: number }[] = [];
+  for (const [key, value] of Object.entries(safeJson(explanations))) {
+    const acknowledgement = upsertExplanation(userId, key, value);
+    if (acknowledgement) acknowledgements.push(acknowledgement);
+  }
+  return acknowledgements;
+}
+
 function localSnapshot(userId: string): Snapshot {
   const row = db.query("SELECT snapshot_json FROM user_snapshots WHERE user_id = ?").get(userId) as { snapshot_json: string } | null;
-  return row ? safeJson(JSON.parse(row.snapshot_json)) : {};
+  const snapshot = row ? safeJson(JSON.parse(row.snapshot_json)) : {};
+  return { ...snapshot, explanations: { ...safeJson(snapshot.explanations), ...storedExplanations(userId) } };
 }
 
 function keyForSentence(sentence: Snapshot) {
@@ -272,6 +327,7 @@ function mergeSnapshot(server: Snapshot, client: Snapshot): Snapshot {
   }
   merged.explanations = explanations;
   merged.cardRound = Math.max(Number(server.cardRound ?? 0), Number(client.cardRound ?? 0));
+  merged.handwritingOpenCount = Math.max(Number(server.handwritingOpenCount ?? 0), Number(client.handwritingOpenCount ?? 0));
   const serverByLanguage = safeJson(server.sentenceDataByLanguage), clientByLanguage = safeJson(client.sentenceDataByLanguage);
   const languageData: Snapshot = {};
   for (const language of new Set([...Object.keys(serverByLanguage), ...Object.keys(clientByLanguage)])) {
@@ -321,6 +377,7 @@ async function fetchRequest(request: Request) {
     try {
       if (url.pathname === "/metrics") return new Response(prometheus(), { headers: { "content-type": "text/plain; version=0.0.4" } });
       if (url.pathname === "/health") return json({ ok: true, service: "hanzi-deck-backend" });
+      if (request.method === "GET" && url.pathname === "/v1/config") return json({ paidModeEnabled: paidModeEnabled() });
       if (request.method === "POST" && url.pathname === "/v1/telemetry/batch") {
         const body = safeJson(await request.json());
         const events = Array.isArray(body.events) ? body.events.slice(0, 100) : [];
@@ -376,12 +433,31 @@ async function fetchRequest(request: Request) {
       if (request.method === "POST" && url.pathname === "/v1/sync/bootstrap") {
         const body = safeJson(await request.json());
         const merged = mergeSnapshot(localSnapshot(user.user_id), safeJson(body.snapshot));
-        db.query("INSERT INTO user_snapshots(user_id, snapshot_json, updated_at, bootstrap_id) VALUES (?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET snapshot_json=excluded.snapshot_json, updated_at=excluded.updated_at, bootstrap_id=excluded.bootstrap_id")
-          .run(user.user_id, JSON.stringify(merged), iso(), String(body.bootstrapId ?? ""));
+        db.transaction(() => {
+          persistExplanations(user.user_id, merged.explanations);
+          db.query("INSERT INTO user_snapshots(user_id, snapshot_json, updated_at, bootstrap_id) VALUES (?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET snapshot_json=excluded.snapshot_json, updated_at=excluded.updated_at, bootstrap_id=excluded.bootstrap_id")
+            .run(user.user_id, JSON.stringify(merged), iso(), String(body.bootstrapId ?? ""));
+        })();
         return json({ snapshot: merged, cursor: Date.now().toString() });
       }
+      if (request.method === "POST" && url.pathname === "/v1/explanations/upsert") {
+        const body = safeJson(await request.json());
+        const entries = Array.isArray(body.entries) ? body.entries.slice(0, 100) : [];
+        const acknowledgements = db.transaction(() => entries.map(value => {
+          const entry = safeJson(value);
+          return upsertExplanation(user.user_id, String(entry.key ?? ""), entry.value);
+        }).filter(Boolean))() as { key: string; updatedAt: number }[];
+        return json({ acknowledgements });
+      }
+      if (request.method === "PUT" && url.pathname === "/v1/admin/settings/paid-mode") {
+        if (!isAdmin(user.user_id)) return json({ error: "forbidden" }, 403);
+        const body = safeJson(await request.json());
+        if (typeof body.enabled !== "boolean") return json({ error: "invalid_paid_mode" }, 400);
+        db.query("UPDATE app_settings SET setting_value = ?, updated_at = ? WHERE setting_key = 'paid_mode_enabled'").run(body.enabled ? "1" : "0", iso());
+        return json({ paidModeEnabled: body.enabled });
+      }
       if (request.method === "GET" && url.pathname === "/v1/account") {
-        return json(db.query("SELECT id, name, email, picture, created_at AS createdAt FROM users WHERE id = ?").get(user.user_id));
+        return json({ ...userAccount(user.user_id), isAdmin: isAdmin(user.user_id), paidModeEnabled: paidModeEnabled() });
       }
       return json({ error: "not_found" }, 404);
     } catch (error) {

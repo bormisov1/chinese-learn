@@ -3,7 +3,7 @@ import { bootstrap } from "./api-client";
 import { applyBootstrapSnapshot } from "./sync-merge";
 export function syncableSnapshot(data: StoreData) {
   const { apiKey: _apiKey, apiKeyValidated: _validated, apiUrl: _apiUrl, model: _model, ...settings } = data.settings;
-  const { removedWordHanzi: _removedWordHanzi, ...sharedData } = data;
+  const { removedWordHanzi: _removedWordHanzi, pendingExplanationKeys: _pendingExplanationKeys, ...sharedData } = data;
   return { ...sharedData, settings, mixQueue: [], mixPosition: 0 };
 }
 
