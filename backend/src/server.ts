@@ -42,8 +42,9 @@ db.exec(`
     payload_json TEXT NOT NULL, updated_at INTEGER NOT NULL,
     PRIMARY KEY(user_id, explanation_key)
   );
-  CREATE TABLE IF NOT EXISTS app_settings (
-    setting_key TEXT PRIMARY KEY, setting_value TEXT NOT NULL, updated_at TEXT NOT NULL
+  CREATE TABLE IF NOT EXISTS admin_preferences (
+    user_id TEXT PRIMARY KEY REFERENCES users(id), premium_enabled INTEGER NOT NULL DEFAULT 1,
+    updated_at TEXT NOT NULL
   );
   CREATE TABLE IF NOT EXISTS analytics_events (
     event_id TEXT PRIMARY KEY, name TEXT NOT NULL, occurred_at TEXT NOT NULL,
@@ -51,7 +52,6 @@ db.exec(`
     install_id_hash TEXT NOT NULL, properties_json TEXT NOT NULL
   );
 `);
-db.query("INSERT OR IGNORE INTO app_settings(setting_key, setting_value, updated_at) VALUES ('paid_mode_enabled', '1', ?)").run(new Date().toISOString());
 try { db.exec("ALTER TABLE oauth_states ADD COLUMN code_verifier TEXT NOT NULL DEFAULT ''"); } catch {}
 try { db.exec("ALTER TABLE oauth_states ADD COLUMN nonce TEXT NOT NULL DEFAULT ''"); } catch {}
 
@@ -226,9 +226,9 @@ function isAdmin(userId: string) {
   return Boolean(email && adminEmails.has(email));
 }
 
-function paidModeEnabled() {
-  const row = db.query("SELECT setting_value FROM app_settings WHERE setting_key = 'paid_mode_enabled'").get() as { setting_value: string } | null;
-  return row?.setting_value !== "0";
+function adminPremiumEnabled(userId: string) {
+  const row = db.query("SELECT premium_enabled FROM admin_preferences WHERE user_id = ?").get(userId) as { premium_enabled: number } | null;
+  return row?.premium_enabled !== 0;
 }
 
 function storedExplanations(userId: string): Snapshot {
@@ -377,7 +377,6 @@ async function fetchRequest(request: Request) {
     try {
       if (url.pathname === "/metrics") return new Response(prometheus(), { headers: { "content-type": "text/plain; version=0.0.4" } });
       if (url.pathname === "/health") return json({ ok: true, service: "hanzi-deck-backend" });
-      if (request.method === "GET" && url.pathname === "/v1/config") return json({ paidModeEnabled: paidModeEnabled() });
       if (request.method === "POST" && url.pathname === "/v1/telemetry/batch") {
         const body = safeJson(await request.json());
         const events = Array.isArray(body.events) ? body.events.slice(0, 100) : [];
@@ -449,15 +448,16 @@ async function fetchRequest(request: Request) {
         }).filter(Boolean))() as { key: string; updatedAt: number }[];
         return json({ acknowledgements });
       }
-      if (request.method === "PUT" && url.pathname === "/v1/admin/settings/paid-mode") {
+      if (request.method === "PUT" && url.pathname === "/v1/admin/settings/premium-access") {
         if (!isAdmin(user.user_id)) return json({ error: "forbidden" }, 403);
         const body = safeJson(await request.json());
-        if (typeof body.enabled !== "boolean") return json({ error: "invalid_paid_mode" }, 400);
-        db.query("UPDATE app_settings SET setting_value = ?, updated_at = ? WHERE setting_key = 'paid_mode_enabled'").run(body.enabled ? "1" : "0", iso());
-        return json({ paidModeEnabled: body.enabled });
+        if (typeof body.enabled !== "boolean") return json({ error: "invalid_admin_premium_access" }, 400);
+        db.query("INSERT INTO admin_preferences(user_id, premium_enabled, updated_at) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET premium_enabled=excluded.premium_enabled, updated_at=excluded.updated_at")
+          .run(user.user_id, body.enabled ? 1 : 0, iso());
+        return json({ adminPremiumEnabled: body.enabled });
       }
       if (request.method === "GET" && url.pathname === "/v1/account") {
-        return json({ ...userAccount(user.user_id), isAdmin: isAdmin(user.user_id), paidModeEnabled: paidModeEnabled() });
+        return json({ ...userAccount(user.user_id), isAdmin: isAdmin(user.user_id), adminPremiumEnabled: adminPremiumEnabled(user.user_id) });
       }
       return json({ error: "not_found" }, 404);
     } catch (error) {

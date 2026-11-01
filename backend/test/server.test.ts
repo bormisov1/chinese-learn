@@ -52,15 +52,18 @@ test("sync merges explanations and preserves a failed card review across stale c
     const afterQueuedUpsert = await bootstrap({});
     expect(afterQueuedUpsert.explanations[queued].explanation.translation).toBe("hello sentence");
 
-    const forbidden = await fetch(`${base}/v1/admin/settings/paid-mode`, { method: "PUT", headers: { "content-type": "application/json", authorization: `Bearer ${session.accessToken}` }, body: JSON.stringify({ enabled: false }) });
+    const forbidden = await fetch(`${base}/v1/admin/settings/premium-access`, { method: "PUT", headers: { "content-type": "application/json", authorization: `Bearer ${session.accessToken}` }, body: JSON.stringify({ enabled: false }) });
     expect(forbidden.status).toBe(403);
     const adminSessionResponse = await fetch(`${base}/v1/auth/dev/session`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "bormisov1@gmail.com" }) });
     const adminSession = await adminSessionResponse.json() as { accessToken: string };
-    const adminAccount = await fetch(`${base}/v1/account`, { headers: { authorization: `Bearer ${adminSession.accessToken}` } }).then(response => response.json()) as { isAdmin: boolean };
+    const adminAccount = await fetch(`${base}/v1/account`, { headers: { authorization: `Bearer ${adminSession.accessToken}` } }).then(response => response.json()) as { isAdmin: boolean; adminPremiumEnabled: boolean };
     expect(adminAccount.isAdmin).toBe(true);
-    const disabled = await fetch(`${base}/v1/admin/settings/paid-mode`, { method: "PUT", headers: { "content-type": "application/json", authorization: `Bearer ${adminSession.accessToken}` }, body: JSON.stringify({ enabled: false }) });
+    expect(adminAccount.adminPremiumEnabled).toBe(true);
+    const disabled = await fetch(`${base}/v1/admin/settings/premium-access`, { method: "PUT", headers: { "content-type": "application/json", authorization: `Bearer ${adminSession.accessToken}` }, body: JSON.stringify({ enabled: false }) });
     expect(disabled.ok).toBe(true);
-    expect((await fetch(`${base}/v1/config`).then(response => response.json()) as { paidModeEnabled: boolean }).paidModeEnabled).toBe(false);
+    expect((await disabled.json() as { adminPremiumEnabled: boolean }).adminPremiumEnabled).toBe(false);
+    const disabledAdminAccount = await fetch(`${base}/v1/account`, { headers: { authorization: `Bearer ${adminSession.accessToken}` } }).then(response => response.json()) as { adminPremiumEnabled: boolean };
+    expect(disabledAdminAccount.adminPremiumEnabled).toBe(false);
 
     const firstGraduation = { round: 1, wordId: "word-1", at: 100 };
     await bootstrap({ cardGraduations: [firstGraduation] });

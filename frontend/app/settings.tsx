@@ -43,7 +43,7 @@ import { chooseBackup, downloadBackup } from "@/backup-files";
 export default function Settings() {
   const t = useTranslation();
   const params = useLocalSearchParams<{ focus?: string; request?: string }>();
-  const { data, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, importWords, patch, retryDictionary, selectLanguage, setAutomaticWordAddition, account, authBusy, authError, signIn, signOut, createBackup, mergeBackup, premium, subscribed, isAdmin, paidModeEnabled, setPaidModeEnabled, hasPremiumAccess, handwritingTrialRemaining, paymentBusy, paymentError, openPaywall, restorePurchases, manageSubscription } = useStore();
+  const { data, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, importWords, patch, retryDictionary, selectLanguage, setAutomaticWordAddition, account, authBusy, authError, signIn, signOut, createBackup, mergeBackup, premium, subscribed, isAdmin, adminPremiumEnabled, setAdminPremiumEnabled, hasPremiumAccess, handwritingTrialRemaining, paymentBusy, paymentError, openPaywall, restorePurchases, manageSubscription } = useStore();
   const scrollRef = useRef<ScrollView>(null);
   const generalMeasured = useRef(false);
   const apiKeyOffset = useRef<number | null>(null);
@@ -285,21 +285,19 @@ export default function Settings() {
           <View style={styles.membershipHeading}>
             <Ionicons name={premium ? "checkmark-circle" : hasPremiumAccess ? "gift-outline" : "lock-closed-outline"} size={25} color={premium ? colors.green : colors.coral} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.privacyTitle}>{isAdmin ? "Admin access active" : !paidModeEnabled ? "Free access active" : subscribed ? "Premium active" : "Hanzi Deck Premium"}</Text>
+              <Text style={styles.privacyTitle}>{adminPremiumEnabled ? "Admin access active" : subscribed ? "Premium active" : "Hanzi Deck Premium"}</Text>
               <Text style={styles.help}>
-                {isAdmin
+                {adminPremiumEnabled
                   ? "All paid features are permanently unlocked for this admin account."
-                  : !paidModeEnabled
-                    ? "Paid mode is disabled; all features are unlocked for everyone."
-                    : subscribed
-                      ? "Handwriting, Sentences, Listening, and Mix are unlocked."
+                  : subscribed
+                    ? "Handwriting, Sentences, Listening, and Mix are unlocked."
                   : handwritingTrialRemaining > 0
                     ? `${handwritingTrialRemaining} of 10 free handwriting ${handwritingTrialRemaining === 1 ? "session remains" : "sessions remain"}.`
                     : "Subscribe to unlock handwriting, Sentences, Listening, and Mix."}
               </Text>
             </View>
           </View>
-          {paidModeEnabled && !isAdmin ? <View style={styles.membershipButtons}>
+          {(!isAdmin || !adminPremiumEnabled || subscribed) ? <View style={styles.membershipButtons}>
             <Button
               label={subscribed ? "Manage subscription" : "View plans"}
               disabled={paymentBusy}
@@ -319,13 +317,13 @@ export default function Settings() {
           <View style={styles.aiChatRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.label}>ADMIN</Text>
-              <Text style={styles.privacyTitle}>Paid mode</Text>
-              <Text style={styles.help}>{paidModeEnabled ? "Subscriptions and free limits apply to non-admin users." : "All users can use paid features without a subscription."}</Text>
+              <Text style={styles.privacyTitle}>Admin premium access</Text>
+              <Text style={styles.help}>{adminPremiumEnabled ? "Premium bypass is enabled for this admin account." : "Premium bypass is disabled; use RevenueCat and the paywall like a regular user."}</Text>
             </View>
             <Switch
-              accessibilityLabel="Paid mode"
-              value={paidModeEnabled}
-              onValueChange={value => void setPaidModeEnabled(value).catch(reason => setPurchaseMessage(reason instanceof Error ? reason.message : "Could not change paid mode."))}
+              accessibilityLabel="Admin premium access"
+              value={adminPremiumEnabled}
+              onValueChange={value => void setAdminPremiumEnabled(value).catch(reason => setPurchaseMessage(reason instanceof Error ? reason.message : "Could not change admin premium access."))}
               trackColor={{ false: colors.line, true: colors.green }}
             />
           </View>
