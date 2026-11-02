@@ -65,6 +65,12 @@ test("sync merges explanations and preserves a failed card review across stale c
     const disabledAdminAccount = await fetch(`${base}/v1/account`, { headers: { authorization: `Bearer ${adminSession.accessToken}` } }).then(response => response.json()) as { adminPremiumEnabled: boolean };
     expect(disabledAdminAccount.adminPremiumEnabled).toBe(false);
 
+    const telegramAdminSessionResponse = await fetch(`${base}/v1/auth/dev/session`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ provider: "telegram", username: "bOrMiSoV" }) });
+    const telegramAdminSession = await telegramAdminSessionResponse.json() as { accessToken: string };
+    const telegramAdminAccount = await fetch(`${base}/v1/account`, { headers: { authorization: `Bearer ${telegramAdminSession.accessToken}` } }).then(response => response.json()) as { email: string | null; isAdmin: boolean };
+    expect(telegramAdminAccount.email).toBeNull();
+    expect(telegramAdminAccount.isAdmin).toBe(true);
+
     const firstGraduation = { round: 1, wordId: "word-1", at: 100 };
     await bootstrap({ cardGraduations: [firstGraduation] });
     const graduationMerge = await bootstrap({ cardGraduations: [{ round: 2, wordId: "word-2", at: 200 }] }) as unknown as { cardGraduations: typeof firstGraduation[] };

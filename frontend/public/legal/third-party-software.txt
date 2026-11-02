@@ -5211,7 +5211,7 @@ SOFTWARE.
 
 ============================================================
 
-@revenuecat/purchases-js-hybrid-mappings@20.1.0
+@revenuecat/purchases-js-hybrid-mappings@19.17.0
 License metadata: MIT
 Source: git+https://github.com/RevenueCat/purchases-hybrid-common.git
 
@@ -5247,7 +5247,7 @@ SOFTWARE.
 
 ============================================================
 
-@revenuecat/purchases-typescript-internal@20.1.0
+@revenuecat/purchases-typescript-internal@19.17.0
 License metadata: MIT
 Source: git+https://github.com/RevenueCat/purchases-hybrid-common.git
 
@@ -18446,7 +18446,7 @@ SOFTWARE.
 
 ============================================================
 
-react-native-purchases-ui@11.0.0
+react-native-purchases-ui@10.16.0
 License metadata: MIT
 Source: git+https://github.com/revenuecat/react-native-purchases.git
 
@@ -18473,7 +18473,7 @@ SOFTWARE.
 
 ============================================================
 
-react-native-purchases@11.0.0
+react-native-purchases@10.16.0
 License metadata: MIT
 Source: git+https://github.com/revenuecat/react-native-purchases.git
 

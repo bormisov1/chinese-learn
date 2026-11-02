@@ -65,12 +65,12 @@
     {
       "name": "RevenueCat React Native SDK",
       "license": "MIT",
-      "version": "11.0.0",
-      "url": "https://github.com/RevenueCat/react-native-purchases/releases/tag/11.0.0"
+      "version": "10.16.0",
+      "url": "https://github.com/RevenueCat/react-native-purchases/releases/tag/10.16.0"
     }
   ],
   "artifacts": [
-    { "path": "package-lock.json", "sha256": "6ce98da85cf70cc62331a623fa9aa4ad7cde70a881ce7be067a8613029003a89" },
+    { "path": "package-lock.json", "sha256": "cb332cacc7d0bd3f75ee7db93243909258b35d98c3c96a38406c19edf59ea735" },
     { "path": "public/hanzi-lookup/hanzi_lookup.js", "sha256": "fe6f70c1b4172951727a1b313313cff1dc1c663ff0c5209a7ccb42ae3e0a71ef" },
     { "path": "public/hanzi-lookup/hanzi_lookup_bg.wasm", "sha256": "8d2affdbfffe651d62534fb6a4ad192d57cf3559631860a7aadb7cd48ffa7463" },
     { "path": "public/hanzi-lookup/worker.js", "sha256": "fd0fb333a2484fc6073f9d3844205cfb3804a0abf314d6f04471286a8e5ad3dc" },

@@ -9,6 +9,8 @@ const dbPath = process.env.DATABASE_PATH ?? "./data/app.sqlite";
 const publicOrigin = process.env.PUBLIC_ORIGIN ?? `http://localhost:${port}`;
 const devAuth = process.env.AUTH_DEV_MODE === "1";
 const adminEmails = new Set((process.env.ADMIN_EMAILS ?? "bormisov1@gmail.com").split(",").map(value => value.trim().toLowerCase()).filter(Boolean));
+const normalizeTelegramUsername = (value: unknown) => String(value ?? "").trim().replace(/^@/, "").toLowerCase();
+const adminTelegramUsernames = new Set((process.env.ADMIN_TELEGRAM_USERNAMES ?? "Bormisov").split(",").map(normalizeTelegramUsername).filter(Boolean));
 if (dirname(dbPath) !== ".") mkdirSync(dirname(dbPath), { recursive: true });
 const db = new Database(dbPath, { create: true });
 db.exec(`
@@ -171,6 +173,8 @@ function createUser(provider: Provider, subject: string, profile: Snapshot) {
   if (existing) {
     db.query("UPDATE users SET name = COALESCE(?, name), email = COALESCE(?, email), picture = COALESCE(?, picture) WHERE id = ?")
       .run(profile.name as string | null, profile.email as string | null, profile.picture as string | null, existing.user_id);
+    db.query("UPDATE identities SET profile_json = ? WHERE provider = ? AND subject = ?")
+      .run(JSON.stringify(profile), provider, subject);
     return existing.user_id;
   }
   const userId = randomUUID();
@@ -223,7 +227,19 @@ function userAccount(userId: string) {
 
 function isAdmin(userId: string) {
   const email = userAccount(userId)?.email?.trim().toLowerCase();
-  return Boolean(email && adminEmails.has(email));
+  if (email && adminEmails.has(email)) return true;
+  const identities = db.query("SELECT provider, profile_json FROM identities WHERE user_id = ?").all(userId) as { provider: string; profile_json: string }[];
+  for (const identity of identities) {
+    let profile: Snapshot;
+    try { profile = safeJson(JSON.parse(identity.profile_json)); } catch { continue; }
+    const identityEmail = String(profile.email ?? "").trim().toLowerCase();
+    if (identityEmail && adminEmails.has(identityEmail)) return true;
+    if (identity.provider === "telegram") {
+      const username = normalizeTelegramUsername(profile.username ?? profile.preferred_username);
+      if (username && adminTelegramUsernames.has(username)) return true;
+    }
+  }
+  return false;
 }
 
 function adminPremiumEnabled(userId: string) {
@@ -410,7 +426,9 @@ async function fetchRequest(request: Request) {
       if (request.method === "POST" && url.pathname === "/v1/auth/dev/session") {
         if (!devAuth) return json({ error: "disabled" }, 404);
         const body = safeJson(await request.json());
-        const userId = createUser("google", `dev:${String(body.email ?? randomUUID())}`, { name: body.name ?? "Local tester", email: body.email ?? null });
+        const provider: Provider = body.provider === "telegram" ? "telegram" : "google";
+        const subject = provider === "telegram" ? `dev:telegram:${String(body.username ?? randomUUID())}` : `dev:${String(body.email ?? randomUUID())}`;
+        const userId = createUser(provider, subject, { name: body.name ?? "Local tester", email: body.email ?? null, username: body.username ?? null });
         return json(issueSession(userId));
       }
       if (request.method === "POST" && url.pathname === "/v1/auth/exchange") {
