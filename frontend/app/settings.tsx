@@ -270,7 +270,7 @@ export default function Settings() {
         <Header
           eyebrow="Configuration"
           title="Settings"
-          subtitle="Your key and study data stay in this app's local storage."
+          subtitle="Your API key stays on this device. Signed-in study data also syncs to your account."
         />
         <View style={[shell.panel, styles.accountPanel]}>
           <Text style={styles.label}>ACCOUNT</Text>
@@ -424,8 +424,8 @@ export default function Settings() {
         <View style={{ flex: 1 }}>
           <Text style={styles.privacyTitle}>Local-first by design</Text>
           <Text style={styles.help}>
-            Vocabulary, generated sentences, indexes, SRS counters, and attempts
-            remain on device. AI requests go to DeepSeek; purchase status is handled by RevenueCat.
+            Study data is saved on this device. When signed in, it also syncs to
+            your account on our backend. AI requests go to DeepSeek; purchase status is handled by RevenueCat.
           </Text>
         </View>
       </View>
