@@ -33,6 +33,7 @@ import { recordCardGraduation, recordRoundCompletion, undoCardGraduation, undoRo
 import { flushTelemetry, track } from "@/telemetry";
 import { ExplanationButton } from "@/explanation-button";
 import { captureCardReviewUndo, restoreCardReview, type CardReviewUndo } from "@/card-review-undo";
+import { GraduationSeal, RoundCompletionRing } from "@/motion-feedback";
 import Handwriting from "./handwriting";
 
 type Phase = "ready" | "studying" | "complete";
@@ -85,6 +86,7 @@ export default function Cards() {
     [poolHandwritingWord, setPoolHandwritingWord] = useState<Word | null>(null),
     [summaryHandwritingCorrectIds, setSummaryHandwritingCorrectIds] = useState<string[]>([]);
   const swipe = useRef(new Animated.ValueXY()).current;
+  const wrongShake = useRef(new Animated.Value(0)).current;
   const cardSpin = useRef(new Animated.Value(0)).current;
   const grading = useRef(false);
   const handwritingRequestPending = useRef(false);
@@ -216,6 +218,7 @@ export default function Cards() {
     setExampleIndex(0);
     grading.current = false;
     swipe.setValue({ x: 0, y: 0 });
+    wrongShake.setValue(0);
     cardSpin.setValue(0);
     setPhase("studying");
   };
@@ -266,6 +269,7 @@ export default function Cards() {
     setHandwritingCorrect(false);
     setExampleIndex(0);
     swipe.setValue({ x: 0, y: 0 });
+    wrongShake.setValue(0);
     cardSpin.setValue(0);
   };
   const previousCard = () => {
@@ -273,6 +277,7 @@ export default function Cards() {
     const previousPosition = phase === "studying" ? position - 1 : position;
     if (!previous || previous.position !== previousPosition) return;
     swipe.stopAnimation();
+    wrongShake.stopAnimation();
     cardSpin.stopAnimation();
     grading.current = false;
     patch((current) => ({
@@ -295,6 +300,7 @@ export default function Cards() {
     setHandwritingCorrect(false);
     setExampleIndex(0);
     swipe.setValue({ x: 0, y: 0 });
+    wrongShake.setValue(0);
     cardSpin.setValue(0);
   };
   const animateSwipe = (correct: boolean) => {
@@ -303,16 +309,27 @@ export default function Cards() {
     if (Platform.OS === "ios") pendingTransition.current = {
       kind: "card", startedAt: transitionNow(), lastCard: position + 1 === roundWords.length,
     };
-    Animated.timing(swipe, {
+    const swipeAway = Animated.timing(swipe, {
       toValue: { x: correct ? 520 : -520, y: 0 },
       duration: 180,
       useNativeDriver: true,
-    }).start(({ finished }) => {
+    });
+    const animation = correct ? swipeAway : Animated.sequence([
+      Animated.timing(wrongShake, { toValue: -9, duration: 36, useNativeDriver: true }),
+      Animated.timing(wrongShake, { toValue: 8, duration: 48, useNativeDriver: true }),
+      Animated.timing(wrongShake, { toValue: -5, duration: 42, useNativeDriver: true }),
+      Animated.timing(wrongShake, { toValue: 0, duration: 38, useNativeDriver: true }),
+      swipeAway,
+    ]);
+    animation.start(({ finished }) => {
       grading.current = false;
       if (finished) {
         if (pendingTransition.current?.kind === "card") pendingTransition.current.swipeCallbackAt = transitionNow();
         grade(correct);
-      } else pendingTransition.current = null;
+      } else {
+        wrongShake.setValue(0);
+        pendingTransition.current = null;
+      }
     });
   };
   const requestHandwriting = (onGranted: () => void) => {
@@ -376,7 +393,11 @@ export default function Cards() {
       flipped
         ? Math.abs(gesture.dx) > 8 && Math.abs(gesture.dx) >= Math.abs(gesture.dy)
         : Math.hypot(gesture.dx, gesture.dy) > 8,
-    onPanResponderGrant: () => swipe.stopAnimation(),
+    onPanResponderGrant: () => {
+      swipe.stopAnimation();
+      wrongShake.stopAnimation();
+      wrongShake.setValue(0);
+    },
     onPanResponderMove: (_, gesture) => {
       if (flipped) swipe.setValue({ x: gesture.dx, y: gesture.dy });
     },
@@ -449,6 +470,7 @@ export default function Cards() {
         {graduations.length > 0 && <RoundPoolChanges graduations={graduations} settings={data.settings}
           handwritingCorrectIds={summaryHandwritingCorrectIds} onHandwriting={openSummaryHandwriting} />}
         <View style={styles.results}>
+          <RoundCompletionRing correct={roundWords.length - mistaken.length} total={roundWords.length} />
           {mistaken.length ? (
             <>
               <Text style={styles.resultsTitle}>MISTAKEN WORDS</Text>
@@ -477,12 +499,9 @@ export default function Cards() {
               })}
             </>
           ) : (
-            <>
-              <Text style={styles.success}>✓</Text>
-              <Text style={styles.roundText}>
-                No mistaken words this round.
-              </Text>
-            </>
+            <Text style={styles.roundText}>
+              No mistaken words this round.
+            </Text>
           )}
         </View>
         <Button
@@ -541,6 +560,7 @@ export default function Cards() {
             exampleIndex={exampleIndex}
             onExampleIndexChange={setExampleIndex}
             swipe={swipe}
+            wrongShake={wrongShake}
             cardSpin={cardSpin}
             panHandlers={panResponder.panHandlers}
             onFlip={flipCard}
@@ -582,7 +602,7 @@ function RoundReviewHeader({ eyebrow, title, subtitle, onPreviousCard }: {
 }
 
 function StackCard({ word, depth, roundIndex, initialTilt, active, height, settings, translationLanguage,
-  examples, flipped, exampleIndex, onExampleIndexChange, swipe, cardSpin,
+  examples, flipped, exampleIndex, onExampleIndexChange, swipe, wrongShake, cardSpin,
   panHandlers, onFlip, onGrade, onHandwriting, handwritingCorrect, onHeightChange,
 }: {
   word: Word;
@@ -598,6 +618,7 @@ function StackCard({ word, depth, roundIndex, initialTilt, active, height, setti
   exampleIndex: number;
   onExampleIndexChange: (index: number) => void;
   swipe: Animated.ValueXY;
+  wrongShake: Animated.Value;
   cardSpin: Animated.Value;
   panHandlers: ReturnType<typeof PanResponder.create>["panHandlers"];
   onFlip: (flipped: boolean) => void;
@@ -673,7 +694,7 @@ function StackCard({ word, depth, roundIndex, initialTilt, active, height, setti
         {...(active ? panHandlers : {})}
         style={[active && webDragSurface, active && {
           transform: [
-            { translateX: flipped ? swipe.x : 0 },
+            { translateX: flipped ? Animated.add(swipe.x, wrongShake) : 0 },
             { translateY: flipped ? swipe.y : 0 },
             { rotateY: cardSpin.interpolate({
               inputRange: [0, 0.5, 1],
@@ -772,19 +793,19 @@ function RoundPoolChanges({ graduations, settings, handwritingCorrectIds, onHand
 }) {
   const incoming = graduations.flatMap(({ replacement }) => replacement ? [replacement] : []);
   return <>
-    <PoolChangeSection title="LEARNED" words={graduations.map(({ learned }) => learned)} settings={settings} />
+    <PoolChangeSection title="LEARNED" words={graduations.map(({ learned }) => learned)} settings={settings} graduated />
     {incoming.length > 0 && <PoolChangeSection title="NEW IN THE ACTIVE POOL" words={incoming} settings={settings}
       incoming handwritingCorrectIds={handwritingCorrectIds} onHandwriting={onHandwriting} />}
   </>;
 }
 
-function PoolChangeSection({ title, words, settings, incoming = false, handwritingCorrectIds = [], onHandwriting }: {
-  title: string; words: Word[]; settings: Settings; incoming?: boolean;
+function PoolChangeSection({ title, words, settings, incoming = false, graduated = false, handwritingCorrectIds = [], onHandwriting }: {
+  title: string; words: Word[]; settings: Settings; incoming?: boolean; graduated?: boolean;
   handwritingCorrectIds?: string[]; onHandwriting?: (word: Word) => void;
 }) {
   return <View style={[styles.poolChanges, incoming && styles.poolChangesIncoming]}>
     <Text style={[styles.poolChangesTitle, incoming && styles.poolChangesTitleIncoming]}>{title}</Text>
-    {words.map((word) => {
+    {words.map((word, index) => {
       const pronunciation = resolveWordPronunciation(word, displayTranslation(word.russian, settings.language));
       return <View key={word.id} style={styles.poolChangeRow}>
         <ExplanationButton kind="word" text={pronunciation.hanzi} pinyin={pronunciation.pinyin} gloss={pronunciation.meaning} size={19} />
@@ -795,6 +816,7 @@ function PoolChangeSection({ title, words, settings, incoming = false, handwriti
           <WordGuessStats word={word} />
         </View>
         <SpeakerButton pronunciation={pronunciation} settings={settings} size={20} />
+        {graduated && <GraduationSeal delay={index * 90} />}
         {incoming && (handwritingCorrectIds.includes(word.id)
           ? <View pointerEvents="none" accessibilityLabel={`Correct handwriting answer for ${pronunciation.hanzi}`} style={styles.poolHandwritingButton}>
               <Ionicons name="checkmark" size={26} color={colors.green} />

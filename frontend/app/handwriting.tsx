@@ -11,6 +11,7 @@ import { Text } from '@/i18n';
 import { colors } from '@/theme';
 import { prepareRecognition, recognizeStrokes } from '@/handwriting/recognition';
 import type { Point, Stroke } from '@/handwriting/types';
+import { SuccessSparks } from '@/motion-feedback';
 
 type HandwritingProps = {
   targetHanzi?: string;
@@ -137,6 +138,7 @@ export default function Handwriting({ targetHanzi, showTarget = false, backLabel
         <Ionicons name="arrow-back" size={23} color={colors.green} />
       </Pressable>}
       <View style={[styles.outputPanel, onBack ? styles.outputPanelWithBack : styles.outputPanelStandalone]}>
+        {correct && <SuccessSparks />}
         <Text
           accessibilityLabel="Handwriting output"
           selectable
@@ -207,7 +209,7 @@ export default function Handwriting({ targetHanzi, showTarget = false, backLabel
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.paper },
   outputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 12, marginBottom: 10 },
-  outputPanel: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 52, paddingHorizontal: 16, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.card },
+  outputPanel: { position: 'relative', flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 52, paddingHorizontal: 16, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.card },
   outputPanelWithBack: { flex: 1, minWidth: 0 },
   outputPanelStandalone: { marginHorizontal: 16, marginTop: 12, marginBottom: 10 },
   outputActions: { flexDirection: 'row', alignItems: 'center', gap: 2 },

@@ -3,7 +3,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from 'expo-router';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Animated, Image, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useStore } from '@/context';
 import { Text, useTranslation } from '@/i18n';
 import { breakdownRecognizedWord, containedBox, coveredBox, groupOcrCharacters, recognizedWord } from '@/photo-ocr-layout';
@@ -23,6 +23,69 @@ async function discardCameraPhoto(uri: string) {
   } catch {
     // Camera cache files can already be removed by the operating system.
   }
+}
+
+function RecognitionFocusBox({ box, selected, unavailable, focus }: {
+  box: { x: number; y: number; width: number; height: number };
+  selected: boolean;
+  unavailable: boolean;
+  focus: boolean;
+}) {
+  const progress = useRef(new Animated.Value(focus ? 0 : 1)).current;
+  useEffect(() => {
+    progress.setValue(focus ? 0 : 1);
+    if (!focus) return;
+    const animation = Animated.spring(progress, {
+      toValue: 1,
+      speed: 20,
+      bounciness: 7,
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [focus, progress]);
+  return <Animated.View
+    pointerEvents="none"
+    style={[
+      styles.highlight,
+      { left: box.x, top: box.y, width: box.width, height: box.height },
+      selected && styles.highlightSelected,
+      unavailable && styles.highlightUnavailable,
+      focus && {
+        opacity: progress,
+        transform: [{ scale: progress.interpolate({ inputRange: [0, 1], outputRange: [1.16, 1] }) }],
+      },
+    ]}
+  >
+    {focus && <>
+      <View style={[styles.focusCorner, styles.focusTopLeft]} />
+      <View style={[styles.focusCorner, styles.focusTopRight]} />
+      <View style={[styles.focusCorner, styles.focusBottomLeft]} />
+      <View style={[styles.focusCorner, styles.focusBottomRight]} />
+    </>}
+  </Animated.View>;
+}
+
+function ExtractionBadge({ label }: { label: string }) {
+  const progress = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const animation = Animated.spring(progress, { toValue: 1, speed: 19, bounciness: 8, useNativeDriver: true });
+    animation.start();
+    return () => animation.stop();
+  }, [progress]);
+  return <Animated.View pointerEvents="none" style={[
+    styles.extractionBadge,
+    {
+      opacity: progress,
+      transform: [
+        { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) },
+        { scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] }) },
+      ],
+    },
+  ]}>
+    <Ionicons name="scan-outline" size={15} color={colors.white} />
+    <Text style={styles.scanBadgeText}>{label}</Text>
+  </Animated.View>;
 }
 
 export default function Recognition() {
@@ -313,10 +376,12 @@ export default function Recognition() {
         : null}
       {frame && (paused || mode === 'photo') ? <Image source={{ uri: frame.uri }} style={StyleSheet.absoluteFillObject} resizeMode={mode === 'camera' ? 'cover' : 'contain'} accessibilityLabel="Recognized camera frame" /> : null}
       {highlights.map(({ id, hanzi, box, entry }) =>
-        <View
+        <RecognitionFocusBox
           key={id}
-          pointerEvents="none"
-          style={[styles.highlight, { left: box.x, top: box.y, width: box.width, height: box.height }, selected.has(hanzi) && styles.highlightSelected, !entry && !existing.has(hanzi) && styles.highlightUnavailable]}
+          box={box}
+          selected={selected.has(hanzi)}
+          unavailable={!entry && !existing.has(hanzi)}
+          focus={paused || mode === 'photo'}
         />,
       )}
       {mode === 'camera' && !permission?.granted
@@ -329,6 +394,7 @@ export default function Recognition() {
       {!frame && mode === 'camera' && permission?.granted ? <View pointerEvents="none" style={styles.hintBadge}><Text style={styles.scanBadgeText}>Point the camera at Chinese text.</Text></View> : null}
       {(scanning || busy) && permission?.granted ? <View style={styles.scanBadge}><ActivityIndicator size="small" color={colors.white} /><Text style={styles.scanBadgeText}>Recognizing text…</Text></View> : null}
       {paused && mode === 'camera' ? <View style={styles.freezeBadge}><Ionicons name="pause" size={13} color={colors.white} /><Text style={styles.scanBadgeText}>Frozen</Text></View> : null}
+      {!busy && frame && (paused || mode === 'photo') && visibleExpressions.length ? <ExtractionBadge label={`${visibleExpressions.length} ${t('Recognized expressions')}`} /> : null}
     </View>
 
     {message ? <Text style={styles.message}>{message}</Text> : null}
@@ -362,8 +428,14 @@ const styles = StyleSheet.create({
   highlight: { position: 'absolute', borderColor: '#F7D56B', borderWidth: 2, borderRadius: 5, backgroundColor: 'rgba(247, 213, 107, 0.19)' },
   highlightSelected: { borderColor: '#70E3A1', backgroundColor: 'rgba(55, 140, 92, 0.48)' },
   highlightUnavailable: { borderColor: '#FFFFFF', backgroundColor: 'rgba(50, 50, 50, 0.26)', opacity: 0.62 },
+  focusCorner: { position: 'absolute', width: 10, height: 10, borderColor: colors.white },
+  focusTopLeft: { left: -4, top: -4, borderLeftWidth: 3, borderTopWidth: 3 },
+  focusTopRight: { right: -4, top: -4, borderRightWidth: 3, borderTopWidth: 3 },
+  focusBottomLeft: { left: -4, bottom: -4, borderLeftWidth: 3, borderBottomWidth: 3 },
+  focusBottomRight: { right: -4, bottom: -4, borderRightWidth: 3, borderBottomWidth: 3 },
   scanBadge: { position: 'absolute', left: 12, top: 12, flexDirection: 'row', gap: 7, alignItems: 'center', backgroundColor: 'rgba(20, 32, 25, 0.75)', borderRadius: 20, paddingHorizontal: 11, paddingVertical: 7 },
   freezeBadge: { position: 'absolute', right: 12, top: 12, flexDirection: 'row', gap: 6, alignItems: 'center', backgroundColor: 'rgba(20, 32, 25, 0.75)', borderRadius: 20, paddingHorizontal: 11, paddingVertical: 7 },
+  extractionBadge: { position: 'absolute', left: 12, bottom: 12, flexDirection: 'row', gap: 6, alignItems: 'center', backgroundColor: 'rgba(55, 90, 75, 0.92)', borderRadius: 20, paddingHorizontal: 11, paddingVertical: 8 },
   scanBadgeText: { color: colors.white, fontWeight: '700', fontSize: 12 },
   panel: { backgroundColor: colors.card, borderRadius: 16, borderColor: colors.line, borderWidth: 1, padding: 16, marginTop: 14, gap: 12 },
   heading: { color: colors.ink, fontSize: 17, fontWeight: '800' },
