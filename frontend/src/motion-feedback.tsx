@@ -13,10 +13,10 @@ import { colors } from '@/theme';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
-function useReducedMotion() {
-  const [reduced, setReduced] = useState(false);
+export function useReducedMotion() {
+  const [reduced, setReduced] = useState<boolean | null>(null);
   useEffect(() => {
-    void AccessibilityInfo.isReduceMotionEnabled().then(setReduced);
+    void AccessibilityInfo.isReduceMotionEnabled().then(setReduced).catch(() => setReduced(false));
     const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduced);
     return () => subscription.remove();
   }, []);
@@ -27,6 +27,7 @@ export function DeckLoadingAnimation() {
   const reduced = useReducedMotion();
   const cards = useRef([0, 1, 2].map(() => new Animated.Value(0))).current;
   useEffect(() => {
+    if (reduced === null) return;
     cards.forEach(value => value.setValue(reduced ? 1 : 0));
     if (reduced) return;
     const animation = Animated.stagger(85, cards.map(value => Animated.spring(value, {
@@ -66,6 +67,7 @@ export function SuccessSparks() {
   const reduced = useReducedMotion();
   const progress = useRef(new Animated.Value(0)).current;
   useEffect(() => {
+    if (reduced === null) return;
     progress.setValue(reduced ? 1 : 0);
     if (reduced) return;
     const animation = Animated.timing(progress, {
@@ -98,6 +100,7 @@ export function ListeningSuccessWave() {
   const reduced = useReducedMotion();
   const bars = useRef([0, 1, 2, 3, 4, 5, 6].map(() => new Animated.Value(0))).current;
   useEffect(() => {
+    if (reduced === null) return;
     bars.forEach(value => value.setValue(reduced ? 1 : 0));
     if (reduced) return;
     const animation = Animated.stagger(35, bars.map(value => Animated.spring(value, {
@@ -126,6 +129,7 @@ export function ImportConfirmationMark({ delay = 0 }: { delay?: number }) {
   const reduced = useReducedMotion();
   const progress = useRef(new Animated.Value(0)).current;
   useEffect(() => {
+    if (reduced === null) return;
     progress.setValue(reduced ? 1 : 0);
     if (reduced) return;
     const animation = Animated.spring(progress, {
@@ -150,62 +154,93 @@ export function ImportConfirmationMark({ delay = 0 }: { delay?: number }) {
   ]}><Ionicons name="checkmark" size={17} color={colors.white} /></Animated.View>;
 }
 
-export function RoundCompletionRing({ correct, total }: { correct: number; total: number }) {
+export function RoundCompletionRing({ correct, total, onComplete }: {
+  correct: number;
+  total: number;
+  onComplete: () => void;
+}) {
   const reduced = useReducedMotion();
   const progress = useRef(new Animated.Value(0)).current;
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
   const circumference = 2 * Math.PI * 42;
   useEffect(() => {
+    if (reduced === null) return;
     progress.setValue(reduced ? 1 : 0);
-    if (reduced) return;
+    if (reduced) {
+      onCompleteRef.current();
+      return;
+    }
     const animation = Animated.timing(progress, {
       toValue: 1,
-      duration: 620,
+      duration: 1240,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
     });
-    animation.start();
+    animation.start(({ finished }) => {
+      if (finished) onCompleteRef.current();
+    });
     return () => animation.stop();
   }, [progress, reduced]);
-  return <View accessibilityLabel={`Round complete. ${correct} of ${total} correct.`} style={styles.roundRing}>
-    <Svg width={104} height={104} style={StyleSheet.absoluteFillObject}>
-      <Circle cx={52} cy={52} r={42} fill="none" stroke={colors.line} strokeWidth={7} />
-      <AnimatedCircle
-        cx={52}
-        cy={52}
-        r={42}
-        fill="none"
-        stroke={colors.green}
-        strokeWidth={7}
-        strokeLinecap="round"
-        strokeDasharray={`${circumference} ${circumference}`}
-        strokeDashoffset={progress.interpolate({ inputRange: [0, 1], outputRange: [circumference, 0] }) as any}
-        rotation={-90}
-        origin="52, 52"
-      />
-    </Svg>
-    <Animated.View style={{ opacity: progress, transform: [{ scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) }] }}>
-      <Text style={styles.roundRingCount}>{correct}/{total}</Text>
-      <Ionicons name="checkmark" size={18} color={colors.green} style={styles.roundRingCheck} />
-    </Animated.View>
+  return <View accessibilityLabel={`Round complete. ${correct} of ${total} correct.`} style={styles.roundCompletionOverlay}>
+    <View style={styles.roundRingLarge}>
+      <View style={styles.roundRing}>
+        <Svg width={104} height={104} style={StyleSheet.absoluteFillObject}>
+          <Circle cx={52} cy={52} r={42} fill="none" stroke={colors.line} strokeWidth={7} />
+          <AnimatedCircle
+            cx={52}
+            cy={52}
+            r={42}
+            fill="none"
+            stroke={colors.green}
+            strokeWidth={7}
+            strokeLinecap="round"
+            strokeDasharray={`${circumference} ${circumference}`}
+            strokeDashoffset={progress.interpolate({ inputRange: [0, 1], outputRange: [circumference, 0] }) as any}
+            rotation={-90}
+            origin="52, 52"
+          />
+        </Svg>
+        <Animated.View style={{ opacity: progress, transform: [{ scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) }] }}>
+          <Text style={styles.roundRingCount}>{correct}/{total}</Text>
+          <Ionicons name="checkmark" size={18} color={colors.green} style={styles.roundRingCheck} />
+        </Animated.View>
+      </View>
+    </View>
   </View>;
 }
 
-export function GraduationSeal({ delay = 0 }: { delay?: number }) {
+export function GraduationSeal({ status, onComplete }: {
+  status: 'pending' | 'active' | 'complete';
+  onComplete: () => void;
+}) {
   const reduced = useReducedMotion();
   const progress = useRef(new Animated.Value(0)).current;
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
   useEffect(() => {
-    progress.setValue(reduced ? 1 : 0);
-    if (reduced) return;
+    if (reduced === null) return;
+    if (reduced) {
+      progress.setValue(1);
+      if (status === 'active') onCompleteRef.current();
+      return;
+    }
+    if (status !== 'active') {
+      progress.setValue(status === 'complete' ? 1 : 0);
+      return;
+    }
+    progress.setValue(0);
     const animation = Animated.spring(progress, {
       toValue: 1,
-      delay,
-      speed: 18,
+      speed: 6,
       bounciness: 8,
       useNativeDriver: true,
     });
-    animation.start();
+    animation.start(({ finished }) => {
+      if (finished) onCompleteRef.current();
+    });
     return () => animation.stop();
-  }, [delay, progress, reduced]);
+  }, [progress, reduced, status]);
   return <Animated.View accessibilityLabel="Word graduated" style={[
     styles.graduationSeal,
     {
@@ -233,7 +268,9 @@ const styles = StyleSheet.create({
   wave: { height: 46, flexDirection: 'row', alignItems: 'center', gap: 4 },
   waveBar: { width: 4, borderRadius: 3, backgroundColor: colors.green },
   importMark: { width: 25, height: 25, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.green },
-  roundRing: { width: 104, height: 104, alignSelf: 'center', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  roundCompletionOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.paper },
+  roundRingLarge: { width: 312, height: 312, alignItems: 'center', justifyContent: 'center' },
+  roundRing: { width: 104, height: 104, alignItems: 'center', justifyContent: 'center', transform: [{ scale: 3 }] },
   roundRingCount: { color: colors.ink, fontSize: 20, lineHeight: 24, fontWeight: '900', textAlign: 'center' },
   roundRingCheck: { alignSelf: 'center' },
   graduationSeal: { width: 56, height: 56, borderRadius: 28, borderWidth: 2, borderColor: colors.green, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.card },

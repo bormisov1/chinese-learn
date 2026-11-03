@@ -33,10 +33,10 @@ import { recordCardGraduation, recordRoundCompletion, undoCardGraduation, undoRo
 import { flushTelemetry, track } from "@/telemetry";
 import { ExplanationButton } from "@/explanation-button";
 import { captureCardReviewUndo, restoreCardReview, type CardReviewUndo } from "@/card-review-undo";
-import { GraduationSeal, RoundCompletionRing } from "@/motion-feedback";
+import { GraduationSeal, RoundCompletionRing, useReducedMotion } from "@/motion-feedback";
 import Handwriting from "./handwriting";
 
-type Phase = "ready" | "studying" | "complete";
+type Phase = "ready" | "studying" | "completing" | "complete";
 type Graduation = { learned: Word; replacement?: Word };
 const findGraduation = (before: Word[], after: Word[], wordId: string): Graduation | undefined => {
   const original = before.find((item) => item.id === wordId);
@@ -69,6 +69,7 @@ const waveOffset = (depth: number) => ({
 export default function Cards() {
   const { data, patch, generateBatch, requestHandwritingAccess } = useStore();
   const t = useTranslation();
+  const reducedMotion = useReducedMotion();
   const [studyRound, setStudyRound] = useState(data.cardRound + 1),
     [roundIds, setRoundIds] = useState<string[]>([]),
     [position, setPosition] = useState(0),
@@ -141,6 +142,7 @@ export default function Cards() {
   }, [phase, word?.id]);
   useEffect(() => {
     if (Platform.OS !== "ios") return;
+    if (phase === "completing") return;
     const pending = pendingTransition.current;
     if (!pending) return;
     // Two frames after React commits is a cheap proxy for the new native screen being usable.
@@ -263,7 +265,7 @@ export default function Cards() {
       undo,
     }]);
     if (graduation) setGraduations((items) => [...items, graduation]);
-    if (roundComplete) setPhase("complete");
+    if (roundComplete) setPhase("completing");
     else setPosition((p) => p + 1);
     setFlipped(false);
     setHandwritingCorrect(false);
@@ -311,10 +313,10 @@ export default function Cards() {
     };
     const swipeAway = Animated.timing(swipe, {
       toValue: { x: correct ? 520 : -520, y: 0 },
-      duration: 180,
+      duration: reducedMotion === false ? 180 : 0,
       useNativeDriver: true,
     });
-    const animation = correct ? swipeAway : Animated.sequence([
+    const animation = correct || reducedMotion !== false ? swipeAway : Animated.sequence([
       Animated.timing(wrongShake, { toValue: -9, duration: 36, useNativeDriver: true }),
       Animated.timing(wrongShake, { toValue: 8, duration: 48, useNativeDriver: true }),
       Animated.timing(wrongShake, { toValue: -5, duration: 42, useNativeDriver: true }),
@@ -452,6 +454,17 @@ export default function Cards() {
       </ScrollView>
     );
 
+  if (phase === "completing")
+    return (
+      <View style={shell.page}>
+        <RoundCompletionRing
+          correct={roundWords.length - mistakeIds.length}
+          total={roundWords.length}
+          onComplete={() => setPhase("complete")}
+        />
+      </View>
+    );
+
   if (phase === "complete") {
     const mistaken = mistakeIds
       .map((id) => data.words.find((w) => w.id === id))
@@ -470,7 +483,6 @@ export default function Cards() {
         {graduations.length > 0 && <RoundPoolChanges graduations={graduations} settings={data.settings}
           handwritingCorrectIds={summaryHandwritingCorrectIds} onHandwriting={openSummaryHandwriting} />}
         <View style={styles.results}>
-          <RoundCompletionRing correct={roundWords.length - mistaken.length} total={roundWords.length} />
           {mistaken.length ? (
             <>
               <Text style={styles.resultsTitle}>MISTAKEN WORDS</Text>
@@ -573,6 +585,7 @@ export default function Cards() {
         ))}
       </View>
     </ScrollView>
+    {reducedMotion === false && <CorrectGuessOverlay swipeX={swipe.x} />}
     {handwritingOpen && <Modal visible animationType="slide" onRequestClose={closeHandwriting}>
         <Handwriting targetHanzi={word.hanzi} onBack={closeHandwriting} onCorrect={finishHandwriting} />
       </Modal>}
@@ -748,9 +761,6 @@ function StackCard({ word, depth, roundIndex, initialTilt, active, height, setti
               <Animated.Text pointerEvents="none" style={[styles.swipeBadge, styles.wrongBadge, {
                 opacity: swipe.x.interpolate({ inputRange: [-100, -35], outputRange: [1, 0], extrapolate: "clamp" }),
               }]}>{t("WRONG")}</Animated.Text>
-              <Animated.Text pointerEvents="none" style={[styles.swipeBadge, styles.rightBadge, {
-                opacity: swipe.x.interpolate({ inputRange: [35, 100], outputRange: [0, 1], extrapolate: "clamp" }),
-              }]}>{t("RIGHT")}</Animated.Text>
               <View style={styles.cardControls}>
                 <ExplanationButton kind="word" text={pronunciation.hanzi} pinyin={pronunciation.pinyin} gloss={pronunciation.meaning} />
                 <HskBadge hanzi={pronunciation.hanzi} />
@@ -803,6 +813,7 @@ function PoolChangeSection({ title, words, settings, incoming = false, graduated
   title: string; words: Word[]; settings: Settings; incoming?: boolean; graduated?: boolean;
   handwritingCorrectIds?: string[]; onHandwriting?: (word: Word) => void;
 }) {
+  const [activeGraduation, setActiveGraduation] = useState(0);
   return <View style={[styles.poolChanges, incoming && styles.poolChangesIncoming]}>
     <Text style={[styles.poolChangesTitle, incoming && styles.poolChangesTitleIncoming]}>{title}</Text>
     {words.map((word, index) => {
@@ -816,7 +827,10 @@ function PoolChangeSection({ title, words, settings, incoming = false, graduated
           <WordGuessStats word={word} />
         </View>
         <SpeakerButton pronunciation={pronunciation} settings={settings} size={20} />
-        {graduated && <GraduationSeal delay={index * 90} />}
+        {graduated && <GraduationSeal
+          status={index < activeGraduation ? "complete" : index === activeGraduation ? "active" : "pending"}
+          onComplete={() => setActiveGraduation((current) => Math.max(current, index + 1))}
+        />}
         {incoming && (handwritingCorrectIds.includes(word.id)
           ? <View pointerEvents="none" accessibilityLabel={`Correct handwriting answer for ${pronunciation.hanzi}`} style={styles.poolHandwritingButton}>
               <Ionicons name="checkmark" size={26} color={colors.green} />
@@ -827,6 +841,15 @@ function PoolChangeSection({ title, words, settings, incoming = false, graduated
             </Pressable>)}
       </View>;
     })}
+  </View>;
+}
+
+function CorrectGuessOverlay({ swipeX }: { swipeX: Animated.Value }) {
+  const t = useTranslation();
+  return <View pointerEvents="none" accessibilityElementsHidden style={styles.correctGuessOverlay}>
+    <Animated.Text style={[styles.correctGuessBadge, {
+      opacity: swipeX.interpolate({ inputRange: [35, 100], outputRange: [0, 1], extrapolate: "clamp" }),
+    }]}>{t("RIGHT")}</Animated.Text>
   </View>;
 }
 
@@ -1160,7 +1183,24 @@ const styles = StyleSheet.create({
     letterSpacing: 1.1,
   },
   wrongBadge: { right: 20, color: colors.red, borderColor: colors.red },
-  rightBadge: { left: 20, color: colors.green, borderColor: colors.green },
+  correctGuessOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 50,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  correctGuessBadge: {
+    color: colors.green,
+    borderColor: colors.green,
+    borderWidth: 8,
+    borderRadius: 32,
+    paddingHorizontal: 36,
+    paddingVertical: 20,
+    fontSize: 48,
+    fontWeight: "900",
+    letterSpacing: 4.4,
+    backgroundColor: colors.card,
+  },
   cardControls: {
     width: "100%",
     height: 38,
