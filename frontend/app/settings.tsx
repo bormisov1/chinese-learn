@@ -43,7 +43,7 @@ import { chooseBackup, downloadBackup } from "@/backup-files";
 export default function Settings() {
   const t = useTranslation();
   const params = useLocalSearchParams<{ focus?: string; request?: string }>();
-  const { data, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, importWords, patch, retryDictionary, selectLanguage, setAutomaticWordAddition, account, authBusy, authError, signIn, signOut, createBackup, mergeBackup, premium, subscribed, isAdmin, adminPremiumEnabled, setAdminPremiumEnabled, hasPremiumAccess, handwritingTrialRemaining, paymentBusy, paymentError, openPaywall, restorePurchases, manageSubscription } = useStore();
+  const { data, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, importWords, patch, retryDictionary, selectLanguage, setAutomaticWordAddition, account, authBusy, authError, signIn, signOut, createBackup, mergeBackup, premium, subscribed, isAdmin, adminPremiumEnabled, adminPremiumBusy, setAdminPremiumEnabled, hasPremiumAccess, handwritingTrialRemaining, paymentBusy, paymentError, openPaywall, restorePurchases, manageSubscription } = useStore();
   const scrollRef = useRef<ScrollView>(null);
   const generalMeasured = useRef(false);
   const apiKeyOffset = useRef<number | null>(null);
@@ -312,6 +312,9 @@ export default function Settings() {
           </View> : null}
           {paymentError ? <Text style={styles.error}>{paymentError}</Text> : null}
           {purchaseMessage ? <Text style={styles.purchaseMessage}>{purchaseMessage}</Text> : null}
+          {adminPremiumBusy ? <View accessibilityLabel="Updating admin premium access" accessibilityRole="progressbar" style={styles.membershipLoadingOverlay}>
+            <ActivityIndicator color={colors.green} size="large" />
+          </View> : null}
         </View>
         {isAdmin ? <View style={[shell.panel, styles.adminPanel]}>
           <View style={styles.aiChatRow}>
@@ -322,6 +325,7 @@ export default function Settings() {
             </View>
             <Switch
               accessibilityLabel="Admin premium access"
+              disabled={adminPremiumBusy}
               value={adminPremiumEnabled}
               onValueChange={value => void setAdminPremiumEnabled(value).catch(reason => setPurchaseMessage(reason instanceof Error ? reason.message : "Could not change admin premium access."))}
               trackColor={{ false: colors.line, true: colors.green }}
@@ -974,6 +978,14 @@ const styles = StyleSheet.create({
   settingsContent: { paddingTop: 32 },
   accountPanel: { marginBottom: 14 },
   membershipPanel: { marginBottom: 14 },
+  membershipLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 20,
+    backgroundColor: "rgba(250, 249, 244, 0.72)",
+  },
   adminPanel: { marginBottom: 14, borderColor: "#D8B45B" },
   membershipPremium: { backgroundColor: "#EAF7ED", borderColor: "#AED8B7" },
   membershipHeading: { flexDirection: "row", alignItems: "center", gap: 12 },

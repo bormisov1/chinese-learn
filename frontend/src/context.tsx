@@ -15,13 +15,13 @@ import { createBackup, mergeBackupData, type BackupFile, type BackupMergeSummary
 import { useRevenueCat } from './revenuecat';
 import { hasPremiumFeatureAccess, recordFreeHandwritingOpen, remainingHandwritingOpens } from './premium-access';
 
-type Context = { data: StoreData; ready: boolean; generating: boolean; error: string; dictionary: Dictionary | null; dictionaryLoading: boolean; dictionaryError: string; dictionaryProgress: number | null; switchingLanguage: AppLanguage | null; account: Account | null; authBusy: boolean; authError: string; authCompletedCode: string | null; paymentsReady: boolean; paymentsConfigured: boolean; paymentBusy: boolean; paymentError: string; premium: boolean; subscribed: boolean; isAdmin: boolean; adminPremiumEnabled: boolean; setAdminPremiumEnabled: (enabled: boolean) => Promise<void>; hasPremiumAccess: boolean; handwritingTrialRemaining: number; openPaywall: () => Promise<boolean>; requestPremiumAccess: () => Promise<boolean>; requestHandwritingAccess: () => Promise<boolean>; restorePurchases: () => Promise<boolean>; manageSubscription: () => Promise<void>; selectLanguage: (language: AppLanguage) => Promise<boolean>; retryDictionary: () => void; importWords: (items: ImportedWord[]) => number; patch: (fn: (data: StoreData) => StoreData) => void; createBackup: () => BackupFile; mergeBackup: (backup: BackupFile) => BackupMergeSummary; setAutomaticWordAddition: (enabled: boolean, completeOnboarding?: boolean) => void; generateBatch: (mandatory?: Word) => Promise<void>; signIn: (provider: "google" | "telegram") => Promise<void>; signOut: () => Promise<void> };
+type Context = { data: StoreData; ready: boolean; generating: boolean; error: string; dictionary: Dictionary | null; dictionaryLoading: boolean; dictionaryError: string; dictionaryProgress: number | null; switchingLanguage: AppLanguage | null; account: Account | null; authBusy: boolean; authError: string; authCompletedCode: string | null; paymentsReady: boolean; paymentsConfigured: boolean; paymentBusy: boolean; paymentError: string; premium: boolean; subscribed: boolean; isAdmin: boolean; adminPremiumEnabled: boolean; adminPremiumBusy: boolean; setAdminPremiumEnabled: (enabled: boolean) => Promise<void>; hasPremiumAccess: boolean; handwritingTrialRemaining: number; openPaywall: () => Promise<boolean>; requestPremiumAccess: () => Promise<boolean>; requestHandwritingAccess: () => Promise<boolean>; restorePurchases: () => Promise<boolean>; manageSubscription: () => Promise<void>; selectLanguage: (language: AppLanguage) => Promise<boolean>; retryDictionary: () => void; importWords: (items: ImportedWord[]) => number; patch: (fn: (data: StoreData) => StoreData) => void; createBackup: () => BackupFile; mergeBackup: (backup: BackupFile) => BackupMergeSummary; setAutomaticWordAddition: (enabled: boolean, completeOnboarding?: boolean) => void; generateBatch: (mandatory?: Word) => Promise<void>; signIn: (provider: "google" | "telegram") => Promise<void>; signOut: () => Promise<void> };
 const StoreContext = createContext<Context>(null as never);
 const id = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [data, setData] = useState<StoreData>(emptyStore), [ready, setReady] = useState(false), [generating, setGenerating] = useState(false), [error, setError] = useState('');
-  const [account, setAccount] = useState<Account | null>(null), [authBusy, setAuthBusy] = useState(false), [authError, setAuthError] = useState(''), [authCompletedCode, setAuthCompletedCode] = useState<string | null>(null);
+  const [account, setAccount] = useState<Account | null>(null), [authBusy, setAuthBusy] = useState(false), [authError, setAuthError] = useState(''), [authCompletedCode, setAuthCompletedCode] = useState<string | null>(null), [adminPremiumBusy, setAdminPremiumBusy] = useState(false);
   const purchases = useRevenueCat(account?.id ?? null);
   const [loadedDictionary, setLoadedDictionary] = useState<{ language: AppLanguage; value: Dictionary } | null>(null);
   const [dictionaryLoading, setDictionaryLoading] = useState(false), [dictionaryError, setDictionaryError] = useState(''), [dictionaryProgress, setDictionaryProgress] = useState<number | null>(null), [switchingLanguage, setSwitchingLanguage] = useState<AppLanguage | null>(null), [dictionaryReload, setDictionaryReload] = useState(0);
@@ -186,8 +186,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const patch = (fn: (value: StoreData) => StoreData) => setData(fn);
   const setAdminPremiumEnabled = async (enabled: boolean) => {
     if (!isAdmin) throw new Error("Admin access required.");
-    const result = await setAdminPremiumAccess(enabled);
-    setAccount(current => current ? { ...current, adminPremiumEnabled: result.adminPremiumEnabled } : current);
+    const previous = adminPremiumEnabled;
+    setAdminPremiumBusy(true);
+    setAccount(current => current ? { ...current, adminPremiumEnabled: enabled } : current);
+    try {
+      const result = await setAdminPremiumAccess(enabled);
+      setAccount(current => current ? { ...current, adminPremiumEnabled: result.adminPremiumEnabled } : current);
+    } catch (reason) {
+      setAccount(current => current?.adminPremiumEnabled === enabled ? { ...current, adminPremiumEnabled: previous } : current);
+      throw reason;
+    } finally {
+      setAdminPremiumBusy(false);
+    }
   };
   const openPaywall = async () => {
     if (premium) return true;
@@ -264,7 +274,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       });
     } catch (e) { if (languageRef.current === language) setError(e instanceof Error ? e.message : 'Generation failed'); } finally { setGenerating(false); }
   };
-  const value = useMemo(() => ({ data, ready, generating, error, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, account, authBusy, authError, authCompletedCode, paymentsReady: purchases.ready, paymentsConfigured: purchases.configured, paymentBusy: purchases.busy, paymentError: purchases.error, premium, subscribed: purchases.premium, isAdmin, adminPremiumEnabled, setAdminPremiumEnabled, hasPremiumAccess: hasPremiumFeatureAccess(data.handwritingOpenCount, premium), handwritingTrialRemaining: remainingHandwritingOpens(data.handwritingOpenCount), openPaywall, requestPremiumAccess, requestHandwritingAccess, restorePurchases: purchases.restorePurchases, manageSubscription: purchases.presentCustomerCenter, selectLanguage, retryDictionary, importWords, patch, createBackup: makeBackup, mergeBackup, setAutomaticWordAddition, generateBatch, signIn, signOut }), [data, ready, generating, error, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, account, authBusy, authError, authCompletedCode, purchases, premium, isAdmin, adminPremiumEnabled]);
+  const value = useMemo(() => ({ data, ready, generating, error, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, account, authBusy, authError, authCompletedCode, paymentsReady: purchases.ready, paymentsConfigured: purchases.configured, paymentBusy: purchases.busy, paymentError: purchases.error, premium, subscribed: purchases.premium, isAdmin, adminPremiumEnabled, adminPremiumBusy, setAdminPremiumEnabled, hasPremiumAccess: hasPremiumFeatureAccess(data.handwritingOpenCount, premium), handwritingTrialRemaining: remainingHandwritingOpens(data.handwritingOpenCount), openPaywall, requestPremiumAccess, requestHandwritingAccess, restorePurchases: purchases.restorePurchases, manageSubscription: purchases.presentCustomerCenter, selectLanguage, retryDictionary, importWords, patch, createBackup: makeBackup, mergeBackup, setAutomaticWordAddition, generateBatch, signIn, signOut }), [data, ready, generating, error, dictionary, dictionaryLoading, dictionaryError, dictionaryProgress, switchingLanguage, account, authBusy, authError, authCompletedCode, purchases, premium, isAdmin, adminPremiumEnabled, adminPremiumBusy]);
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
 export const useStore = () => useContext(StoreContext);
