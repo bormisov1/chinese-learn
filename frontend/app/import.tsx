@@ -14,14 +14,19 @@ import { Button, Header, shell } from '@/ui';
 import hskLevels from '@/data/hsk-levels.json';
 import type { Dictionary } from '@/dictionary';
 import { parseTextVocabulary } from '@/text-vocabulary';
+import { ImportConfirmationMark } from '@/motion-feedback';
 
 export default function Import() {
   const { data, dictionary, dictionaryLoading, dictionaryError, retryDictionary, importWords } = useStore();
   const t = useTranslation();
   const [text, setText] = useState(''), [textMessage, setTextMessage] = useState('');
+  const [confirmedWords, setConfirmedWords] = useState<Set<string>>(new Set());
   const parsedText = parseTextVocabulary(text, dictionary);
   const commitText = () => {
+    const existing = new Set(data.words.map(word => word.hanzi));
+    const imported = parsedText.words.filter(word => !existing.has(word.hanzi));
     const count = importWords(parsedText.words);
+    setConfirmedWords(new Set(imported.slice(0, count).map(word => word.hanzi)));
     setTextMessage(count ? `Added ${count} new word${count === 1 ? '' : 's'}. Duplicates skipped.` : 'No new words to add.');
   };
 
@@ -37,13 +42,21 @@ export default function Import() {
       <TextInput
         accessibilityLabel="Chinese word or sentence"
         multiline
-        onChangeText={value => { setText(value); setTextMessage(''); }}
+        onChangeText={value => { setText(value); setTextMessage(''); setConfirmedWords(new Set()); }}
         placeholder="例如：我喜欢学习中文"
         placeholderTextColor={colors.muted}
         style={styles.textInput}
         value={text}
       />
-      {parsedText.words.length ? <View style={styles.textPreview}>{parsedText.words.map(word => <View key={word.hanzi} style={styles.row}><Text style={styles.hanzi}>{word.hanzi}</Text><Text style={styles.pinyin}>{word.pinyin}</Text><Text numberOfLines={1} style={styles.russian}>{word.russian}</Text></View>)}</View> : <Text style={styles.note}>{text.trim() ? 'No dictionary words found.' : 'Recognized words will appear here.'}</Text>}
+      {parsedText.words.length ? <View style={styles.textPreview}>{parsedText.words.map((word, index) => {
+        const confirmed = confirmedWords.has(word.hanzi);
+        return <View key={word.hanzi} style={[styles.row, confirmed && styles.rowConfirmed]}>
+          <Text style={styles.hanzi}>{word.hanzi}</Text>
+          <Text style={styles.pinyin}>{word.pinyin}</Text>
+          <Text numberOfLines={1} style={styles.russian}>{word.russian}</Text>
+          {confirmed && <ImportConfirmationMark delay={index * 65} />}
+        </View>;
+      })}</View> : <Text style={styles.note}>{text.trim() ? 'No dictionary words found.' : 'Recognized words will appear here.'}</Text>}
       {parsedText.unmatchedCharacters > 0 ? <Text style={styles.warning}>{`${t("Unmatched Chinese characters will be skipped:")} ${parsedText.unmatchedCharacters}`}</Text> : null}
       <Button label={`Add ${parsedText.words.length || ''} ${parsedText.words.length === 1 ? 'word' : 'words'}`.replace('  ', ' ')} icon="add-circle-outline" disabled={!parsedText.words.length} onPress={commitText}/>
       {textMessage ? <Text style={styles.note}>{textMessage}</Text> : null}
@@ -61,4 +74,4 @@ function HskAdder({ dictionary, existing, onAdd }: { dictionary: Dictionary | nu
   return <View style={{ marginTop: 16, padding: 16, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: 16 }}><Text style={styles.sectionTitle}>Add HSK words</Text><Text style={styles.textHelp}>Seven new words per click. Choose a level:</Text><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginVertical: 14 }}>{[1, 2, 3, 4, 5, 6].map(value => <Pressable key={value} onPress={() => { setLevel(value); setMessage(''); }} style={{ paddingHorizontal: 11, paddingVertical: 8, borderRadius: 10, backgroundColor: level === value ? colors.green : colors.pale }}><Text style={{ color: level === value ? colors.white : colors.green, fontWeight: '800', fontSize: 12 }}>HSK {value}</Text></Pressable>)}</View><Text style={{ color: colors.muted, fontSize: 12, marginBottom: 12 }}>{`${available.length} HSK ${level} ${t("words remaining")}`}</Text><Button label={`Add 7 HSK ${level} words`} icon="add-circle-outline" disabled={!available.length} onPress={add}/>{message ? <Text style={styles.note}>{message}</Text> : null}</View>;
 }
 
-const styles = StyleSheet.create({ sectionTitle: { color: colors.ink, fontWeight: '800', fontSize: 16 }, textPanel: { padding: 16, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: 16 }, textHelp: { color: colors.muted, marginTop: 4, lineHeight: 20 }, textInput: { minHeight: 92, marginTop: 14, padding: 13, borderWidth: 1, borderColor: '#BDC9C0', borderRadius: 12, backgroundColor: colors.paper, color: colors.ink, fontSize: 17, lineHeight: 25, textAlignVertical: 'top' }, textPreview: { marginVertical: 10 }, warning: { color: colors.coral, fontSize: 12, lineHeight: 18, marginBottom: 12 }, label: { color: colors.muted, fontSize: 11, fontWeight: '800', letterSpacing: 1.4, marginTop: 23, marginBottom: 9 }, row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 7, gap: 10 }, hanzi: { fontSize: 20, fontWeight: '700', width: 70 }, pinyin: { color: colors.green, width: 120 }, russian: { color: colors.muted, flex: 1 }, note: { color: colors.muted, marginVertical: 10, lineHeight: 20 } });
+const styles = StyleSheet.create({ sectionTitle: { color: colors.ink, fontWeight: '800', fontSize: 16 }, textPanel: { padding: 16, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: 16 }, textHelp: { color: colors.muted, marginTop: 4, lineHeight: 20 }, textInput: { minHeight: 92, marginTop: 14, padding: 13, borderWidth: 1, borderColor: '#BDC9C0', borderRadius: 12, backgroundColor: colors.paper, color: colors.ink, fontSize: 17, lineHeight: 25, textAlignVertical: 'top' }, textPreview: { marginVertical: 10, gap: 3 }, warning: { color: colors.coral, fontSize: 12, lineHeight: 18, marginBottom: 12 }, label: { color: colors.muted, fontSize: 11, fontWeight: '800', letterSpacing: 1.4, marginTop: 23, marginBottom: 9 }, row: { minHeight: 39, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 7, paddingVertical: 7, gap: 10, borderRadius: 9 }, rowConfirmed: { backgroundColor: colors.pale }, hanzi: { fontSize: 20, fontWeight: '700', width: 70 }, pinyin: { color: colors.green, width: 120 }, russian: { color: colors.muted, flex: 1 }, note: { color: colors.muted, marginVertical: 10, lineHeight: 20 } });

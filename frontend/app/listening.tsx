@@ -21,6 +21,7 @@ import {
 } from "@/pronunciation";
 import { track } from "@/telemetry";
 import { ExplanationButton } from "@/explanation-button";
+import { ListeningSuccessWave } from "@/motion-feedback";
 
 type ListeningItem =
   | { kind: "word"; id: string; pronunciation: ResolvedPronunciation; word: Word }
@@ -143,7 +144,10 @@ export default function Listening() {
 
       {item.kind === "sentence" && evaluation && (
         <View style={[styles.feedback, evaluation.correct ? styles.correct : styles.incorrect]}>
-          <Text style={styles.feedbackTitle}>{evaluation.correct ? "✓ Correct" : "Not quite yet"}</Text>
+          <View style={styles.feedbackHeading}>
+            <Text style={styles.feedbackTitle}>{evaluation.correct ? "✓ Correct" : "Not quite yet"}</Text>
+            {evaluation.correct && <ListeningSuccessWave />}
+          </View>
           {!evaluation.correct && (
             <View style={styles.translationResult}>
               <Text style={styles.resultLabel}>YOUR TRANSLATION</Text>
@@ -203,6 +207,7 @@ const styles = StyleSheet.create({
   error: { color: colors.red, marginTop: 12 },
   feedback: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: 18, padding: 20, marginTop: 18, gap: 12 },
   correct: { borderColor: colors.green }, incorrect: { borderColor: colors.coral },
+  feedbackHeading: { minHeight: 46, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
   feedbackTitle: { color: colors.ink, fontSize: 20, fontWeight: "800" },
   translationResult: { borderLeftWidth: 3, borderLeftColor: colors.coral, paddingLeft: 12 },
   resultLabel: { color: colors.muted, fontSize: 10, fontWeight: "800", letterSpacing: 1.2 },

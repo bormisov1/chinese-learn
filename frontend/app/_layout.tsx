@@ -11,6 +11,7 @@ import { I18nProvider, translate } from '@/i18n';
 import { useEffect, useRef } from 'react';
 import { MissingApiKeyPromptProvider } from '@/missing-api-key-prompt';
 import { ChatOverlay } from '@/chat-overlay';
+import { DeckLoadingAnimation } from '@/motion-feedback';
 
 function WebShellStyles() {
   useEffect(() => {
@@ -65,7 +66,7 @@ function AppTabs() {
       if (!granted) router.replace('/');
     });
   }, [hasPremiumAccess, pathname, paymentsReady, protectedRoute, ready, requestPremiumAccess]);
-  if (!ready) return <View style={styles.loading}><ActivityIndicator color={colors.green} /></View>;
+  if (!ready) return <View style={styles.loading}><DeckLoadingAnimation /></View>;
   if (!data.languageSelected || !data.onboardingComplete) return <I18nProvider value={data.settings.language}><Welcome /></I18nProvider>;
   if (protectedRoute && (!paymentsReady || !hasPremiumAccess)) return <View style={styles.loading}><ActivityIndicator color={colors.green} /></View>;
   const t = (value: string) => translate(data.settings.language, value);
