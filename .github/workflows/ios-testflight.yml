@@ -10,7 +10,6 @@ permissions:
 
 concurrency:
   group: hanzi-deck-ios-testflight
-  queue: max
   cancel-in-progress: false
 
 jobs:
@@ -109,3 +108,36 @@ jobs:
             -authenticationKeyPath "$ASC_KEY_PATH" \
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+  notify-telegram:
+    name: Notify Telegram
+    if: ${{ always() }}
+    needs: [credentials, ios]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Telegram about build result
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          BUILD_RESULT: ${{ needs.ios.result }}
+          JOB_RESULTS: credentials=${{ needs.credentials.result }}, ios=${{ needs.ios.result }}
+          BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+        run: |
+          set -euo pipefail
+          test -n "$TELEGRAM_BOT_TOKEN"
+          test -n "$TELEGRAM_CHAT_ID"
+          case "$BUILD_RESULT" in
+            success) icon='✅'; summary='сборка и загрузка в TestFlight успешны' ;;
+            cancelled) icon='⚠️'; summary='сборка отменена' ;;
+            skipped) icon='❌'; summary='сборка не запущена из-за предыдущей ошибки' ;;
+            *) icon='❌'; summary='сборка завершилась ошибкой' ;;
+          esac
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          message=$(printf '%s Hanzi Deck: %s\nWorkflow: %s\nВетка: %s\nCommit: %.7s\nJobs: %s\nЗапуск: %s' \
+            "$icon" "$summary" "$GITHUB_WORKFLOW" "$BRANCH_NAME" "$GITHUB_SHA" "$JOB_RESULTS" "$run_url")
+          curl --fail --silent --show-error --retry 2 \
+            --request POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${message}" \
+            --data-urlencode 'disable_web_page_preview=true'
