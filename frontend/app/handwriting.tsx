@@ -133,12 +133,12 @@ export default function Handwriting({ targetHanzi, showTarget = false, backLabel
 
   const visible = active.length ? [...strokes, active] : strokes;
   return <View style={[styles.page, onBack && { paddingTop: insets.top, paddingBottom: insets.bottom + 10 }]}>
+    {correct && <SuccessSparks />}
     <View style={onBack ? styles.outputRow : undefined}>
       {onBack && <Pressable accessibilityRole="button" accessibilityLabel={backLabel} onPress={onBack} style={styles.backAction}>
         <Ionicons name="arrow-back" size={23} color={colors.green} />
       </Pressable>}
       <View style={[styles.outputPanel, onBack ? styles.outputPanelWithBack : styles.outputPanelStandalone]}>
-        {correct && <SuccessSparks />}
         <Text
           accessibilityLabel="Handwriting output"
           selectable

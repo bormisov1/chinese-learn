@@ -585,7 +585,6 @@ export default function Cards() {
         ))}
       </View>
     </ScrollView>
-    {reducedMotion === false && <CorrectGuessOverlay swipeX={swipe.x} />}
     {handwritingOpen && <Modal visible animationType="slide" onRequestClose={closeHandwriting}>
         <Handwriting targetHanzi={word.hanzi} onBack={closeHandwriting} onCorrect={finishHandwriting} />
       </Modal>}
@@ -761,6 +760,9 @@ function StackCard({ word, depth, roundIndex, initialTilt, active, height, setti
               <Animated.Text pointerEvents="none" style={[styles.swipeBadge, styles.wrongBadge, {
                 opacity: swipe.x.interpolate({ inputRange: [-100, -35], outputRange: [1, 0], extrapolate: "clamp" }),
               }]}>{t("WRONG")}</Animated.Text>
+              <Animated.Text pointerEvents="none" style={[styles.swipeBadge, styles.rightBadge, {
+                opacity: swipe.x.interpolate({ inputRange: [35, 100], outputRange: [0, 1], extrapolate: "clamp" }),
+              }]}>{t("RIGHT")}</Animated.Text>
               <View style={styles.cardControls}>
                 <ExplanationButton kind="word" text={pronunciation.hanzi} pinyin={pronunciation.pinyin} gloss={pronunciation.meaning} />
                 <HskBadge hanzi={pronunciation.hanzi} />
@@ -841,15 +843,6 @@ function PoolChangeSection({ title, words, settings, incoming = false, graduated
             </Pressable>)}
       </View>;
     })}
-  </View>;
-}
-
-function CorrectGuessOverlay({ swipeX }: { swipeX: Animated.Value }) {
-  const t = useTranslation();
-  return <View pointerEvents="none" accessibilityElementsHidden style={styles.correctGuessOverlay}>
-    <Animated.Text style={[styles.correctGuessBadge, {
-      opacity: swipeX.interpolate({ inputRange: [35, 100], outputRange: [0, 1], extrapolate: "clamp" }),
-    }]}>{t("RIGHT")}</Animated.Text>
   </View>;
 }
 
@@ -1183,24 +1176,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.1,
   },
   wrongBadge: { right: 20, color: colors.red, borderColor: colors.red },
-  correctGuessOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 50,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  correctGuessBadge: {
-    color: colors.green,
-    borderColor: colors.green,
-    borderWidth: 8,
-    borderRadius: 32,
-    paddingHorizontal: 36,
-    paddingVertical: 20,
-    fontSize: 48,
-    fontWeight: "900",
-    letterSpacing: 4.4,
-    backgroundColor: colors.card,
-  },
+  rightBadge: { left: 20, color: colors.green, borderColor: colors.green },
   cardControls: {
     width: "100%",
     height: 38,

@@ -81,18 +81,20 @@ export function SuccessSparks() {
   }, [progress, reduced]);
   if (reduced) return null;
   return <View pointerEvents="none" style={styles.sparkLayer}>
-    {sparkVectors.map(([x, y], index) => <Animated.View key={index} style={[
-      styles.spark,
-      index % 2 ? styles.sparkCoral : styles.sparkGreen,
-      {
-        opacity: progress.interpolate({ inputRange: [0, 0.12, 0.72, 1], outputRange: [0, 1, 0.8, 0] }),
-        transform: [
-          { translateX: progress.interpolate({ inputRange: [0, 1], outputRange: [0, x] }) },
-          { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [0, y] }) },
-          { scale: progress.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0.2, 1, 0.35] }) },
-        ],
-      },
-    ]} />)}
+    <View style={styles.sparkOrigin}>
+      {sparkVectors.map(([x, y], index) => <Animated.View key={index} style={[
+        styles.spark,
+        index % 2 ? styles.sparkCoral : styles.sparkGreen,
+        {
+          opacity: progress.interpolate({ inputRange: [0, 0.12, 0.72, 1], outputRange: [0, 1, 0.8, 0] }),
+          transform: [
+            { translateX: progress.interpolate({ inputRange: [0, 1], outputRange: [0, x] }) },
+            { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [0, y] }) },
+            { scale: progress.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0.2, 1, 0.35] }) },
+          ],
+        },
+      ]} />)}
+    </View>
   </View>;
 }
 
@@ -261,7 +263,8 @@ const styles = StyleSheet.create({
   deckStack: { width: 120, height: 104, alignItems: 'center', justifyContent: 'center' },
   deckCard: { position: 'absolute', width: 72, height: 86, alignItems: 'center', justifyContent: 'center', borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.card, shadowColor: colors.ink, shadowOpacity: 0.1, shadowRadius: 10, shadowOffset: { width: 0, height: 5 } },
   deckGlyph: { color: colors.green, fontSize: 34, fontWeight: '700' },
-  sparkLayer: { position: 'absolute', left: '50%', top: '50%', width: 1, height: 1, zIndex: 3 },
+  sparkLayer: { ...StyleSheet.absoluteFillObject, zIndex: 20, alignItems: 'center', justifyContent: 'center' },
+  sparkOrigin: { width: 1, height: 1, transform: [{ scale: 3 }] },
   spark: { position: 'absolute', width: 6, height: 6, borderRadius: 3 },
   sparkGreen: { backgroundColor: colors.green },
   sparkCoral: { backgroundColor: colors.coral },
