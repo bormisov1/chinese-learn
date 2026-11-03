@@ -38,3 +38,36 @@ jobs:
             -configuration Release \
             -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO
+
+  notify-telegram:
+    name: Notify Telegram
+    if: ${{ always() }}
+    needs: ios
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Telegram about build result
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          BUILD_RESULT: ${{ needs.ios.result }}
+          JOB_RESULTS: ios=${{ needs.ios.result }}
+          BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+        run: |
+          set -euo pipefail
+          test -n "$TELEGRAM_BOT_TOKEN"
+          test -n "$TELEGRAM_CHAT_ID"
+          case "$BUILD_RESULT" in
+            success) icon='✅'; summary='проверочная iOS-сборка успешна' ;;
+            cancelled) icon='⚠️'; summary='проверочная iOS-сборка отменена' ;;
+            skipped) icon='❌'; summary='проверочная iOS-сборка пропущена' ;;
+            *) icon='❌'; summary='проверочная iOS-сборка завершилась ошибкой' ;;
+          esac
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          message=$(printf '%s Hanzi Deck: %s\nWorkflow: %s\nВетка: %s\nCommit: %.7s\nJobs: %s\nЗапуск: %s' \
+            "$icon" "$summary" "$GITHUB_WORKFLOW" "$BRANCH_NAME" "$GITHUB_SHA" "$JOB_RESULTS" "$run_url")
+          curl --fail --silent --show-error --retry 2 \
+            --request POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${message}" \
+            --data-urlencode 'disable_web_page_preview=true'
