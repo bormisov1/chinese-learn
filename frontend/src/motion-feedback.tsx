@@ -165,7 +165,7 @@ export function RoundCompletionRing({ correct, total, onComplete }: {
   const progress = useRef(new Animated.Value(0)).current;
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
-  const circumference = 2 * Math.PI * 42;
+  const circumference = 2 * Math.PI * 126;
   useEffect(() => {
     if (reduced === null) return;
     progress.setValue(reduced ? 1 : 0);
@@ -187,25 +187,25 @@ export function RoundCompletionRing({ correct, total, onComplete }: {
   return <View accessibilityLabel={`Round complete. ${correct} of ${total} correct.`} style={styles.roundCompletionOverlay}>
     <View style={styles.roundRingLarge}>
       <View style={styles.roundRing}>
-        <Svg width={104} height={104} style={StyleSheet.absoluteFillObject}>
-          <Circle cx={52} cy={52} r={42} fill="none" stroke={colors.line} strokeWidth={7} />
+        <Svg width={312} height={312} style={StyleSheet.absoluteFillObject}>
+          <Circle cx={156} cy={156} r={126} fill="none" stroke={colors.line} strokeWidth={21} />
           <AnimatedCircle
-            cx={52}
-            cy={52}
-            r={42}
+            cx={156}
+            cy={156}
+            r={126}
             fill="none"
             stroke={colors.green}
-            strokeWidth={7}
+            strokeWidth={21}
             strokeLinecap="round"
             strokeDasharray={`${circumference} ${circumference}`}
             strokeDashoffset={progress.interpolate({ inputRange: [0, 1], outputRange: [circumference, 0] }) as any}
             rotation={-90}
-            origin="52, 52"
+            origin="156, 156"
           />
         </Svg>
         <Animated.View style={{ opacity: progress, transform: [{ scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) }] }}>
           <Text style={styles.roundRingCount}>{correct}/{total}</Text>
-          <Ionicons name="checkmark" size={18} color={colors.green} style={styles.roundRingCheck} />
+          <Ionicons name="checkmark" size={54} color={colors.green} style={styles.roundRingCheck} />
         </Animated.View>
       </View>
     </View>
@@ -273,8 +273,8 @@ const styles = StyleSheet.create({
   importMark: { width: 25, height: 25, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.green },
   roundCompletionOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.paper },
   roundRingLarge: { width: 312, height: 312, alignItems: 'center', justifyContent: 'center' },
-  roundRing: { width: 104, height: 104, alignItems: 'center', justifyContent: 'center', transform: [{ scale: 3 }] },
-  roundRingCount: { color: colors.ink, fontSize: 20, lineHeight: 24, fontWeight: '900', textAlign: 'center' },
+  roundRing: { width: 312, height: 312, alignItems: 'center', justifyContent: 'center' },
+  roundRingCount: { color: colors.ink, fontSize: 60, lineHeight: 72, fontWeight: '900', textAlign: 'center' },
   roundRingCheck: { alignSelf: 'center' },
   graduationSeal: { width: 56, height: 56, borderRadius: 28, borderWidth: 2, borderColor: colors.green, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.card },
   graduationHanzi: { color: colors.green, fontSize: 16, lineHeight: 19, fontWeight: '900' },
