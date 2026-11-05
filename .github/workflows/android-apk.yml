@@ -22,7 +22,7 @@ jobs:
     env:
       CI: '1'
       EXPO_PUBLIC_BACKEND_URL: https://zh.x.bormisov.com/api
-      ORG_GRADLE_PROJECT_reactNativeArchitectures: arm64-v8a
+      ORG_GRADLE_PROJECT_reactNativeArchitectures: armeabi-v7a,arm64-v8a,x86,x86_64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -50,43 +50,84 @@ jobs:
           NODE
       - name: Generate the native Android project
         run: npx expo prebuild --platform android --no-install
-      - name: Build standalone release APK
+      - name: Configure separate APKs for each Android ABI
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = 'android/app/build.gradle';
+          const source = fs.readFileSync(path, 'utf8');
+          const marker = '    defaultConfig {';
+          if (!source.includes(marker)) throw new Error(`Missing ${marker} in ${path}`);
+          const splits = `    splits {
+              abi {
+                  reset()
+                  enable true
+                  universalApk false
+                  include "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+              }
+          }
+
+          `;
+          fs.writeFileSync(path, source.replace(marker, splits + marker));
+          NODE
+      - name: Build standalone release APKs
         run: ./gradlew assembleRelease --no-daemon
         working-directory: frontend/android
-      - name: Prepare APK
-        id: apk
+      - name: Archive APKs separately
+        id: archives
         run: |
+          set -euo pipefail
           short_sha="${GITHUB_SHA:0:7}"
-          apk_name="HanziDeck-${short_sha}-arm64.apk"
-          cp android/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/$apk_name"
-          echo "path=$RUNNER_TEMP/$apk_name" >> "$GITHUB_OUTPUT"
-          echo "name=$apk_name" >> "$GITHUB_OUTPUT"
+          apk_dir="android/app/build/outputs/apk/release"
+          staging_dir="$RUNNER_TEMP/hanzi-deck-apks"
+          archive_dir="$RUNNER_TEMP/hanzi-deck-archives"
+          mkdir -p "$staging_dir" "$archive_dir"
+          for abi in armeabi-v7a arm64-v8a x86 x86_64; do
+            source_apk="$apk_dir/app-${abi}-release.apk"
+            apk_name="HanziDeck-${short_sha}-${abi}.apk"
+            test -f "$source_apk"
+            cp "$source_apk" "$staging_dir/$apk_name"
+            (cd "$staging_dir" && zip -9 -j "$archive_dir/${apk_name%.apk}.zip" "$apk_name")
+          done
+          echo "dir=$archive_dir" >> "$GITHUB_OUTPUT"
+          ls -lh "$archive_dir"
       - name: Upload GitHub artifact
         uses: actions/upload-artifact@v4
         with:
           name: hanzi-deck-android-${{ github.sha }}
-          path: ${{ steps.apk.outputs.path }}
+          path: ${{ steps.archives.outputs.dir }}/*.zip
           if-no-files-found: error
           retention-days: 14
-      - name: Send APK to Telegram
+      - name: Send APK archives separately to Telegram
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          APK_PATH: ${{ steps.apk.outputs.path }}
-          APK_NAME: ${{ steps.apk.outputs.name }}
+          ARCHIVE_DIR: ${{ steps.archives.outputs.dir }}
           BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
         run: |
           set -euo pipefail
           test -n "$TELEGRAM_BOT_TOKEN"
           test -n "$TELEGRAM_CHAT_ID"
           run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-          caption=$(printf 'Hanzi Deck Android APK\nFile: %s\nBranch: %s\nCommit: %.7s\nBuild: %s' \
-            "$APK_NAME" "$BRANCH_NAME" "$GITHUB_SHA" "$run_url")
-          curl --fail --silent --show-error --retry 2 \
-            --request POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
-            --form-string "chat_id=${TELEGRAM_CHAT_ID}" \
-            --form "document=@${APK_PATH};type=application/vnd.android.package-archive" \
-            --form-string "caption=${caption}"
+          shopt -s nullglob
+          archives=("$ARCHIVE_DIR"/*.zip)
+          test "${#archives[@]}" -eq 4
+          failed=0
+          for archive in "${archives[@]}"; do
+            archive_name="$(basename "$archive")"
+            caption=$(printf 'Hanzi Deck Android APK archive\nFile: %s\nBranch: %s\nCommit: %.7s\nBuild: %s' \
+              "$archive_name" "$BRANCH_NAME" "$GITHUB_SHA" "$run_url")
+            if ! curl --fail --silent --show-error --retry 2 \
+              --request POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
+              --form-string "chat_id=${TELEGRAM_CHAT_ID}" \
+              --form "document=@${archive};type=application/zip" \
+              --form-string "caption=${caption}" \
+              >/dev/null; then
+              echo "::error::Failed to send $archive_name to Telegram"
+              failed=1
+            fi
+          done
+          exit "$failed"
 
   notify-failure:
     name: Notify Telegram on failure
