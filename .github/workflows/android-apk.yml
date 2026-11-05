@@ -22,7 +22,7 @@ jobs:
     env:
       CI: '1'
       EXPO_PUBLIC_BACKEND_URL: https://zh.x.bormisov.com/api
-      EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY: ${{ secrets.REVENUECAT_ANDROID_TEST_STORE_KEY }}
+      EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY: ${{ secrets.REVENUECAT_ANDROID_PUBLIC_SDK_KEY }}
       EXPO_PUBLIC_REVENUECAT_ENTITLEMENT_ID: premium
       ORG_GRADLE_PROJECT_reactNativeArchitectures: armeabi-v7a,arm64-v8a,x86,x86_64
     steps:
@@ -52,16 +52,14 @@ jobs:
           NODE
       - name: Generate the native Android project
         run: npx expo prebuild --platform android --no-install
-      - name: Configure separate internal APKs for each Android ABI
+      - name: Configure separate release APKs for each Android ABI
         run: |
           node - <<'NODE'
           const fs = require('fs');
           const path = 'android/app/build.gradle';
           const source = fs.readFileSync(path, 'utf8');
           const marker = '    defaultConfig {';
-          const releaseMarker = '        release {';
           if (!source.includes(marker)) throw new Error(`Missing ${marker} in ${path}`);
-          if (!source.includes(releaseMarker)) throw new Error(`Missing ${releaseMarker} in ${path}`);
           const splits = `    splits {
               abi {
                   reset()
@@ -72,33 +70,22 @@ jobs:
           }
 
           `;
-          const internalBuild = `        internal {
-              // Standalone Telegram test build: bundle JS, but stay debuggable so RevenueCat Test Store is allowed.
-              signingConfig signingConfigs.debug
-              debuggable true
-              matchingFallbacks = ['release']
-              minifyEnabled false
-              shrinkResources false
-          }
-          `;
-          fs.writeFileSync(path, source
-            .replace(marker, splits + marker)
-            .replace(releaseMarker, internalBuild + releaseMarker));
+          fs.writeFileSync(path, source.replace(marker, splits + marker));
           NODE
-      - name: Build standalone internal APKs
-        run: ./gradlew assembleInternal --no-daemon
+      - name: Build standalone release APKs
+        run: ./gradlew assembleRelease --no-daemon
         working-directory: frontend/android
       - name: Archive APKs separately
         id: archives
         run: |
           set -euo pipefail
           short_sha="${GITHUB_SHA:0:7}"
-          apk_dir="android/app/build/outputs/apk/internal"
+          apk_dir="android/app/build/outputs/apk/release"
           staging_dir="$RUNNER_TEMP/hanzi-deck-apks"
           archive_dir="$RUNNER_TEMP/hanzi-deck-archives"
           mkdir -p "$staging_dir" "$archive_dir"
           for abi in armeabi-v7a arm64-v8a x86 x86_64; do
-            source_apk="$apk_dir/app-${abi}-internal.apk"
+            source_apk="$apk_dir/app-${abi}-release.apk"
             apk_name="HanziDeck-${short_sha}-${abi}.apk"
             test -f "$source_apk"
             cp "$source_apk" "$staging_dir/$apk_name"
