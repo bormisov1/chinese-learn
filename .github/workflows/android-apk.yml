@@ -1,0 +1,115 @@
+name: Hanzi Deck Android APK
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hanzi-deck-android-apk
+  cancel-in-progress: false
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      CI: '1'
+      EXPO_PUBLIC_BACKEND_URL: https://zh.x.bormisov.com/api
+      ORG_GRADLE_PROJECT_reactNativeArchitectures: arm64-v8a
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install dependencies and check the app
+        run: |
+          npm ci
+          npm test
+          npm run typecheck
+          npm run audit:i18n
+      - name: Set a unique Android version code
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const config = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+          config.expo.android.versionCode = 10000 + Number(process.env.GITHUB_RUN_NUMBER);
+          fs.writeFileSync('app.json', JSON.stringify(config, null, 2) + '\n');
+          NODE
+      - name: Generate the native Android project
+        run: npx expo prebuild --platform android --no-install
+      - name: Build standalone release APK
+        run: ./gradlew assembleRelease --no-daemon
+        working-directory: frontend/android
+      - name: Prepare APK
+        id: apk
+        run: |
+          short_sha="${GITHUB_SHA:0:7}"
+          apk_name="HanziDeck-${short_sha}-arm64.apk"
+          cp android/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/$apk_name"
+          echo "path=$RUNNER_TEMP/$apk_name" >> "$GITHUB_OUTPUT"
+          echo "name=$apk_name" >> "$GITHUB_OUTPUT"
+      - name: Upload GitHub artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hanzi-deck-android-${{ github.sha }}
+          path: ${{ steps.apk.outputs.path }}
+          if-no-files-found: error
+          retention-days: 14
+      - name: Send APK to Telegram
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          APK_PATH: ${{ steps.apk.outputs.path }}
+          APK_NAME: ${{ steps.apk.outputs.name }}
+          BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+        run: |
+          set -euo pipefail
+          test -n "$TELEGRAM_BOT_TOKEN"
+          test -n "$TELEGRAM_CHAT_ID"
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          caption=$(printf 'Hanzi Deck Android APK\nFile: %s\nBranch: %s\nCommit: %.7s\nBuild: %s' \
+            "$APK_NAME" "$BRANCH_NAME" "$GITHUB_SHA" "$run_url")
+          curl --fail --silent --show-error --retry 2 \
+            --request POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
+            --form-string "chat_id=${TELEGRAM_CHAT_ID}" \
+            --form "document=@${APK_PATH};type=application/vnd.android.package-archive" \
+            --form-string "caption=${caption}"
+
+  notify-failure:
+    name: Notify Telegram on failure
+    if: ${{ always() && needs.android.result != 'success' }}
+    needs: android
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send failure details
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          BUILD_RESULT: ${{ needs.android.result }}
+          BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+        run: |
+          set -euo pipefail
+          test -n "$TELEGRAM_BOT_TOKEN"
+          test -n "$TELEGRAM_CHAT_ID"
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          message=$(printf '❌ Hanzi Deck Android APK: %s\nBranch: %s\nCommit: %.7s\nBuild: %s' \
+            "$BUILD_RESULT" "$BRANCH_NAME" "$GITHUB_SHA" "$run_url")
+          curl --fail --silent --show-error --retry 2 \
+            --request POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${message}" \
+            --data-urlencode 'disable_web_page_preview=true'
