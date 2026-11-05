@@ -112,6 +112,8 @@ test("sync merges explanations and preserves a failed card review across stale c
         event(crypto.randomUUID(), "card_reviewed", { mode: "cards", result: "correct", graduated: true }),
         firstReview,
         event(crypto.randomUUID(), "card_graduation_undone", { mode: "cards" }),
+        event(crypto.randomUUID(), "android_startup", { stage: "js_entry", manufacturer: "TECNO", model: "KN3", androidSdk: 35, abis: "arm64-v8a" }),
+        event(crypto.randomUUID(), "android_crash", { source: "java_uncaught", stage: "native_uncaught", exception: "IllegalStateException", message: "startup failed", stack: "example stack" }),
       ] }),
     });
     expect(telemetryResponse.ok).toBe(true);
@@ -119,6 +121,8 @@ test("sync merges explanations and preserves a failed card review across stale c
     expect(metrics).toContain('card_graduations_total{mode="cards"} 2');
     expect(metrics).toContain('card_graduations_undone_total{mode="cards"} 1');
     expect(metrics).toContain('client_events_total{event="card_reviewed",graduated="true",mode="cards",result="correct"} 2');
+    expect(metrics).toContain('client_events_total{event="android_startup",stage="js_entry"} 1');
+    expect(metrics).toContain('client_events_total{event="android_crash",source="java_uncaught",stage="native_uncaught"} 1');
   } finally {
     process.kill();
     await process.exited;

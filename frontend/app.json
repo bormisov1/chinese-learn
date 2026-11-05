@@ -17,6 +17,7 @@
     },
     "android": {
       "package": "com.bormisov.hanzideck",
+      "newArchEnabled": false,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon-foreground.png",
         "backgroundColor": "#F7C07C"

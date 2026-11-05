@@ -15,10 +15,12 @@ import expo.modules.kotlin.modules.ModuleDefinition
 import org.json.JSONArray
 
 class HanziInkModule : Module() {
-  private val identifier = DigitalInkRecognitionModelIdentifier.fromLanguageTag("zh-Hani-CN")
-  private val model = identifier?.let { DigitalInkRecognitionModel.builder(it).build() }
-  private val recognizer = model?.let {
-    DigitalInkRecognition.getClient(DigitalInkRecognizerOptions.builder(it).build())
+  private val model by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+    DigitalInkRecognitionModelIdentifier.fromLanguageTag("zh-Hani-CN")
+      ?.let { DigitalInkRecognitionModel.builder(it).build() }
+  }
+  private val recognizer by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+    model?.let { DigitalInkRecognition.getClient(DigitalInkRecognizerOptions.builder(it).build()) }
   }
 
   override fun definition() = ModuleDefinition {

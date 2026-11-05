@@ -67,7 +67,7 @@ const telemetryNames = new Set([
   "app_opened", "first_app_opened", "login_started", "login_succeeded", "login_failed",
   "language_switched", "language_switch_failed", "words_added", "round_started",
   "round_completed", "card_reviewed", "card_graduation_undone", "sentence_practice_completed", "listening_item_completed",
-  "mix_item_completed", "sync_bootstrap", "study_mode_selected", "card_transition_timed",
+  "mix_item_completed", "sync_bootstrap", "study_mode_selected", "card_transition_timed", "android_startup", "android_crash",
 ]);
 const metricLabel = (value: string) => value.replace(/[^a-zA-Z0-9_.:-]/g, "_").slice(0, 80) || "unknown";
 const inc = (name: string, labels: Record<string, string> = {}, amount = 1) => {
@@ -122,8 +122,12 @@ function recordTelemetry(event: Snapshot) {
   if (!telemetryNames.has(name)) return false;
   const properties = safeJson(event.properties);
   const boundedProperties: Snapshot = {};
-  for (const key of ["platform", "provider", "source", "language", "from", "to", "mode", "kind", "result", "round", "count", "size", "firstTime", "chatId", "fullName", "username", "durationMs", "completionMs", "averageMs", "maxMs", "maxSwipeCallbackMs", "maxRenderReadyMs"]) {
+  for (const key of ["platform", "provider", "source", "stage", "manufacturer", "model", "androidSdk", "abis", "thread", "exception", "language", "from", "to", "mode", "kind", "result", "round", "count", "size", "firstTime", "chatId", "fullName", "username", "durationMs", "completionMs", "averageMs", "maxMs", "maxSwipeCallbackMs", "maxRenderReadyMs"]) {
     if (properties[key] !== undefined) boundedProperties[key] = typeof properties[key] === "number" ? Math.max(0, Math.min(100000, Math.trunc(Number(properties[key])))) : String(properties[key]).slice(0, 40);
+  }
+  if (name === "android_crash") {
+    if (properties.message !== undefined) boundedProperties.message = String(properties.message).slice(0, 500);
+    if (properties.stack !== undefined) boundedProperties.stack = String(properties.stack).slice(0, 4000);
   }
   if (name === "card_reviewed" && typeof properties.graduated === "boolean") boundedProperties.graduated = properties.graduated;
   const eventId = String(event.eventId ?? "");
@@ -132,7 +136,7 @@ function recordTelemetry(event: Snapshot) {
     .run(eventId, name, String(event.occurredAt ?? iso()), iso(), String(event.platform ?? "unknown").slice(0, 20), String(event.appVersion ?? "unknown").slice(0, 40), hash(String(event.installId ?? "unknown")), JSON.stringify(boundedProperties));
   if (insert.changes === 0) return true;
   const labels: Record<string, string> = { event: name };
-  for (const key of ["platform", "provider", "language", "from", "to", "source", "mode", "kind", "result", "firstTime"]) if (boundedProperties[key] !== undefined) labels[key] = String(boundedProperties[key]);
+  for (const key of ["platform", "provider", "language", "from", "to", "source", "stage", "mode", "kind", "result", "firstTime"]) if (boundedProperties[key] !== undefined) labels[key] = String(boundedProperties[key]);
   if (boundedProperties.round !== undefined) labels.round = String(boundedProperties.round);
   if (boundedProperties.graduated !== undefined) labels.graduated = String(boundedProperties.graduated);
   inc("client_events_total", labels);
