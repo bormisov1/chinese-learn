@@ -100,37 +100,45 @@ jobs:
           path: ${{ steps.archives.outputs.dir }}/*.zip
           if-no-files-found: error
           retention-days: 14
-      - name: Send APK archives separately to Telegram
+      - name: Send APK archives and commit to Telegram
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: '-1003965333149'
           ARCHIVE_DIR: ${{ steps.archives.outputs.dir }}
-          BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
         run: |
           set -euo pipefail
           test -n "$TELEGRAM_BOT_TOKEN"
           test -n "$TELEGRAM_CHAT_ID"
-          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           commit_message="$(git log -1 --format=%s "$GITHUB_SHA")"
           shopt -s nullglob
           archives=("$ARCHIVE_DIR"/*.zip)
           test "${#archives[@]}" -eq 4
-          failed=0
-          for archive in "${archives[@]}"; do
-            archive_name="$(basename "$archive")"
-            caption=$(printf 'Hanzi Deck Android APK archive\nFile: %s\nBranch: %s\nCommit: %.7s — %s\nBuild: %s' \
-              "$archive_name" "$BRANCH_NAME" "$GITHUB_SHA" "$commit_message" "$run_url")
-            if ! curl --fail --silent --show-error --retry 2 \
-              --request POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
-              --form-string "chat_id=${TELEGRAM_CHAT_ID}" \
-              --form "document=@${archive};type=application/zip" \
-              --form-string "caption=${caption}" \
-              >/dev/null; then
-              echo "::error::Failed to send $archive_name to Telegram"
-              failed=1
-            fi
+          media='[{"type":"document","media":"attach://file0"},{"type":"document","media":"attach://file1"},{"type":"document","media":"attach://file2"},{"type":"document","media":"attach://file3"}]'
+          group_args=(
+            --fail --silent --show-error --retry 2
+            --request POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMediaGroup"
+            --form-string "chat_id=${TELEGRAM_CHAT_ID}"
+            --form-string "media=${media}"
+          )
+          for index in "${!archives[@]}"; do
+            group_args+=(--form "file${index}=@${archives[$index]};type=application/zip")
           done
-          exit "$failed"
+          if ! curl "${group_args[@]}" >/dev/null; then
+            echo "::warning::Media group failed; sending archives separately"
+            for archive in "${archives[@]}"; do
+              curl --fail --silent --show-error --retry 2 \
+                --request POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
+                --form-string "chat_id=${TELEGRAM_CHAT_ID}" \
+                --form "document=@${archive};type=application/zip" \
+                >/dev/null
+            done
+          fi
+          message=$(printf '%s\n%s' "$commit_message" "$GITHUB_SHA")
+          curl --fail --silent --show-error --retry 2 \
+            --request POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${message}" \
+            >/dev/null
 
   notify-failure:
     name: Notify Telegram on failure
