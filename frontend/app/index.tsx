@@ -89,8 +89,8 @@ export default function Home() {
       <View style={styles.roundChart}>
         <View style={styles.chartHeading}>
           <View>
-            <Text style={styles.chartEyebrow}>{t("ACTIVE POOL")}</Text>
-            <Text style={styles.chartTitle}>{t("Words graduated · last 7 days")}</Text>
+            <Text style={styles.chartEyebrow}>{t("Words graduated")}</Text>
+            <Text style={styles.chartTitle}>{t("Last 7 days")}</Text>
           </View>
           <View style={styles.chartTotal}>
             <Text style={styles.chartTotalNumber}>{sevenDayGraduations}</Text>
@@ -222,6 +222,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "900",
     letterSpacing: 1.4,
+    textTransform: "uppercase",
   },
   chartTitle: { color: colors.ink, fontSize: 20, fontWeight: "800", marginTop: 3 },
   chartTotal: { alignItems: "flex-end" },
